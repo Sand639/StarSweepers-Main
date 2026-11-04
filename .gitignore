@@ -1,0 +1,20 @@
+# リポジトリのルート用の .gitignore（2026/9/30 追加）
+#
+# Unity 用の除外設定は StarSweepers/.gitignore にあるが、あれは StarSweepers/ の中にしか効かない。
+# ルートに別のフォルダができると、Library などのキャッシュがそのままコミットされてしまう。
+# 実際に、名前変更（Mirai01 → StarSweepers）の前の古いフォルダ Mirai01/ が
+# キャッシュごと約4,300ファイルコミットされた（2026/9/29）ので、ここで防ぐ。
+
+# 名前変更前の古いプロジェクトフォルダ。**もう使わない**（名前が変わったあとにやること.md）
+/Mirai01/
+
+# Unity が自動で作るフォルダ（StarSweepers/ 以外の場所にできたときの保険）
+/*/[Ll]ibrary/
+/*/[Tt]emp/
+/*/[Oo]bj/
+/*/[Ll]ogs/
+/*/[Uu]ser[Ss]ettings/
+/*/.vs/
+
+# Unity のテストの結果ファイル（テストを動かすたびに作られる。2026/9/30 追加）
+/StarSweepers/TestResults*.xml

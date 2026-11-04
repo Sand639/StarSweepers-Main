@@ -1,0 +1,367 @@
+using System.Collections.Generic;
+using Unity.Netcode;
+using UnityEngine;
+
+/// <summary>
+/// **乗っている人と物を、決まった向きに運ぶベルトコンベア。** 一定時間ごとに向きが逆になる（2026/10/6・大槻さん）。
+///
+/// ・**置いた場所が、ベルトの上面の真ん中。** ベルトは置いた物の奥行き（青い矢印 Z）の向きに流れる
+/// ・Reverse Interval Seconds（初期値8秒）ごとに**向きが逆になる**。0 なら逆にならない
+/// ・逆になる Warning Seconds（初期値1.5秒）前から、**ベルトの帯が黄色く点滅して予告する**
+/// ・帯（横の筋）が流れて見えるので、どちらへ流れているか一目で分かる
+///
+/// 大きさ（Belt Size）を変えると、当たり判定・見た目・帯の数が自動で合う。
+/// ベルトの端から先に床が無ければ、運ばれた物は落ちる（場外へ捨てるベルトにできる）。
+///
+/// ## オンラインのとき
+///
+/// ベルトそのものは通信しない。**全員で同期された時計（ServerTime）から、いまの向きを各PCが計算する**
+/// （列車 <see cref="SpaceJunkTrain"/>・回転する床 <see cref="SpaceJunkRotatingFloor"/> と同じ）。
+/// ・プレイヤー … **自分のPCが、自分の体を運ぶ**
+/// ・物資 … **物理を動かしているPC（ふつうはホスト）が運ぶ**。ほかのPCでは物理が止まっているので何もしない
+///
+/// ## 物資は転がさずに、ベルトの面と一緒に滑らせる（2026/11/4・大槻さん）
+///
+/// 前は、止まっている床の上で物資だけを押していたので、底が床にこすれて**転がりながら進んでいた**。
+/// そのため、まっすぐのベルトのあとに横向きのベルトを置くと、転がる勢いで前の向きへ進み続けて不自然だった。
+/// ・ベルトに動かない Rigidbody（Is Kinematic）を付け、**物理の計算の上ではベルトの面が流れる速さで動いている**ことにした（見た目の位置は変わらない）。
+///   底がベルトと同じ速さになるので、こすれて転がらない
+/// ・物資の速さは、**ベルトの面に沿った向きぜんぶ**（流れる向きと、その横）をベルトの速さに合わせる。横向きのベルトに乗り移ると、前の向きの勢いが消えて横へ流れる
+/// ・回る勢い（角速度）には手を出さない。**重心が偏って傾く・倒れる・ぶつかって回る動きは、そのまま残る**
+/// </summary>
+[RequireComponent(typeof(BoxCollider))]
+public class SpaceJunkConveyor : MonoBehaviour
+{
+    [Header("流れ方")]
+    [Tooltip("流れる速さ（1秒あたりのメートル）。マイナスにすると最初の向きが逆になる")]
+    [SerializeField] private float speed = 4f;
+
+    [Tooltip("何秒ごとに向きが逆になるか。0 なら逆にならない")]
+    [SerializeField] private float reverseIntervalSeconds = 8f;
+
+    [Tooltip("向きが逆になる何秒前から予告する（帯が黄色く点滅する）か")]
+    [SerializeField] private float warningSeconds = 1.5f;
+
+    [Tooltip("逆になるタイミングをずらす秒数（ベルトを何本か置いて、ばらばらに逆にしたいとき）")]
+    [SerializeField] private float timeOffsetSeconds = 0f;
+
+    [Header("運ぶ強さ")]
+    [Tooltip("物資をベルトの速さに合わせる強さ。大きいほどすぐベルトと同じ速さになる")]
+    [SerializeField] private float itemGrip = 6f;
+
+    [Tooltip("ベルトの上面から、どの高さまでの人と物を「乗っている」とみなすか（m）")]
+    [SerializeField] private float carryHeight = 1.2f;
+
+    [Header("大きさと見た目")]
+    [Tooltip("ベルトの大きさ（X＝幅、Y＝厚み、Z＝長さ）")]
+    [SerializeField] private Vector3 beltSize = new Vector3(4f, 0.5f, 20f);
+
+    [Tooltip("ベルトの土台の見た目（子の Base）")]
+    [SerializeField] private Transform baseVisual;
+
+    [Tooltip("帯（横の筋）の間隔（m）")]
+    [SerializeField] private float slatSpacing = 1.5f;
+
+    [Tooltip("帯の色")]
+    [SerializeField] private Color slatColor = new Color(0.55f, 0.6f, 0.68f);
+
+    [Tooltip("向きが逆になる前の、予告の色")]
+    [SerializeField] private Color warningColor = new Color(1f, 0.82f, 0.1f);
+
+    /// <summary>いま流れている向き（ワールド。長さ1）。止まっていれば 0。</summary>
+    public Vector3 FlowDirection { get; private set; }
+
+    private BoxCollider box;
+
+    /// <summary>ベルトの面を「動いている床」として物理に見せるための、動かない Rigidbody。Awake で付ける。</summary>
+    private Rigidbody surfaceBody;
+
+    /// <summary>見た目の帯（横の筋）。Awake で Belt Size に合わせた数だけ作る。</summary>
+    private readonly List<Transform> slats = new List<Transform>();
+
+    /// <summary>帯の色を変えるための、帯だけのマテリアル（土台のものを複製。予告の点滅で色を変える）。</summary>
+    private Material slatMaterial;
+
+    /// <summary>帯がどれだけ流れたか（m）。帯の間隔で折り返す。</summary>
+    private float slatScroll;
+
+    /// <summary>ベルトの上の当たり判定の入れ物（一度に 64 個まで。足りなければ増やす）。毎回作らないため。</summary>
+    private readonly Collider[] overlapBuffer = new Collider[64];
+
+    /// <summary>この物理の更新で、もう押した物（当たり判定が複数ある物を二重に押さないため）。</summary>
+    private readonly HashSet<Rigidbody> pushedThisStep = new HashSet<Rigidbody>();
+
+    private void Awake()
+    {
+        box = GetComponent<BoxCollider>();
+        ApplySize();
+        BuildSlats();
+
+        // プレハブやシーンを書き換えずに済むよう、再生したときに付ける
+        surfaceBody = GetComponent<Rigidbody>();
+        if (surfaceBody == null)
+        {
+            surfaceBody = gameObject.AddComponent<Rigidbody>();
+        }
+        surfaceBody.isKinematic = true;
+        surfaceBody.useGravity = false;
+        surfaceBody.interpolation = RigidbodyInterpolation.None;
+    }
+
+    private void OnValidate()
+    {
+        ApplySize();
+    }
+
+    /// <summary>当たり判定と土台の見た目を、Belt Size に合わせる。上面が置いた場所の高さになる。</summary>
+    private void ApplySize()
+    {
+        if (box == null)
+        {
+            box = GetComponent<BoxCollider>();
+        }
+
+        if (box != null)
+        {
+            box.size = beltSize;
+            box.center = new Vector3(0f, -beltSize.y * 0.5f, 0f);
+        }
+
+        if (baseVisual != null)
+        {
+            baseVisual.localScale = beltSize;
+            baseVisual.localPosition = new Vector3(0f, -beltSize.y * 0.5f, 0f);
+        }
+    }
+
+    // ------------------------------------------------------------
+    // 向き
+    // ------------------------------------------------------------
+
+    private void Update()
+    {
+        float sign = CurrentSign(out bool warning);
+        FlowDirection = transform.forward * sign;
+
+        UpdateSlats(sign, warning);
+        CarryPlayers();
+    }
+
+    /// <summary>
+    /// いまの向き（+1＝奥へ、-1＝手前へ）。<paramref name="warning"/> は、もうすぐ逆になるか。
+    /// </summary>
+    private float CurrentSign(out bool warning)
+    {
+        warning = false;
+        float sign = speed >= 0f ? 1f : -1f;
+
+        if (reverseIntervalSeconds <= 0f)
+        {
+            return sign;
+        }
+
+        double clock = SharedClock() - timeOffsetSeconds;
+        double interval = reverseIntervalSeconds;
+        long index = (long)System.Math.Floor(clock / interval);
+        double untilFlip = (index + 1) * interval - clock;
+
+        warning = untilFlip <= warningSeconds;
+        return (index & 1L) == 0L ? sign : -sign;
+    }
+
+    /// <summary>
+    /// 全員で同じ時計。通信中は ServerTime、1人用のときはシーンが始まってからの秒数。
+    /// </summary>
+    private static double SharedClock()
+    {
+        NetworkManager network = NetworkManager.Singleton;
+        if (network != null && network.IsListening)
+        {
+            return network.ServerTime.Time;
+        }
+        return Time.timeSinceLevelLoad;
+    }
+
+    // ------------------------------------------------------------
+    // 運ぶ
+    // ------------------------------------------------------------
+
+    /// <summary>ベルトの上に立っている（自分のPCで動かしている）プレイヤーを運ぶ。</summary>
+    private void CarryPlayers()
+    {
+        int count = OverlapAbove();
+        float distance = Mathf.Abs(speed) * Time.deltaTime;
+
+        for (int i = 0; i < count; i++)
+        {
+            FishingPlayerController player = overlapBuffer[i].GetComponentInParent<FishingPlayerController>();
+            if (player == null || !player.isActiveAndEnabled)
+            {
+                continue;
+            }
+
+            CharacterController controller = player.GetComponent<CharacterController>();
+            if (controller == null || !controller.enabled || controller != overlapBuffer[i])
+            {
+                continue;
+            }
+
+            controller.Move(FlowDirection * distance);
+        }
+    }
+
+    private void FixedUpdate()
+    {
+        // 物資は物理で運ぶ。物理を動かしているPCでだけ効く（ほかのPCでは Is Kinematic になっている）
+        int count = OverlapAbove();
+        pushedThisStep.Clear();
+
+        Vector3 beltVelocity = FlowDirection * Mathf.Abs(speed);
+        float grip = Mathf.Clamp01(itemGrip * Time.fixedDeltaTime);
+
+        for (int i = 0; i < count; i++)
+        {
+            Rigidbody body = overlapBuffer[i].attachedRigidbody;
+            if (body == null || body.isKinematic || !pushedThisStep.Add(body))
+            {
+                continue;
+            }
+
+            // 引っ掛けられている物は、フックの動きに任せる
+            HookableObject item = body.GetComponent<HookableObject>();
+            if (item != null && (item.IsHooked || item.IsVanished))
+            {
+                continue;
+            }
+
+            // ベルトの面に沿った向きだけ、ベルトとの速さの差を縮める（上下の動き＝落ちる・跳ねるは物理に任せる）。
+            // 重心に力をかけるので、回る勢いは変わらない
+            Vector3 slip = Vector3.ProjectOnPlane(body.linearVelocity - beltVelocity, transform.up);
+            body.AddForce(-slip * grip, ForceMode.VelocityChange);
+        }
+
+        MoveSurface();
+    }
+
+    /// <summary>
+    /// ベルトの面を、流れる向きに動いていることにする。一度うしろへ戻してから元の場所へ「動かす」ので、
+    /// 位置は変わらないが、物理の計算ではベルトが流れる速さで動いていることになる（乗った物は摩擦で一緒に滑る）。
+    /// </summary>
+    private void MoveSurface()
+    {
+        Vector3 position = surfaceBody.position;
+        surfaceBody.position = position - FlowDirection * (Mathf.Abs(speed) * Time.fixedDeltaTime);
+        surfaceBody.MovePosition(position);
+    }
+
+    /// <summary>
+    /// 見た目どおりの幅と長さ（m）。Belt Size に、Transform の Scale（親の分も含む）を掛けたもの。
+    /// ロビーのように Scale で縮めて置いたベルトでも、運ぶ範囲と矢印が見た目と合うようにする（2026/11/4）。
+    /// </summary>
+    private Vector2 WorldWidthAndLength()
+    {
+        Vector3 scale = transform.lossyScale;
+        return new Vector2(beltSize.x * Mathf.Abs(scale.x), beltSize.z * Mathf.Abs(scale.z));
+    }
+
+    /// <summary>ベルトの上の箱に入っている当たり判定を集める。数を返す。</summary>
+    private int OverlapAbove()
+    {
+        // 高さ（Carry Height）は Scale に関係なくメートルのまま
+        Vector2 size = WorldWidthAndLength();
+        Vector3 halfExtents = new Vector3(size.x * 0.5f, carryHeight * 0.5f, size.y * 0.5f);
+        Vector3 center = transform.position + transform.up * (carryHeight * 0.5f);
+
+        return Physics.OverlapBoxNonAlloc(center, halfExtents, overlapBuffer, transform.rotation,
+            ~0, QueryTriggerInteraction.Ignore);
+    }
+
+    // ------------------------------------------------------------
+    // 見た目（流れる帯）
+    // ------------------------------------------------------------
+
+    /// <summary>帯（横の筋）を、ベルトの長さに合わせて並べる。当たり判定は付けない。</summary>
+    private void BuildSlats()
+    {
+        // 間隔は最低 30cm（帯が多くなりすぎないように）
+        float spacing = Mathf.Max(0.3f, slatSpacing);
+        int count = Mathf.Max(1, Mathf.FloorToInt(beltSize.z / spacing));
+
+        // 土台のマテリアルを複製して帯に使う（色を変えても土台や他のベルトに影響しないように）
+        Renderer baseRenderer = baseVisual != null ? baseVisual.GetComponent<Renderer>() : null;
+        slatMaterial = baseRenderer != null ? new Material(baseRenderer.sharedMaterial) : null;
+
+        for (int i = 0; i < count; i++)
+        {
+            GameObject slat = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            slat.name = $"Slat_{i + 1}";
+            Destroy(slat.GetComponent<Collider>());
+            slat.transform.SetParent(transform, false);
+            // 幅はベルトの 92%（両端に土台を少し見せる）、厚みは 4cm、奥行きは間隔の 1/4
+            slat.transform.localScale = new Vector3(beltSize.x * 0.92f, 0.04f, spacing * 0.25f);
+
+            if (slatMaterial != null)
+            {
+                slat.GetComponent<Renderer>().sharedMaterial = slatMaterial;
+            }
+
+            slats.Add(slat.transform);
+        }
+    }
+
+    /// <summary>帯を流れる向きへ動かし、予告中なら色を点滅させる。毎フレーム呼ぶ。</summary>
+    private void UpdateSlats(float sign, bool warning)
+    {
+        if (slats.Count == 0)
+        {
+            return;
+        }
+
+        float spacing = beltSize.z / slats.Count;
+        slatScroll = Mathf.Repeat(slatScroll + sign * Mathf.Abs(speed) * Time.deltaTime, spacing);
+
+        // 帯は等間隔に並び、流れる向きへ少しずつずれる。端まで行ったら反対の端へ回り込む
+        for (int i = 0; i < slats.Count; i++)
+        {
+            float z = -beltSize.z * 0.5f + Mathf.Repeat(i * spacing + slatScroll + spacing * 0.5f, beltSize.z);
+            // 上面から 2cm 浮かせて、土台と重なってちらつかないようにする
+            slats[i].localPosition = new Vector3(0f, 0.02f, z);
+        }
+
+        if (slatMaterial != null)
+        {
+            // 予告中は 1秒に4回点滅する
+            bool blinkOn = warning && Mathf.Repeat(Time.time * 4f, 1f) < 0.5f;
+            Color color = blinkOn ? warningColor : slatColor;
+            slatMaterial.color = color;
+            if (slatMaterial.HasProperty("_BaseColor"))
+            {
+                slatMaterial.SetColor("_BaseColor", color);
+            }
+        }
+    }
+
+    private void OnDestroy()
+    {
+        if (slatMaterial != null)
+        {
+            Destroy(slatMaterial);
+        }
+    }
+
+    private void OnDrawGizmos()
+    {
+        // 最初に流れる向きを、ベルトの上に矢印（線）で出す
+        Gizmos.color = new Color(1f, 0.85f, 0.2f, 0.9f);
+        Vector2 size = WorldWidthAndLength();
+        Vector3 forward = transform.forward * (speed >= 0f ? 1f : -1f);
+        Vector3 from = transform.position + Vector3.up * 0.1f - forward * size.y * 0.4f;
+        Vector3 to = transform.position + Vector3.up * 0.1f + forward * size.y * 0.4f;
+        Gizmos.DrawLine(from, to);
+        // 矢じりは最大 1.5m。短いベルトでは長さに合わせて小さくする
+        float head = Mathf.Min(1.5f, size.y * 0.3f);
+        Vector3 side = Vector3.Cross(Vector3.up, forward) * (size.x * 0.3f);
+        Gizmos.DrawLine(to, to - forward * head + side);
+        Gizmos.DrawLine(to, to - forward * head - side);
+    }
+}

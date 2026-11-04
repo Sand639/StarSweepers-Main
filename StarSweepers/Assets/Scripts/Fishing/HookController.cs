@@ -1,0 +1,953 @@
+using UnityEngine;
+using UnityEngine.InputSystem;
+
+/// <summary>
+/// **フック操作の中枢。** チャージ→発射→帰還→物資への接続、の流れを管理する。
+///
+/// 左クリックの流れ（仕様2）：
+///   1. 押す           → 構える（チャージ開始）
+///   2. 押している長さ  → チャージ量が 0〜1 まで増える
+///   3. 離す           → マウス方向へフックを発射。飛距離はチャージ量で決まる
+///   4. 物資に当たる    → フックした状態にして、引き寄せ・投げを ThrowController に渡す
+///   5. 何も当たらない  → 最大距離まで伸びて手元へ戻る
+///
+/// **宇宙ごみ式（ThrowController の Style が TwoButtons）では、左クリック（LT）でも右クリック（RT）でも撃てる。**
+/// どちらで撃ったかを ThrowController に伝え、引っ掛けたあとの流れが変わる（左＝引っ張る／右＝投げる）。
+/// 設定の「投げ方」が **ZRワンボタン** のときは、右クリック（RT・ZR）だけで撃つ（2026/10/15）。
+///
+/// フックの実際の飛び方の計算はここに置き、HookProjectile は当たり判定だけにしている。
+/// 引き寄せ・投げは ThrowController、糸の見た目は HookLine に分けてある。
+///
+/// ## 段階（<see cref="HookPhase"/>）の移り方
+///
+///   Idle →（ボタンを押す）→ Charging →（離す）→ Flying
+///   Flying →（物資・大型物件に当たる）→ Attached →（ThrowController が投げ終わる）→ Returning → Idle
+///   Flying →（何にも当たらず届く距離まで伸びた）→ Returning → Idle
+///
+///   毎フレームの係は Tick〜（<see cref="TickIdle"/> など）。段階ごとに1つずつある。
+///
+/// ## 当たったときの分かれ道（<see cref="OnHookableTouched"/>）
+///
+/// | 当たった物資 | どうなるか |
+/// | --- | --- |
+/// | だれもつかんでいない | 引っ掛ける → <see cref="ThrowController.Begin"/>（オンラインでは先に引っ掛けた形にして、ホストに確かめてもらう。爆発物なら導火線に火がつく） |
+/// | ほかの人がつかんでいる（宇宙ごみ式） | くっついて待つ（横取りの待ち）→ <see cref="ThrowController.BeginContest"/> |
+/// | ほかの人がつかんでいる（釣り式） | 何もせず素通り |
+/// | 重い物に、右（投げる）で撃ったフック | 引っ掛けずに戻る（<see cref="ThrowController.RefusesHook"/>） |
+///
+/// 大型物件（<see cref="IHookPullable"/>）に当たったときは <see cref="OnPullableTouched"/> → <see cref="ThrowController.BeginPullable"/>。
+/// </summary>
+
+public class HookController : MonoBehaviour
+{
+    /// <summary>フックがいまどの段階にいるか。</summary>
+    public enum HookPhase
+    {
+        Idle,       // 手元で待機
+        Charging,   // 構えてチャージ中
+        Flying,     // 発射して前へ伸びている
+        Returning,  // 手元へ戻っている
+        Attached    // 物資に刺さっている（引き寄せ・投げ中）
+    }
+
+    [Header("参照")]
+    [Tooltip("狙う方向の計算元。プレイヤーに付いている PlayerAimController")]
+    [SerializeField] private PlayerAimController aim;
+
+    [Tooltip("フックが出てくる手元の位置。プレイヤーの子に空オブジェクトを作って入れる")]
+    [SerializeField] private Transform handPoint;
+
+    [Tooltip("シーンに置いたフック先端（HookProjectile）")]
+    [SerializeField] private HookProjectile hook;
+
+    [Tooltip("糸の見た目（HookLine）")]
+    [SerializeField] private HookLine line;
+
+    [Tooltip("引き寄せ・投げを担当する ThrowController")]
+    [SerializeField] private ThrowController throwController;
+
+    [Tooltip("チャージ量やタイミングを表示する UI（無くても動く）")]
+    [SerializeField] private HookChargeUI ui;
+
+    [Tooltip("スタン（動けない状態）の管理。スタン中はフックを使えなくなる")]
+    [SerializeField] private PlayerStun stun;
+
+    [Tooltip("オンライン用の部品。**1人用のシーンでは空のままでよい**（入っていればオンラインとして動く）")]
+    [SerializeField] private FishingNetPlayer netPlayer;
+
+    [Tooltip("狙いの切り替え（近く／遠く／手動）。空なら同じ体から探し、無ければ自動で付ける")]
+    [SerializeField] private HookAimAssist aimAssist;
+
+    [Tooltip("Assets/InputSystem_Actions を入れる")]
+    [SerializeField] private InputActionAsset inputActions;
+
+    [Header("チャージ")]
+    [Tooltip("押しっぱなしでチャージが最大になるまでの秒数")]
+    [SerializeField] private float chargeTime = 1.0f;
+
+    [Header("飛距離（メートル）")]
+    [Tooltip("チャージ 0 のときの飛距離")]
+    [SerializeField] private float minRange = 4f;
+
+    [Tooltip("チャージ最大のときの飛距離（最大値）")]
+    [SerializeField] private float maxRange = 16f;
+
+    [Header("フックの速さ（メートル毎秒）")]
+    [Tooltip("発射して前へ伸びる速さ")]
+    [SerializeField] private float flySpeed = 30f;
+
+    [Tooltip("手元へ戻る速さ")]
+    [SerializeField] private float returnSpeed = 45f;
+
+    [Tooltip("この距離まで戻ったら「回収完了」とみなす")]
+    [SerializeField] private float catchDistance = 0.5f;
+
+    [Header("当たり判定")]
+    [Tooltip("飛んでいるフックの先の、当たりを見る球の半径。大きいほど引っ掛けやすい")]
+    [SerializeField] private float hookCastRadius = 0.35f;
+
+    [Tooltip("フックが引っ掛かる相手のレイヤー。物資が乗っているレイヤーだけに絞ってもよい")]
+    [SerializeField] private LayerMask hookableMask = ~0;
+
+    private InputActionMap playerMap;
+    private InputAction attackAction;
+    private PlayerInputSource input;
+
+    private HookPhase phase = HookPhase.Idle;
+
+    /// <summary>チャージ量（0〜1）。押している間に増え、飛距離を決める。</summary>
+    private float charge;
+
+    /// <summary>今回の発射で、フックがここまでに進んだ距離（m）。</summary>
+    private float traveled;
+
+    /// <summary>今回の発射で、フックが伸びる距離（m）。ここまで進んでも何にも当たらなければ戻り始める。</summary>
+    private float targetDistance;
+
+    private Vector3 launchDirection = Vector3.forward;
+
+    /// <summary>フックの先のいまの位置（ワールド座標）。毎フレームの最後に、見た目（HookProjectile・糸）をここへ合わせる。</summary>
+    private Vector3 hookPosition;
+
+    /// <summary>いま引っ掛けている物資（自分の物）。無ければ null。</summary>
+    private HookableObject attached;
+
+    /// <summary>いま引っ掛けている大型物件。無ければ null。物資と同時には入らない。</summary>
+    private IHookPullable attachedPullable;
+
+    /// <summary>
+    /// **ほかの人が持っている物資に、くっついて待っているときの相手**（横取りの待ち。宇宙ごみ式。2026/10/13）。
+    /// 自分の物ではないので <see cref="attached"/> には入れない（外すときに、持ち主の引っ掛けまで外さないように）。
+    /// </summary>
+    private HookableObject contestItem;
+
+    /// <summary>オートエイムで発射したときの相手。飛んでいる間だけ入っていて、フックはこれを追いかける。</summary>
+    private HookableObject autoTarget;
+
+    /// <summary>宇宙ごみ式で、いま右（投げる）のボタンでチャージしているか。false なら左（引っ張る）。</summary>
+    private bool chargingWithThrow;
+
+    /// <summary>
+    /// **宇宙ごみ式（<see cref="ThrowStyle.TwoButtons"/>）で撃つか。**
+    /// そのときは Attack ではなく、左クリック（LT）と右クリック（RT）を直接見る。釣り式では今までどおり Attack。
+    /// </summary>
+    private bool UsesTwoButtons => throwController != null && throwController.Style == ThrowStyle.TwoButtons;
+
+    /// <summary>オートエイムで飛ばすとき、届く範囲（Max Range）にどれだけ上乗せして伸ばすか（メートル）。</summary>
+    private const float AutoReachMargin = 1.5f;
+
+    // ---- 他のスクリプトが読む用 ----
+
+    /// <summary>チャージ最大のときの飛距離。オートエイムはこの範囲の中から相手を選ぶ。</summary>
+    public float MaxRange => maxRange;
+
+    /// <summary>オートエイムで発射した相手（飛んでいる間だけ）。手動で撃ったときは null。</summary>
+    public HookableObject AutoTarget => autoTarget;
+
+    /// <summary>フックが出てくる手元の位置。</summary>
+    public Transform HandPoint => handPoint;
+
+    /// <summary>狙う方向の計算元。</summary>
+    public PlayerAimController Aim => aim;
+
+    /// <summary>最後にフックを発射した向き（水平、長さ1）。フックが飛ぶ向き。</summary>
+    public Vector3 LaunchDirection => launchDirection;
+
+    /// <summary>
+    /// **いまプレイヤーが向いている向き**（水平、長さ1）。
+    /// 投げる方向はこちらを基準にする（引っ張っている間に振り向いたら行き先も変わる）。
+    /// </summary>
+    public Vector3 CurrentAimDirection
+    {
+        get
+        {
+            if (aim != null && aim.HasAim)
+            {
+                Vector3 flat = aim.AimDirection;
+                flat.y = 0f;
+                if (flat.sqrMagnitude > 0.0001f)
+                {
+                    return flat.normalized;
+                }
+            }
+
+            Vector3 forward = transform.forward;
+            forward.y = 0f;
+            return forward.sqrMagnitude > 0.0001f ? forward.normalized : Vector3.forward;
+        }
+    }
+
+    /// <summary>プレイヤー本体。引き寄せの行き先の基準になる。</summary>
+    public Transform PlayerRoot => transform;
+
+    /// <summary>チャージ・タイミング表示の UI。</summary>
+    public HookChargeUI UI => ui;
+
+    /// <summary>
+    /// 表示を後から結びつける。
+    /// **オンラインではプレイヤーがプレハブから生まれるため、
+    /// シーンに置いた UI をあらかじめ入れておけない。**
+    /// 自分のプレイヤーが生まれた時点で <see cref="FishingNetPlayer"/> から渡される。
+    /// </summary>
+    public void SetUI(HookChargeUI newUi)
+    {
+        ui = newUi;
+
+        if (ui != null)
+        {
+            ui.ShowCharge(false);
+            ui.ShowTiming(false);
+        }
+    }
+
+    /// <summary>プレイヤーがスタン中か。<see cref="ThrowController"/> も参照する。</summary>
+    public bool IsStunned => stun != null && stun.IsStunned;
+
+    /// <summary>いま引っ掛けている物資（無ければ null）。答え合わせ（<c>SpaceJunkLocalStateCheck</c>）が使う。</summary>
+    public HookableObject AttachedItem => attached;
+
+    /// <summary>
+    /// **いま何かをつかんでいるか**（物資か、大型の引っ張れる物）。糸の色を濃くするのに使う。
+    /// ほかの人がつかんでいる物資にくっついて待っている間（横取りの待ち）は、まだつかんでいない扱い。
+    /// </summary>
+    public bool IsGrabbing => phase == HookPhase.Attached && (attached != null || attachedPullable != null);
+
+    /// <summary>
+    /// **オンラインとして動いているか。**
+    /// 通信部品が入っていて、実際に同期が始まっているときだけ true。
+    /// 1人用のシーンでは常に false になり、これまでどおり手元で完結する。
+    /// </summary>
+    public bool IsOnline => netPlayer != null && netPlayer.IsSpawned;
+
+    /// <summary>自分の参加番号。オンラインでないときは0。</summary>
+    public int LocalPlayerIndex => netPlayer != null ? Mathf.Max(0, netPlayer.PlayerIndex) : 0;
+
+    /// <summary>いまの段階。UI などが参照する。</summary>
+    public HookPhase Phase => phase;
+
+    /// <summary>最後にフックを放したときのチャージ量（0〜1）。アンカーなどが使う。</summary>
+    public float Charge => charge;
+
+    /// <summary>**いま離したら、フックがどこまで飛ぶか**（m）。溜めている間に地面へ長さを見せる <see cref="HookChargeStrip"/> が使う。</summary>
+    public float ReachAtCurrentCharge => Mathf.Lerp(minRange, maxRange, charge);
+
+    /// <summary>狙いの切り替え（近く／遠く／手動）。</summary>
+    public HookAimAssist AimAssist => aimAssist;
+
+    private void Awake()
+    {
+        if (aim == null)
+        {
+            aim = GetComponentInParent<PlayerAimController>();
+        }
+
+        if (stun == null)
+        {
+            stun = GetComponent<PlayerStun>();
+        }
+
+        if (netPlayer == null)
+        {
+            netPlayer = GetComponent<FishingNetPlayer>();
+        }
+
+        // 操作の読み口（単体操作か、1台のPCで複数人の席か）
+        input = PlayerInputSource.Get(this);
+
+        // 狙いの切り替えは、付いていなければここで付ける。
+        // **既存のシーンやプレハブを作り直さなくても使える**ようにするため
+        if (aimAssist == null)
+        {
+            aimAssist = GetComponent<HookAimAssist>();
+        }
+        if (aimAssist == null)
+        {
+            aimAssist = gameObject.AddComponent<HookAimAssist>();
+        }
+
+        // 溜めている間の、地面の長方形（レティクル タイプB）。狙いの切り替えと同じく、無ければここで付ける
+        if (GetComponent<HookChargeStrip>() == null)
+        {
+            gameObject.AddComponent<HookChargeStrip>();
+        }
+
+        // 糸が液体のときは、フックの先の球を隠す（流れの先端がフックの代わり。2026/10/20）
+        if (line != null && hook != null)
+        {
+            line.HideTip(hook.gameObject);
+        }
+
+        if (inputActions == null)
+        {
+            Debug.LogError($"{name}: 入力の設定（InputSystem_Actions）が入っていません。", this);
+            enabled = false;
+            return;
+        }
+
+        // **入力の設定は、この体専用の複製を使う**（理由は FishingPlayerController.Awake と同じ。
+        // 共有したままだと、他の人のぶんを止めたときに自分の入力まで止まる）
+        inputActions = Instantiate(inputActions);
+
+        playerMap = inputActions.FindActionMap("Player", true);
+        attackAction = playerMap.FindAction("Attack", true);
+    }
+
+    private void OnDestroy()
+    {
+        if (inputActions != null)
+        {
+            Destroy(inputActions);
+        }
+    }
+
+    private void OnEnable()
+    {
+        playerMap?.Enable();
+
+        if (hook != null)
+        {
+            hook.HookableTouched += OnHookableTouched;
+            hook.PullableTouched += OnPullableTouched;
+        }
+    }
+
+    private void OnDisable()
+    {
+        ResetHook();
+        playerMap?.Disable();
+
+        if (hook != null)
+        {
+            hook.HookableTouched -= OnHookableTouched;
+            hook.PullableTouched -= OnPullableTouched;
+        }
+    }
+
+    private void Start()
+    {
+        hookPosition = handPoint != null ? handPoint.position : transform.position;
+        UpdateHookVisual();
+
+        if (ui != null)
+        {
+            ui.ShowCharge(false);
+            ui.ShowTiming(false);
+        }
+    }
+
+    private void Update()
+    {
+        if (GamePause.BlocksInput)
+        {
+            return;
+        }
+
+        switch (phase)
+        {
+            case HookPhase.Idle:
+                TickIdle();
+                break;
+            case HookPhase.Charging:
+                TickCharging();
+                break;
+            case HookPhase.Flying:
+                TickFlying();
+                break;
+            case HookPhase.Returning:
+                TickReturning();
+                break;
+            case HookPhase.Attached:
+                TickAttached();
+                break;
+        }
+
+        // オートエイムの相手を覚えておくのは、飛んでいる間だけ
+        if (phase != HookPhase.Flying)
+        {
+            autoTarget = null;
+        }
+
+        UpdateHookVisual();
+    }
+
+    /// <summary>手元で待っている間。撃つボタンが押されたら、チャージを始める。</summary>
+    private void TickIdle()
+    {
+        // フックは手元にくっついている
+        hookPosition = handPoint.position;
+
+        // スタン中は釣りができない。試合が終わったあとも操作を受け付けない
+        if (IsStunned || !FishingMatch.PlayAllowed)
+        {
+            return;
+        }
+
+        bool pressed;
+
+        if (UsesTwoButtons)
+        {
+            // **宇宙ごみ式：左（LT）でも右（RT）でも撃てる。** どちらで撃ったかで、引っ掛けたあとの流れが変わる
+            // （左＝くっついた場所で止まって引っ張る／右＝頭上で止まって投げる）
+            // **投げ方が「ZRワンボタン」なら、右（RT・ZR）だけで撃つ**（2026/10/15）。
+            // 引っ掛けたあとの流れは ThrowController が決める（前へ投げる動き＋途中のスキルチェックで後ろへ引っ張る）
+            // 左右を同時に押したときは左を優先する（right は left が false のときだけ見る）
+            bool left = !throwController.UsesOneButton && throwController.PullPressed();
+            bool right = !left && throwController.ThrowPressed();
+            pressed = left || right;
+            chargingWithThrow = right;
+        }
+        else
+        {
+            pressed = input.AttackPressed(attackAction);
+        }
+
+        if (pressed)
+        {
+            phase = HookPhase.Charging;
+            charge = 0f;
+            if (ui != null)
+            {
+                ui.ShowCharge(true);
+                ui.SetCharge(0f);
+            }
+        }
+    }
+
+    /// <summary>
+    /// 構えてチャージしている間。**押し始めたのと同じボタン**が離されたら撃つ
+    /// （宇宙ごみ式で左で押し始めたなら左、右なら右。もう片方を離しても撃たない）。
+    /// </summary>
+    private void TickCharging()
+    {
+        hookPosition = handPoint.position;
+
+        // Charge Time 秒で 0 → 1。0 で割らないよう、Charge Time は 0.01 秒より短くしない
+        charge = Mathf.Clamp01(charge + Time.deltaTime / Mathf.Max(0.01f, chargeTime));
+        if (ui != null)
+        {
+            ui.SetCharge(charge);
+        }
+
+        bool released = UsesTwoButtons
+            ? (chargingWithThrow ? throwController.ThrowReleased() : throwController.PullReleased())
+            : input.AttackReleased(attackAction);
+
+        if (released)
+        {
+            if (UsesTwoButtons)
+            {
+                throwController.SetNextIsThrow(chargingWithThrow);
+            }
+
+            Fire();
+        }
+    }
+
+    /// <summary>
+    /// フックを撃つ。向きは狙いの方向（無ければ体の正面）、伸びる距離はチャージ量で決まる。
+    /// オートエイムで相手が選ばれたときだけ、向きと距離を相手に合わせて上書きする。
+    /// </summary>
+    private void Fire()
+    {
+        launchDirection = aim != null && aim.HasAim ? aim.AimDirection : transform.forward;
+        launchDirection.y = 0f;
+        launchDirection.Normalize();
+
+        targetDistance = ReachAtCurrentCharge;
+
+        // **オートエイム（近く／遠く）なら、選んだ物資へ向けて飛ばす。**
+        // 相手がいれば、チャージ量に関係なく届くところまで伸ばす。
+        // 届く範囲に物資が無ければ、手動と同じくマウスの方向へ飛ぶ
+        autoTarget = aimAssist != null ? aimAssist.PickTarget() : null;
+        if (autoTarget != null)
+        {
+            Vector3 toTarget = HookAimAssist.AimPointOf(autoTarget) - handPoint.position;
+            toTarget.y = 0f;
+            if (toTarget.sqrMagnitude > 0.0001f)
+            {
+                launchDirection = toTarget.normalized;
+            }
+
+            targetDistance = maxRange + AutoReachMargin;
+        }
+
+        traveled = 0f;
+        hookPosition = handPoint.position;
+        phase = HookPhase.Flying;
+
+        if (ui != null)
+        {
+            ui.ShowCharge(false);
+        }
+    }
+
+    /// <summary>
+    /// 前へ伸びている間。このフレームに進む区間を球で調べ（<c>SphereCast</c>）、当たった物によって
+    /// 大型物件 → 物資の順に引っ掛ける。何にも当たらず Target Distance まで進んだら戻り始める。
+    /// </summary>
+    private void TickFlying()
+    {
+        // このフレームに進む距離（m）
+        float step = flySpeed * Time.deltaTime;
+
+        // オートエイムの相手が途中で消えたり、先に取られたりしたら、そこからはまっすぐ飛ぶ
+        if (autoTarget != null && (autoTarget.IsVanished || autoTarget.IsHooked))
+        {
+            autoTarget = null;
+        }
+
+        Vector3 moveDirection = launchDirection;
+        Vector3 destination = hookPosition + launchDirection * step;
+
+        if (autoTarget != null)
+        {
+            // **相手を追いかける。** 動いている物資や、高さの違う物資にも当たるように、毎フレーム向きを取り直す
+            Vector3 aimPoint = HookAimAssist.AimPointOf(autoTarget);
+            Vector3 toTarget = aimPoint - hookPosition;
+
+            // すでに相手の中まで来ている（球の判定は、中から始まると当たらない）
+            // （判定の球の半径に 0.1m の余裕を足した距離まで近づいたら、当たったことにする）
+            if (toTarget.magnitude <= hookCastRadius + 0.1f)
+            {
+                OnHookableTouched(autoTarget);
+
+                // オンラインで先に取られていて引っ掛けられなかったときは、追うのをやめて
+                // そのまままっすぐ飛ばす（その場に止まり続けないように）
+                if (phase == HookPhase.Flying)
+                {
+                    autoTarget = null;
+                }
+                return;
+            }
+
+            moveDirection = toTarget.normalized;
+            destination = Vector3.MoveTowards(hookPosition, aimPoint, step);
+        }
+
+        // 動いた区間に物資があれば、その手前で引っ掛ける（速いフックがすり抜けないように）
+        // （トリガーの当たり判定も拾う：大型物件の引っ掛け口（MovableBlockPullPoint など）がトリガーになっているため）
+        if (Physics.SphereCast(hookPosition, hookCastRadius, moveDirection,
+                out RaycastHit hit, step, hookableMask, QueryTriggerInteraction.Collide))
+        {
+            // 大型物件は、右（投げる）で撃ったフックでは、ここでは引っ掛けない（左で撃ったときだけ）。
+            // ※ OnPullableTouched のほうは、ZRワンボタンなら右で撃っても引っ掛ける（2026/10/15）
+            IHookPullable pullable = FindPullable(hit.collider);
+            if (!chargingWithThrow && CanHookPullable(pullable, PlayerRoot))
+            {
+                OnPullableTouched(pullable);
+                return;
+            }
+
+            // ほかの人がつかんでいる物資は、横取りの待ちができる（宇宙ごみ式）ときだけ相手にする
+            HookableObject touched = hit.collider.GetComponentInParent<HookableObject>();
+            if (touched != null && !touched.IsVanished && (!touched.IsHooked || CanContest))
+            {
+                OnHookableTouched(touched);
+                return;
+            }
+        }
+
+        hookPosition = destination;
+        traveled += step;
+
+        if (traveled >= targetDistance)
+        {
+            phase = HookPhase.Returning;
+        }
+    }
+
+    /// <summary>手元へ戻っている間。手元から Catch Distance 以内まで戻ったら、待機に戻る（次が撃てる）。</summary>
+    private void TickReturning()
+    {
+        hookPosition = Vector3.MoveTowards(
+            hookPosition, handPoint.position, returnSpeed * Time.deltaTime);
+
+        if (Vector3.Distance(hookPosition, handPoint.position) <= catchDistance)
+        {
+            phase = HookPhase.Idle;
+        }
+    }
+
+    /// <summary>
+    /// 何かに刺さっている間。フックの先を相手（大型物件 → 横取りの待ちの相手 → 自分の物資の順に見る）に貼り付けておく。
+    /// 相手が消えたら、取り残されないよう自分で戻り始める。
+    /// </summary>
+    private void TickAttached()
+    {
+        // ThrowController が物資を引き寄せている。フックと糸の先は物資の結び目に貼り付く。
+        // 投げ終わると ThrowController が NotifyThrowFinished() を呼ぶ
+
+        // 引き寄せ中に物資が消えた（爆発した）場合は、ここで取り残されないよう戻る
+        if (attachedPullable != null)
+        {
+            Component pullableComponent = attachedPullable.HookComponent;
+            if (pullableComponent == null || !attachedPullable.IsHooked)
+            {
+                attachedPullable = null;
+                phase = HookPhase.Returning;
+                return;
+            }
+
+            hookPosition = attachedPullable.HookAnchorPoint;
+            return;
+        }
+
+        // 横取りの待ち：ほかの人が持っている物資にくっついていく（やめるのは ThrowController が決める）
+        if (contestItem != null)
+        {
+            if (contestItem.IsVanished)
+            {
+                contestItem = null;
+                phase = HookPhase.Returning;
+                return;
+            }
+
+            hookPosition = contestItem.AnchorPoint;
+            return;
+        }
+
+        if (attached == null || attached.IsVanished)
+        {
+            attached = null;
+            phase = HookPhase.Returning;
+            return;
+        }
+
+        hookPosition = attached.AnchorPoint;
+    }
+
+    /// <summary>命中した Collider またはその親から、拉扯対象（引っ張れる大型物件。<see cref="IHookPullable"/>）を探す。</summary>
+    public static IHookPullable FindPullable(Collider hitCollider)
+    {
+        if (hitCollider == null)
+        {
+            return null;
+        }
+
+        foreach (MonoBehaviour behaviour in hitCollider.GetComponentsInParent<MonoBehaviour>(true))
+        {
+            if (behaviour is IHookPullable pullable)
+            {
+                return pullable;
+            }
+        }
+
+        return null;
+    }
+
+    /// <summary>共通条件と、対象が持つ Player ごとの条件をまとめて確認する。</summary>
+    public static bool CanHookPullable(IHookPullable pullable, Transform playerRoot)
+    {
+        if (pullable == null || !pullable.CanBeHooked)
+        {
+            return false;
+        }
+
+        return pullable is not IPlayerAwareHookPullable playerAware
+            || playerAware.CanBeHookedBy(playerRoot);
+    }
+
+    /// <summary>
+    /// 左ボタンで飛ばした Hook が大型の拉扯対象（引っ張れる大型物件）に触れたときに呼ばれる。
+    /// ZRワンボタンのときは右で飛ばしたフックでも呼ばれる。<see cref="TickFlying"/> の球の判定と、
+    /// フック先端のトリガー（HookProjectile の PullableTouched）の両方から呼ばれる。
+    /// </summary>
+    private void OnPullableTouched(IHookPullable pullable)
+    {
+        // ZRワンボタンでは撃つのがいつも右（投げる）なので、大型物件も右で撃ったフックで引っ掛ける（2026/10/15）
+        bool refusedByThrowButton = chargingWithThrow && (throwController == null || !throwController.UsesOneButton);
+        if (phase != HookPhase.Flying || refusedByThrowButton || !CanHookPullable(pullable, PlayerRoot))
+        {
+            return;
+        }
+
+        pullable.SetHooked(true);
+        attached = null;
+        attachedPullable = pullable;
+        hookPosition = pullable.HookAnchorPoint;
+        phase = HookPhase.Attached;
+
+        if (throwController != null)
+        {
+            throwController.BeginPullable(pullable);
+        }
+        else
+        {
+            pullable.SetHooked(false);
+            attachedPullable = null;
+            phase = HookPhase.Returning;
+        }
+    }
+
+    /// <summary>飛んでいるフックが物資に触れたときに呼ばれる。</summary>
+    private void OnHookableTouched(HookableObject hookable)
+    {
+        if (phase != HookPhase.Flying || hookable == null || hookable.IsVanished)
+        {
+            return;
+        }
+
+        // **このPCで、ほかの人がつかんでいる物資**（オンラインでないとき・1台で複数人のとき）。
+        // 宇宙ごみ式なら、くっついて待つ（引っ張ったら横取り。2026/10/13）。釣り式では今までどおり素通りする
+        FishingNetSupply onlineSupply = IsOnline ? hookable.GetComponent<FishingNetSupply>() : null;
+        if (hookable.IsHooked && onlineSupply == null)
+        {
+            if (CanContest)
+            {
+                BeginContest(hookable);
+            }
+            return;
+        }
+
+        // **右クリック（投げる）で撃ったフックは、重い物には引っ掛からない**（宇宙ごみ式だけ。2026/9/29）。
+        // 重い物は投げられないため。引っ掛けずにそのまま戻る
+        if (throwController != null && throwController.RefusesHook(hookable))
+        {
+            phase = HookPhase.Returning;
+            return;
+        }
+
+        // オンラインでは、**早い者勝ちの判定をホストが行う。**
+        // ここでは先に手元で引っ掛けた形にしておき（待たせると操作が重くなる）、
+        // すでに取られていた場合はホストから断りが来て CancelAttachBecauseTaken() で戻す
+        if (IsOnline)
+        {
+            FishingNetSupply netSupply = hookable.GetComponent<FishingNetSupply>();
+
+            if (netSupply != null)
+            {
+                // 引っ掛け中なのが**自分**なら（離したのがまだ届いていない など）、ふつうにつかみ直す（2026/10/6）
+                if (netSupply.IsClaimed && netSupply.HookedByPlayerIndex != LocalPlayerIndex)
+                {
+                    // **宇宙ごみ式では、ほかの人がつかんでいる物資にフックが当たったら、くっついて待つ。**
+                    // 引っ張ったら横取り（持っている人のフックが外れ、自分が引っ張る）。2026/10/13・大槻さん
+                    // （2026/9/22〜10/12 は、当たった瞬間に持っている人の引っ掛けを外していた）。
+                    // 釣り式では今までどおり、何もせず素通りする
+                    if (CanContest)
+                    {
+                        BeginContest(hookable);
+                    }
+
+                    return;
+                }
+
+                // このPCで「引っ掛け中」になっている（自分がつかんでいる途中など）。今までどおり何もしない
+                if (hookable.IsHooked)
+                {
+                    return;
+                }
+
+                netSupply.RequestClaim(LocalPlayerIndex);
+            }
+        }
+
+        hookable.SetHooked(true);
+        attachedPullable = null;
+        attached = hookable;
+        hookPosition = hookable.AnchorPoint;
+        phase = HookPhase.Attached;
+
+        // **爆発物なら、ここで導火線に火がつく**（釣り上げられた瞬間から数え始める）
+        ExplosiveObject bomb = hookable.GetComponent<ExplosiveObject>();
+        if (bomb != null)
+        {
+            // オンラインでは、火がついたことをホスト経由で全員に配る。
+            // 手元だけで火をつけると、他の人には突然爆発したように見えてしまう
+            FishingNetBomb netBomb = hookable.GetComponent<FishingNetBomb>();
+
+            if (IsOnline && netBomb != null)
+            {
+                netBomb.RequestLightFuse();
+            }
+            else
+            {
+                bomb.LightFuse();
+            }
+        }
+
+        if (throwController != null)
+        {
+            throwController.Begin(hookable);
+        }
+        else
+        {
+            // 投げる係がいなければ、その場で解除して戻る
+            hookable.SetHooked(false);
+            attached = null;
+            phase = HookPhase.Returning;
+        }
+    }
+
+    /// <summary>
+    /// **フックを一瞬で手元に戻し、つかんでいる物資も離す。**（2026/9/22）
+    ///
+    /// 出てくる場所へ戻ったとき（R キー・落下）や、シーンが切り替わったときに呼ぶ。
+    /// 呼ばないと、**物資をつかんだまま戻ったり、伸ばしたフックがそのまま次のラウンドに残ったり**する。
+    /// つかんでいた物資はその場に落ちる（オンラインではホストへ「離した」と伝える）。
+    /// </summary>
+    public void ResetHook()
+    {
+        if (throwController != null)
+        {
+            throwController.ForceRelease();
+        }
+
+        if (attached != null && !attached.IsVanished)
+        {
+            attached.SetHooked(false);
+        }
+
+        if (attachedPullable != null)
+        {
+            attachedPullable.SetHooked(false);
+        }
+
+        attached = null;
+        attachedPullable = null;
+        contestItem = null;
+        autoTarget = null;
+        charge = 0f;
+        phase = HookPhase.Idle;
+        hookPosition = handPoint != null ? handPoint.position : transform.position;
+
+        if (ui != null)
+        {
+            ui.ShowCharge(false);
+            ui.ShowTiming(false);
+        }
+
+        UpdateHookVisual();
+    }
+
+    /// <summary>ThrowController が投げ終わったら呼ぶ。フックを手元へ戻し始める。</summary>
+    public void NotifyThrowFinished()
+    {
+        attached = null;
+        attachedPullable = null;
+        contestItem = null;
+        phase = HookPhase.Returning;
+    }
+
+    // ------------------------------------------------------------
+    // 横取り（宇宙ごみ式。2026/10/13・大槻さん）
+    // ------------------------------------------------------------
+
+    /// <summary>同じプレイヤーの投げる係（横取りの返事を渡すのに使う）。</summary>
+    public ThrowController Thrower => throwController;
+
+    /// <summary>ほかの人がつかんでいる物資に当たったとき、くっついて待てるか（宇宙ごみ式だけ）。</summary>
+    private bool CanContest => throwController != null && throwController.BreaksOthersGrab;
+
+    /// <summary>
+    /// **ほかの人がつかんでいる物資に、くっついて待つ。** 持っている人のフックは、まだ外さない。
+    /// 引っ張ったら横取り（<see cref="ThrowController.BeginContest"/>）。
+    /// </summary>
+    private void BeginContest(HookableObject hookable)
+    {
+        attached = null;
+        attachedPullable = null;
+        contestItem = hookable;
+        hookPosition = hookable.AnchorPoint;
+        phase = HookPhase.Attached;
+        throwController.BeginContest(hookable);
+    }
+
+    /// <summary>
+    /// **横取りできた物資を、自分の物として引っ掛け直す。** <see cref="ThrowController"/> が、横取りが決まったときに呼ぶ
+    /// （このあと、そのまま引っ張り始める）。
+    /// </summary>
+    public void AttachStolen(HookableObject item)
+    {
+        contestItem = null;
+        attachedPullable = null;
+        attached = item;
+        item.SetHooked(true);
+        hookPosition = item.AnchorPoint;
+        phase = HookPhase.Attached;
+    }
+
+    /// <summary>
+    /// **オンラインで、ホストから「その物資はもう取られている」と返ってきたとき。**
+    /// 手元で先に引っ掛けた形にしていたのを取り消して、フックを戻す。
+    /// </summary>
+    public void CancelAttachBecauseTaken()
+    {
+        if (phase != HookPhase.Attached)
+        {
+            return;
+        }
+
+        if (attached != null)
+        {
+            attached.SetHooked(false);
+        }
+        attached = null;
+
+        if (throwController != null)
+        {
+            throwController.AbandonBecauseLost();
+        }
+
+        phase = HookPhase.Returning;
+        Debug.Log("[FISH] その物資は先に取られていました。フックを戻します。");
+    }
+
+    /// <summary>
+    /// 古い依頼への断りでは、現在引っ掛けている別の物資を外さない。
+    /// （ホストの断りが遅れて届くあいだに、別の物資を引っ掛け直していることがあるため。断られた物資が
+    /// <paramref name="expectedTarget"/> で、いま引っ掛けている物資と同じときだけ取り消す）
+    /// </summary>
+    public void CancelAttachBecauseTaken(HookableObject expectedTarget)
+    {
+        if (attached != expectedTarget)
+        {
+            return;
+        }
+        CancelAttachBecauseTaken();
+    }
+
+    /// <summary>糸とフックの見た目を、いまの段階に合わせて更新する。</summary>
+    private void UpdateHookVisual()
+    {
+        if (hook != null)
+        {
+            hook.MoveTo(hookPosition);
+        }
+
+        if (line == null)
+        {
+            return;
+        }
+
+        bool showLine = phase == HookPhase.Flying
+                     || phase == HookPhase.Returning
+                     || phase == HookPhase.Attached;
+
+        line.SetGrabbing(IsGrabbing);
+        line.Show(showLine);
+        if (showLine)
+        {
+            line.SetEnds(handPoint.position, hookPosition);
+        }
+    }
+}

@@ -1,0 +1,113 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!1 &1651896720171708508
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 4934441267420280236}
+  - component: {fileID: 3330516895738359731}
+  - component: {fileID: 1856025888152722295}
+  m_Layer: 0
+  m_Name: SpaceJunkSession
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &4934441267420280236
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1651896720171708508}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &3330516895738359731
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1651896720171708508}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d5a57f767e5e46a458fc5d3c628d0cbb, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Unity.Netcode.Runtime::Unity.Netcode.NetworkObject
+  GlobalObjectIdHash: 1611748419
+  InScenePlacedSourceGlobalObjectIdHash: 0
+  m_InScenePlacedDisabledByDefault: 0
+  DeferredDespawnTick: 0
+  Ownership: 1
+  AlwaysReplicateAsRoot: 0
+  SynchronizeTransform: 1
+  m_InScenePlaced: 0
+  ActiveSceneSynchronization: 0
+  SceneMigrationSynchronization: 1
+  SpawnWithObservers: 1
+  DontDestroyWithOwner: 0
+  AutoObjectParentSync: 1
+  SyncOwnerTransformWhenParented: 1
+  AllowOwnerToParent: 0
+--- !u!114 &1856025888152722295
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1651896720171708508}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 4b4eb48d6017d8245bbf4545a7743ac7, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::SpaceJunkSession
+  ShowTopMostFoldoutHeaderGroup: 1
+  lobbySceneName: SpaceJunkLobby
+  roundResultSeconds: 5
+  matchResultSeconds: 8
+  winRule: 0
+  events:
+    startSeconds: 20
+    pool:
+    - kind: 2
+      displayName: "\u671F\u9593\u9650\u5B9A\u9AD8\u4FA1\u5024\u30C7\u30D6\u30EA"
+      description: 
+      durationSeconds: 40
+      weight: 1
+    - kind: 1
+      displayName: "\u30BB\u30C3\u30C8\u30C7\u30D6\u30EA"
+      description: 
+      durationSeconds: 40
+      weight: 1
+    - kind: 3
+      displayName: "\u7279\u6B8A\u30C7\u30D6\u30EA"
+      description: 
+      durationSeconds: 40
+      weight: 1
+    debugForceEvent: 0
+    debrisSetOrdered: 0
+    debrisSetMinSize: 4
+    debrisSetMaxSize: 6
+    debrisSetGoal: 3
+    debrisSetBonus: 10
+    highValueBonus: 2
+    heavyInitialCount: 1
+    heavyWeightMin: 2
+    heavyWeightMax: 2
+    heavyPoints: 10
+    heavyWeightBonus: 0
+    heavyBonusPerWeight: 10
+    heavyBaseScale: 1.6
+    heavyScalePerWeight: 0.3
+    heavyColor: {r: 0.35, g: 0.85, b: 1, a: 1}

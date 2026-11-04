@@ -1,0 +1,130 @@
+# .gitattributes
+#
+# ファイルの「改行コード」と「マージのしかた」をGitに教える設定ファイル。
+# 中身を変えていないのに差分が出る、シーンが壊れる、といった事故を防ぐためのもの。
+# 触る必要はほとんどないが、意味は Documents/README.md にも書いてある。
+#
+# 作成：2026年8月31日
+
+# =============================================================
+# 基本方針：文字のファイルは、すべて改行コードを LF に統一する
+# =============================================================
+# Windows と Mac で改行コードが変わると、中身が同じでも「全行変更された」
+# ように見えてしまう。それを防ぐため、リポジトリ内は LF に揃える。
+# Visual Studio / Rider / Unity はどれも LF をそのまま扱えるので問題ない。
+
+* text=auto eol=lf
+
+# Windows でしか動かないスクリプトだけは CRLF でないと動かないので除外
+*.bat  text eol=crlf
+*.cmd  text eol=crlf
+*.ps1  text eol=crlf
+
+# =============================================================
+# Unity のファイル
+# =============================================================
+# シーンやプレハブは、Gitが自動でマージすると中身が壊れて
+# Unityで開けなくなることがある。
+# そこで「自動マージしない（-merge）」を指定し、衝突したら
+# どちらか一方を選ぶ形にしている。
+#
+# ※ 衝突したら自分で解決せず、大槻 海斗に連絡すること。
+# ※ そもそも同じシーン・プレハブを2人で同時に編集しないこと。
+
+*.unity              text eol=lf -merge
+*.prefab             text eol=lf -merge
+*.asset              text eol=lf -merge
+*.controller         text eol=lf -merge
+*.overrideController text eol=lf -merge
+*.anim               text eol=lf -merge
+*.mat                text eol=lf -merge
+*.physicMaterial     text eol=lf -merge
+*.physicsMaterial2D  text eol=lf -merge
+*.lighting           text eol=lf -merge
+*.terrainlayer       text eol=lf -merge
+*.mask               text eol=lf -merge
+*.playable           text eol=lf -merge
+*.signal             text eol=lf -merge
+*.spriteatlas        text eol=lf -merge
+*.spriteatlasv2      text eol=lf -merge
+*.shadervariants     text eol=lf -merge
+
+# .meta は自動マージしてよい（1行ずつの単純な設定ファイルのため）
+*.meta          text eol=lf
+*.inputactions  text eol=lf
+*.uxml          text eol=lf
+*.uss           text eol=lf
+
+# =============================================================
+# プログラム・設定ファイル（差分を見やすくする）
+# =============================================================
+*.cs      text eol=lf diff=csharp
+*.shader  text eol=lf
+*.cginc   text eol=lf
+*.hlsl    text eol=lf
+*.compute text eol=lf
+*.json    text eol=lf
+*.md      text eol=lf
+*.txt     text eol=lf
+*.xml     text eol=lf
+*.yml     text eol=lf
+*.yaml    text eol=lf
+*.asmdef  text eol=lf
+*.asmref  text eol=lf
+
+# =============================================================
+# 画像・音・モデル・フォントなど（中身を書き換えてはいけないファイル）
+# =============================================================
+# これらを「文字のファイル」として扱うと壊れるため、binary を指定する。
+
+# 画像
+*.png  binary
+*.jpg  binary
+*.jpeg binary
+*.gif  binary
+*.bmp  binary
+*.tga  binary
+*.tif  binary
+*.tiff binary
+*.psd  binary
+*.ai   binary
+*.exr  binary
+*.hdr  binary
+*.ico  binary
+
+# 音
+*.wav  binary
+*.mp3  binary
+*.ogg  binary
+*.aif  binary
+*.aiff binary
+
+# 動画
+*.mp4  binary
+*.mov  binary
+*.webm binary
+
+# 3Dモデル
+*.fbx   binary
+*.obj   binary
+*.blend binary
+*.dae   binary
+*.3ds   binary
+
+# フォント
+*.ttf  binary
+*.otf  binary
+*.ttc  binary
+
+# その他
+*.pdf          binary
+*.dll          binary
+*.so           binary
+*.dylib        binary
+*.a            binary
+*.zip          binary
+*.7z           binary
+*.rar          binary
+*.unitypackage binary
+*.cubemap      binary
+*.wlt          binary
