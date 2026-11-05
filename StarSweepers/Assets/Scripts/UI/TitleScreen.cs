@@ -16,121 +16,35 @@ using UnityEngine.InputSystem.UI;
 using UnityEngine.UI;
 
 /// <summary>
-/// **タイトル画面。**（2026/10/6・大槻さん。めっちゃカメレオンのタイトル画面を参考にした）
-///
-/// | 画面 | できること |
-/// | --- | --- |
-/// | メイン | マルチプレイ／プラクティス（オフラインでロビーへ）／設定／ゲームを終了。右下にバージョン（2026/10/22 から） |
-/// | マルチプレイ | クイックマッチ／部屋を探す／部屋を作る（2026/10/22。名前の欄は 2026/10/27 に消した。名前はロビーでランダムに付く）。**2026/10/27 から、この3つの画面は右に出てくるタブレットの中に出し、メインは左に出したまま** |
-/// | 部屋を探す | 真ん中の枠に：右上の「番号入力で検索する」（番号の近い部屋に絞る。プライベートは全部一致で出す）／募集中の部屋の一覧（**LAN の部屋はいつも一番上**。鍵＝パスワードあり）／下に ■パブリック ■フレンド ■パスワード不要（2026/10/22。大槻さんの写真の形） |
-/// | 部屋を作る | 最大人数（2〜8。初期値8）・サーバーの名前・パスワード・□パブリック □プライベート □LAN → 作成（名前の欄は無い。2026/10/22） |
-/// | 設定 | サウンド（音量）／グラフィック（解像度・画面モード・フレームレート上限・垂直同期・画質）／ゲーム全般（マウス感度・操作タイプ） |
-///
-/// ## 画面はプレハブ（2026/10/6 から）
-///
-/// **`Assets/Resources/TitleScreen.prefab`** が画面そのもの。TitleScene に置いてある。
-/// **ボタンや文字は、エディタで自由に動かし・大きさを変え・画像や色を変えてよい。**
-/// このスクリプトは、部品に付いている印を頼りに中身を動かす（名前や並び順は見ない）。
-///
-/// | 印 | 何を決めるか |
-/// | --- | --- |
-/// | <see cref="TitleMenuButton"/> の Action | ボタンを押したときにすること |
-/// | <see cref="TitlePart"/> の Role | 画面（ページ）・コードが書き換える文字・一覧の入れ物など |
-/// | <see cref="TitleInput"/> の Kind | 入力欄に何を入れるか（名前・参加コード など） |
-/// | <see cref="TitleSettingRow"/> の Kind | 設定の1行が何の設定か |
-///
-/// ボタンの見た目（画像・色）は <see cref="TitleScreenTheme"/> でまとめて変えられる。
-/// 作り直したいときは `Tools > StarSweepers > タイトル画面のプレハブを作り直す`（**手で直した配置は消える**）。
-///
-/// ## いつ出るか
-///
-/// **TitleScene で出る**（ゲームはここから始まる）。タイトルとロビーの行き来は <see cref="TitleSceneFlow"/> がする。
-///
-/// ## 操作
-///
-/// マウスで選ぶ。コントローラーでは十字キー／スティックで選んで A、**B（キーボードは Esc）で1つ前の画面へ戻る。**
-///
-/// ## 流れ（何がどの順で起きるか）
-///
-/// 1. **出たとき**（<see cref="Awake"/> / <see cref="OnEnable"/>）… 1回だけ <see cref="Initialize"/> で部品を集めてボタン・入力欄・設定の行をつなぎ、
-///    メインの画面を出す。ホストに切られて戻ってきたなら、その理由を取っておく（<see cref="TakeDisconnectReason"/>）
-/// 2. **毎フレーム**（<see cref="Update"/>）… Steam から頼まれた参加を受ける → つないでいる途中の表示を出し入れ（<see cref="UpdateBusyOverlay"/>）
-///    → マルチプレイの画面なら参加可能なサーバーの一覧を取り直す（<see cref="UpdateJoinableList"/>）→ B／Esc で1つ前の画面へ
-/// 3. **ボタンを押したとき** … どのボタンも <see cref="Do"/> に来て、Action ごとの処理に分かれる
-/// 4. **つないだあと** … ホストになる／参加するのは NetworkManager と <see cref="InternetConnection"/> の仕事。
-///    つながったら <see cref="TitleSceneFlow"/> がロビーへ移し、この画面はシーンごと消える
-///
-/// 画面（ページ）の行き来：
-///
-/// ```
-/// メイン ─┬─ マルチプレイ ─┬─ 部屋を探す（Page.Multi）
-///         │               └─ 部屋を作る（Page.Create）
-///         └─ 設定
-/// ```
-///
-/// 戻る（<see cref="GoBack"/>）は、この木を1つ上へ戻る。参加の確認の窓が開いていれば、窓を閉じるだけ。
-///
-/// ファイルの中は「出し入れ → 部品をつなぐ → ボタン → 画面の切り替え → つなぐ → ソロ・マルチ → 参加の確認の窓 →
-/// クイックプレイ → LAN → 切られたとき → フレンド・つないでいる途中の表示 → 設定 → 補助」の順に並んでいる。
+/// タイトル画面（メイン・マルチプレイ・部屋を探す・部屋を作る・設定）を動かす。
+/// 詳しい説明は Documents/スクリプトの説明/UI/TitleScreen.md。
 /// </summary>
 [DisallowMultipleComponent]
 public class TitleScreen : MonoBehaviour
 {
-    /// <summary>タイトル画面を出すシーンの名前。</summary>
     public const string TitleSceneName = "TitleScene";
-
-    /// <summary>ロビーのシーンの名前（つながったら、ホストが全員をここへ移す）。</summary>
     public const string LobbySceneName = "SpaceJunkLobby";
 
-    /// <summary>画面のプレハブの場所（Resources の中）。TitleScene に置き忘れたときに使う。</summary>
+    /// <summary>Resources の中の画面のプレハブの名前。</summary>
     public const string PrefabResourcePath = "TitleScreen";
 
-    /// <summary>
-    /// LAN で最後に入れたIPアドレス（次に開いたときに入れておく）。
-    /// ※ 2026/10/19 に IP アドレスを打つ欄が無くなってからは、読むだけで書き込む所が無い（いつも初期値か、前に保存された値）。
-    /// </summary>
-    private const string LastLanAddressKey = "StarSweepers.LastLanAddress";
-
-    /// <summary>サーバーの名前の最大の文字数。</summary>
     private const int ServerNameMaxLength = 25;
-
-    /// <summary>参加コード・IPアドレスの最大の文字数。</summary>
     private const int PrivateCodeMaxLength = 12;
-    private const int LanAddressMaxLength = 40;
-
-    /// <summary>「サーバーを作る」で選べる最大人数の下限（上限は定員 <see cref="SpaceJunkTeams.MaxPlayers"/>）。</summary>
     private const int CreateMinPlayers = 2;
 
-    /// <summary>パスワードが長すぎるときの、「いま何文字か」の文字の色（赤）。</summary>
+    /// <summary>パスワードが長すぎるときの文字数表示の色。</summary>
     private static readonly Color CounterTooLongColor = new Color(1f, 0.45f, 0.4f, 1f);
 
-    /// <summary>いまタイトル画面が出ているか。ポーズ画面やロビーの画面が、これを見て自分を隠す。</summary>
+    /// <summary>タイトル画面が出ているか（ポーズ画面などが見て自分を隠す）。</summary>
     public static bool IsVisible { get; private set; }
 
-    /// <summary>
-    /// 画面の種類。
-    /// Find・FindPublic・FindLan・FindFriends は、2026/10/19 にマルチプレイの画面へまとめて**いまは使っていない**
-    /// （プレハブからも消えている）。FindPrivate も 2026/10/22 に「部屋を探す」（Multi）へまとめた。並び順を変えないように残してある。
-    /// </summary>
-    public enum Page
+    private enum Page
     {
         Main,
-        Create,
-        Find,
-        FindPrivate,
-        FindPublic,
-        FindLan,
+        MultiMenu, // マルチプレイ（クイックマッチ・部屋を探す・部屋を作る）
+        FindRoom,  // 部屋を探す
+        Create,    // 部屋を作る
         Settings,
-        FindFriends,
-
-        /// <summary>
-        /// **部屋を探す**（参加コードで入る・サーバー検索設定・参加可能なサーバー）。
-        /// 2026/10/19 に「マルチプレイ」の画面として作り、2026/10/22 に「部屋を探す」になった（名前はそのまま）。
-        /// </summary>
-        Multi,
-
-        /// <summary>マルチプレイ（クイックマッチ・部屋を探す・部屋を作る）。2026/10/22</summary>
-        MultiMenu,
     }
 
     private enum SettingsTab
@@ -143,7 +57,7 @@ public class TitleScreen : MonoBehaviour
     [Tooltip("ON：再生したときに、文字をパソコンの日本語フォントに差し替える（日本語が四角にならないように）")]
     [SerializeField] private bool useOsJapaneseFont = true;
 
-    /// <summary>プレハブの作りの版（作るツールが入れる。古ければツールが作り直す）。</summary>
+    /// <summary>プレハブの作りの版（作るツールが入れる）。</summary>
     [SerializeField, HideInInspector] private int prefabVersion;
 
     public int PrefabVersion => prefabVersion;
@@ -156,92 +70,61 @@ public class TitleScreen : MonoBehaviour
     }
 #endif
 
-    // 部品（Initialize で1回だけ集める。同じ Role が2つあれば、先に見つかったほうを使う）
     private readonly Dictionary<TitlePartRole, TitlePart> parts = new Dictionary<TitlePartRole, TitlePart>();
     private readonly Dictionary<Page, GameObject> pages = new Dictionary<Page, GameObject>();
     private readonly Dictionary<SettingsTab, GameObject> settingsGroups = new Dictionary<SettingsTab, GameObject>();
 
-    /// <summary>画面にあるボタン全部（一覧のカードの見本の中のボタンは除く）。「選ばれている」見た目を付け外しするのに使う。</summary>
+    /// <summary>画面のボタン全部（一覧のカードの見本の中は除く）。</summary>
     private readonly List<TitleMenuButton> buttons = new List<TitleMenuButton>();
     private readonly List<TitleSettingRow> settingRows = new List<TitleSettingRow>();
 
-    // 参加可能なサーバーの一覧（マルチプレイ画面。2026/10/19）
     private GameObject joinableCardTemplate;
     private readonly List<GameObject> joinableCards = new List<GameObject>();
 
-    /// <summary>
-    /// 前に並べた一覧の中身を1本の文字にしたもの。毎フレーム作り直すと重いうえ、コントローラーで選んでいたカードが外れるので、
-    /// これが変わったときだけカードを作り直す（<see cref="UpdateJoinableList"/>）。null にすると、次のフレームで必ず作り直す。
-    /// </summary>
+    /// <summary>前に並べた一覧の中身を1本の文字にしたもの。変わったときだけカードを作り直す（null で必ず作り直す）。</summary>
     private string joinableSignature = string.Empty;
 
-    /// <summary>LAN の部屋の知らせをいま聞いているか（<see cref="SetLanListening"/> で二重に始めたり止めたりしないため）。</summary>
     private bool lanListening;
 
-    /// <summary>ホストに切られて戻ってきたときの理由（例：満員）。出し終わったら空にする。</summary>
+    /// <summary>ホストに切られて戻ってきたときの理由。出し終わったら空にする。</summary>
     private string disconnectNotice;
 
-    /// <summary>
-    /// 前に出した切られた理由（同じ理由を、タイトルに戻るたびに出し直さないため）。
-    /// タイトルに戻るたびにこの画面は作り直されるので、static にしてシーンをまたいで覚えておく。
-    /// </summary>
+    /// <summary>前に出した切られた理由（同じ理由を出し直さないため。シーンをまたいで覚えるので static）。</summary>
     private static string shownDisconnectReason = string.Empty;
 
-    /// <summary>見つかった Steam のフレンドの部屋（一覧に並べる用。<see cref="SearchFriendsForList"/> が入れ直す）。</summary>
     private readonly List<SteamFriendRoom> friendRooms = new List<SteamFriendRoom>();
-
-    /// <summary>フレンドの部屋を探している途中か（二重に探さないため）。</summary>
     private bool searchingFriends;
-
-    /// <summary>準備（<see cref="Initialize"/>）が済んだか。Awake と OnEnable のどちらからも呼ぶので、2回目以降は何もしない。</summary>
     private bool initialized;
-
-    /// <summary>いま出している画面（戻る先を決めるのと、毎フレームの処理を分けるのに使う）。</summary>
     private Page current = Page.Main;
 
-    /// <summary>タブレット（マルチプレイ・部屋を探す・部屋を作る）が開いているか。閉じた状態から開いたときだけ右から出す。</summary>
+    /// <summary>タブレット（マルチプレイ・部屋を探す・部屋を作る）が開いているか。</summary>
     private bool tabletOpen;
 
-    // サーバーを作る
-    // 公開のしかたは createLan と createPrivate の組み合わせで決まる：
-    // LAN（createLan が true。createPrivate は見ない）／パブリック（どちらも false）／プライベート（createPrivate だけ true）
-    private int createMaxPlayers = SpaceJunkTeams.MaxPlayers; // 初期値は定員（8人）。2026/10/15・大槻さん
+    // 部屋を作る。LAN（createLan）／パブリック（どちらも false）／プライベート（createPrivate だけ true）
+    private int createMaxPlayers = SpaceJunkTeams.MaxPlayers;
     private bool createLan;
-    private bool createPrivate = false; // 最初はパブリック（2026/10/15・大槻さん）
+    private bool createPrivate;
     private string createServerName = string.Empty;
-
-    /// <summary>作る部屋のパスワード（空ならなし。1〜32文字）。保存はしない。</summary>
     private string createPassword = string.Empty;
 
-    // サーバーを探す
+    /// <summary>部屋を探す画面の、部屋番号の検索欄の文字。</summary>
     private string privateCode = string.Empty;
 
-    /// <summary>入る部屋のパスワード（パスワードの付いた部屋だけ要る）。</summary>
+    /// <summary>入る部屋のパスワード（参加の確認の窓で入れる）。</summary>
     private string joinPassword = string.Empty;
 
-    /// <summary>LAN でつなぎに行く先のIPアドレス（いまは一覧で選んだ部屋のもの。つないでいる途中の表示に出す）。</summary>
-    private string lanAddress = string.Empty;
-
-    /// <summary>
-    /// 一覧に並べる公開のサーバーを取っている途中か（<see cref="QueryPublicForList"/>）。
-    /// インターネットの係は1度に1つのことしかできないので、クイックプレイはこれが終わるのを待つ。
-    /// </summary>
+    /// <summary>一覧用に公開の部屋を取っている途中か。クイックマッチはこれが終わるのを待つ。</summary>
     private bool searching;
 
-    // 設定
     private SettingsTab settingsTab = SettingsTab.Sound;
 
     /// <summary>選べる解像度（同じ大きさはまとめてある）。</summary>
     private Resolution[] resolutions = new Resolution[0];
 
-    /// <summary>
-    /// 選んでいる解像度（<see cref="resolutions"/> の番号）と画面モード。
-    /// **「解像度／スクリーンモードを適用」を押すまでは画面に効かせない**（<see cref="ApplyScreen"/>）。
-    /// </summary>
+    // 選んでいる解像度と画面モード（「適用」を押すまで画面には効かせない）
     private int resolutionIndex;
     private FullScreenMode pendingScreenMode;
 
-    /// <summary>「＜」「＞」で画面モードを切り替える順番。</summary>
     private static readonly FullScreenMode[] ScreenModes =
         { FullScreenMode.ExclusiveFullScreen, FullScreenMode.FullScreenWindow, FullScreenMode.Windowed };
 
@@ -254,11 +137,11 @@ public class TitleScreen : MonoBehaviour
         Initialize();
     }
 
+    /// <summary>出すたびに、メインの画面から始める。</summary>
     private void OnEnable()
     {
         Initialize();
 
-        // 出すたびに、メインの画面から始める
         IsVisible = true;
         EnsureEventSystem();
         ShowPage(Page.Main);
@@ -272,20 +155,17 @@ public class TitleScreen : MonoBehaviour
         SetLanListening(false);
         UiPointer.StickScrollTarget = null;
         tabletOpen = false;
-
-        // **閉じたあとも、カーソルは出したままにする。**（2026/10/6「ロビーでクリックするたびにカーソルが隠れる」の修正）
         ShowCursor();
     }
 
     private void Update()
     {
-        // 遊んでいた画面から戻ってきたときなどに、カーソルが隠れたままにならないように
         ShowCursor();
 
         JoinFromSteamRequest();
         UpdateBusyOverlay();
 
-        if (current == Page.Multi)
+        if (current == Page.FindRoom)
         {
             UpdateJoinableList();
         }
@@ -293,7 +173,7 @@ public class TitleScreen : MonoBehaviour
         UpdateTabletSlide();
         UpdateTabletHints();
 
-        // つないでいる途中の表示が出ている間は戻らない（その表示の「戻る」「やめる」「OK」で閉じる）
+        // つないでいる途中の表示が出ている間は戻らない（表示のボタンで閉じる）
         GameObject busy = PartObject(TitlePartRole.BusyOverlay);
         if (WasBackPressed() && (busy == null || !busy.activeSelf))
         {
@@ -301,7 +181,7 @@ public class TitleScreen : MonoBehaviour
         }
     }
 
-    /// <summary>「1つ前の画面へ戻る」が押されたか（キーボードの Esc／コントローラーの B ＝右のボタン）。</summary>
+    /// <summary>「戻る」が押されたか（Esc／コントローラーの B）。</summary>
     private static bool WasBackPressed()
     {
         Keyboard keyboard = Keyboard.current;
@@ -309,10 +189,7 @@ public class TitleScreen : MonoBehaviour
                GamepadInput.WasPressed(GamepadButton.East);
     }
 
-    /// <summary>
-    /// カーソルを画面に閉じ込めない。**Windows のカーソルの見え隠れは <see cref="UiPointer"/> が受け持つ**
-    /// （いつも隠して、代わりにスコープレンズのポインターを出す。2026/10/11）。
-    /// </summary>
+    /// <summary>カーソルを画面に閉じ込めない（見え隠れは UiPointer が受け持つ）。</summary>
     private static void ShowCursor()
     {
         Cursor.lockState = CursorLockMode.None;
@@ -322,10 +199,7 @@ public class TitleScreen : MonoBehaviour
     // 部品を見つけて、つなぐ
     // ------------------------------------------------------------
 
-    /// <summary>
-    /// **最初に1回だけの準備。** フォントを差し替え、印の付いた部品を集めて、ボタン・入力欄・設定の行に処理をつなぐ。
-    /// 順番に意味がある：<see cref="CollectParts"/> で一覧のカードの見本を見つけてから <see cref="WireButtons"/> する（見本の中のボタンをつながないため）。
-    /// </summary>
+    /// <summary>最初に1回だけ、フォントを差し替えて部品を集め、ボタン・入力欄・設定をつなぐ。</summary>
     private void Initialize()
     {
         if (initialized)
@@ -334,13 +208,13 @@ public class TitleScreen : MonoBehaviour
         }
 
         initialized = true;
-        lanAddress = PlayerPrefs.GetString(LastLanAddressKey, "127.0.0.1");
 
         if (useOsJapaneseFont)
         {
             ApplyJapaneseFont();
         }
 
+        // CollectParts でカードの見本を見つけてから WireButtons する（見本の中のボタンをつながないため）
         CollectParts();
         WireButtons();
         WireInputs();
@@ -348,10 +222,7 @@ public class TitleScreen : MonoBehaviour
         ApplyVersionText();
     }
 
-    /// <summary>
-    /// **文字を、パソコンの日本語フォントに差し替える。**
-    /// プレハブには保存できないフォントなので、再生したときに毎回ここで入れる（<see cref="UiFont"/>）。
-    /// </summary>
+    /// <summary>文字をパソコンの日本語フォントに差し替える。</summary>
     private void ApplyJapaneseFont()
     {
         Font font = UiFont.Find(32);
@@ -361,10 +232,7 @@ public class TitleScreen : MonoBehaviour
         }
     }
 
-    /// <summary>
-    /// 印（<see cref="TitlePart"/> の Role）の付いた部品を集め、画面（ページ）と設定のタブの中身を覚える。
-    /// 再生したときに隠しておく部品（カードの見本・参加の確認の窓・つないでいる途中の表示）は、ここで隠す。
-    /// </summary>
+    /// <summary>印（TitlePart）の付いた部品を集め、最初は隠しておく部品を隠す。</summary>
     private void CollectParts()
     {
         foreach (TitlePart part in GetComponentsInChildren<TitlePart>(true))
@@ -374,7 +242,7 @@ public class TitleScreen : MonoBehaviour
                 parts[part.Role] = part;
             }
 
-            // 右下の操作の案内は、タブレットの画面ごとにあるので全部集める
+            // 操作の案内はタブレットの画面ごとにあるので、全部集める
             if (part.Role == TitlePartRole.TabletHint && part.GetComponent<Text>() != null)
             {
                 tabletHints.Add(part.GetComponent<Text>());
@@ -384,21 +252,19 @@ public class TitleScreen : MonoBehaviour
         AddPage(Page.Main, TitlePartRole.PageMain);
         AddPage(Page.Create, TitlePartRole.PageCreate);
         AddPage(Page.Settings, TitlePartRole.PageSettings);
-        AddPage(Page.Multi, TitlePartRole.PageMulti);
+        AddPage(Page.FindRoom, TitlePartRole.PageMulti);
         AddPage(Page.MultiMenu, TitlePartRole.PageMultiMenu);
 
         AddSettingsGroup(SettingsTab.Sound, TitlePartRole.SettingsSound);
         AddSettingsGroup(SettingsTab.Graphics, TitlePartRole.SettingsGraphics);
         AddSettingsGroup(SettingsTab.General, TitlePartRole.SettingsGeneral);
 
-        // 参加可能なサーバーの一覧のカードの見本（マルチプレイ画面。2026/10/19）。これを複製して1枚ずつ作る（見本そのものは隠しておく）
         joinableCardTemplate = PartObject(TitlePartRole.JoinableCardTemplate);
         if (joinableCardTemplate != null)
         {
             joinableCardTemplate.SetActive(false);
         }
 
-        // 参加の確認の窓（2026/10/19）は、はじめは閉じておく
         GameObject joinDialog = PartObject(TitlePartRole.JoinDialog);
         if (joinDialog != null)
         {
@@ -434,10 +300,7 @@ public class TitleScreen : MonoBehaviour
         }
     }
 
-    /// <summary>
-    /// ボタンを押したら <see cref="Do"/> に Action が届くようにする。
-    /// Button の無い <see cref="TitleMenuButton"/> も <see cref="buttons"/> には入れる（「選ばれている」見た目だけ使うため）。
-    /// </summary>
+    /// <summary>ボタンを押したら <see cref="Do"/> に Action が届くようにする。</summary>
     private void WireButtons()
     {
         foreach (TitleMenuButton look in GetComponentsInChildren<TitleMenuButton>(true))
@@ -448,6 +311,7 @@ public class TitleScreen : MonoBehaviour
                 continue;
             }
 
+            // Button の無い物も、選ばれている見た目のために入れておく
             buttons.Add(look);
 
             Button button = look.GetComponent<Button>();
@@ -461,10 +325,7 @@ public class TitleScreen : MonoBehaviour
         }
     }
 
-    /// <summary>
-    /// 入力欄に、いまの値と打てる文字数を入れ、打ったら値を覚えるようにする。
-    /// 値は欄ではなくこのスクリプト（名前は <see cref="GameSettings"/>）が持つ。同じ Kind の欄が別の画面にあっても、同じ値になる。
-    /// </summary>
+    /// <summary>入力欄に今の値と文字数の上限を入れ、打ったら値を覚えるようにする。</summary>
     private void WireInputs()
     {
         foreach (TitleInput input in GetComponentsInChildren<TitleInput>(true))
@@ -491,18 +352,16 @@ public class TitleScreen : MonoBehaviour
         return kind == TitleInputKind.CreatePassword || kind == TitleInputKind.JoinPassword;
     }
 
-    /// <summary>
-    /// 入力欄に打てる文字数。パスワードは 32 文字を超えたことを知らせたいので、少し多めに打てるようにする。
-    /// </summary>
+    /// <summary>入力欄に打てる文字数（パスワードは長すぎを知らせるため、少し多めに打てる）。</summary>
     private static int InputLimitOf(TitleInputKind kind)
     {
         return IsPassword(kind) ? InternetConnection.PasswordInputLimit : MaxLengthOf(kind);
     }
 
-    /// <summary>「いま何文字か」の文字の、プレハブで決めた色（32文字を超えて赤くしたあと、戻すため）。</summary>
+    /// <summary>文字数表示の、プレハブで決めた色（赤から戻すため）。</summary>
     private readonly Dictionary<Text, Color> counterColors = new Dictionary<Text, Color>();
 
-    /// <summary>右端の「いま何文字か」。パスワードが 32 文字を超えたら「パスワードは32文字までです」を出す。</summary>
+    /// <summary>入力欄の右端の文字数表示を出し直す（パスワードが長すぎたら注意を赤で出す）。</summary>
     private void UpdateCounter(TitleInputKind kind, Text counter, string value)
     {
         if (counter == null)
@@ -519,19 +378,16 @@ public class TitleScreen : MonoBehaviour
         int max = MaxLengthOf(kind);
         bool tooLong = IsPassword(kind) && value.Length > max;
 
-        // 長い文が切れないように、左へはみ出して出せるようにしておく
         counter.horizontalOverflow = HorizontalWrapMode.Overflow;
         counter.text = tooLong ? InternetConnection.PasswordTooLongMessage : $"{value.Length}/{max}";
         counter.color = tooLong ? CounterTooLongColor : normal;
     }
 
-    /// <summary>入力欄の最大の文字数（「いま何文字か」の分母）。どれでもないときは LAN の IP アドレスの欄。</summary>
+    /// <summary>入力欄の最大の文字数。</summary>
     private static int MaxLengthOf(TitleInputKind kind)
     {
         switch (kind)
         {
-            case TitleInputKind.PlayerName:
-                return GameSettings.PlayerNameMaxLength;
             case TitleInputKind.ServerName:
                 return ServerNameMaxLength;
             case TitleInputKind.PrivateCode:
@@ -540,17 +396,15 @@ public class TitleScreen : MonoBehaviour
             case TitleInputKind.JoinPassword:
                 return InternetConnection.PasswordMaxLength;
             default:
-                return LanAddressMaxLength;
+                return 0;
         }
     }
 
-    /// <summary>その Kind の入力欄に入れる、いまの値。<see cref="SetValue"/> と対になっている。</summary>
+    /// <summary>その入力欄に入れる今の値。</summary>
     private string ValueOf(TitleInputKind kind)
     {
         switch (kind)
         {
-            case TitleInputKind.PlayerName:
-                return GameSettings.PlayerName ?? string.Empty;
             case TitleInputKind.ServerName:
                 return createServerName;
             case TitleInputKind.PrivateCode:
@@ -560,17 +414,15 @@ public class TitleScreen : MonoBehaviour
             case TitleInputKind.JoinPassword:
                 return joinPassword;
             default:
-                return lanAddress;
+                return string.Empty;
         }
     }
 
+    /// <summary>入力欄に打った値を覚える。</summary>
     private void SetValue(TitleInputKind kind, string value)
     {
         switch (kind)
         {
-            case TitleInputKind.PlayerName:
-                GameSettings.PlayerName = value;
-                break;
             case TitleInputKind.ServerName:
                 createServerName = value;
                 break;
@@ -583,16 +435,10 @@ public class TitleScreen : MonoBehaviour
             case TitleInputKind.JoinPassword:
                 joinPassword = value;
                 break;
-            default:
-                lanAddress = value;
-                break;
         }
     }
 
-    /// <summary>
-    /// その画面の入力欄に、いまの値を入れ直す（同じ値を入れる欄が別の画面にもあるため。
-    /// 例：パスワードは「プライベートサーバー」と「パブリックサーバー」の両方の画面にある）。
-    /// </summary>
+    /// <summary>その画面の入力欄に、今の値を入れ直す。</summary>
     private void RefreshInputs(GameObject page)
     {
         foreach (TitleInput input in page.GetComponentsInChildren<TitleInput>(true))
@@ -606,7 +452,7 @@ public class TitleScreen : MonoBehaviour
         }
     }
 
-    /// <summary>右下のバージョン。文字の中の {version} を、Project Settings の Version に置き換える。</summary>
+    /// <summary>右下のバージョンの文字の {version} を、Project Settings の Version に置き換える。</summary>
     private void ApplyVersionText()
     {
         Text version = PartText(TitlePartRole.VersionText);
@@ -620,14 +466,7 @@ public class TitleScreen : MonoBehaviour
     // ボタン
     // ------------------------------------------------------------
 
-    /// <summary>
-    /// **ボタンを押したときの入口。** Action ごとに処理を呼び分ける。
-    ///
-    /// ・同じ処理に来る Action がいくつかあるのは、古い版のプレハブのボタンでも動くようにするため
-    ///   （例：OpenFind・OpenFindPrivate は部屋を探す画面へ、PracticeSolo はプラクティスへ、UseInternet／UseLan は版 6 より前のつなぎかたのボタン）
-    /// ・ここに無い Action は、別の場所でつないでいる：一覧のカードの「参加する」は <see cref="AddJoinableCard"/>、
-    ///   つないでいる途中の表示のボタン（None）は <see cref="UpdateBusyOverlay"/>、設定の「＜」「＞」は <see cref="WireSettings"/>
-    /// </summary>
+    /// <summary>ボタンを押したときの入口。Action ごとに処理を呼び分ける。</summary>
     private void Do(TitleButtonAction action)
     {
         switch (action)
@@ -635,32 +474,25 @@ public class TitleScreen : MonoBehaviour
             case TitleButtonAction.QuickPlay: QuickPlay(); break;
             case TitleButtonAction.PlaySolo: StartSolo(); break;
             case TitleButtonAction.OpenMulti: ShowPage(Page.MultiMenu); break;
-            case TitleButtonAction.OpenFindRoom: ShowPage(Page.Multi); break;
-            case TitleButtonAction.ToggleSearchPublic: SetSearchPublic(!searchPublic); break;
-            case TitleButtonAction.ToggleSearchFriends: SetSearchFriends(!searchFriends); break;
-            case TitleButtonAction.ConfirmJoinDialog: ConfirmJoinDialog(); break;
-            case TitleButtonAction.CloseJoinDialog: CloseJoinDialog(); break;
-            case TitleButtonAction.RefreshRoomList: RefreshRoomListNow(); break;
-            case TitleButtonAction.ToggleSearchNoPassword: SetSearchNoPassword(!searchNoPassword); break;
+            case TitleButtonAction.OpenFindRoom: ShowPage(Page.FindRoom); break;
             case TitleButtonAction.OpenCreate: ShowPage(Page.Create); break;
-            case TitleButtonAction.OpenFind: ShowPage(Page.Multi); break;
             case TitleButtonAction.OpenSettings: ShowPage(Page.Settings); break;
             case TitleButtonAction.Quit: QuitGame(); break;
             case TitleButtonAction.Back: GoBack(); break;
 
+            case TitleButtonAction.ToggleSearchPublic: SetSearchPublic(!searchPublic); break;
+            case TitleButtonAction.ToggleSearchFriends: SetSearchFriends(!searchFriends); break;
+            case TitleButtonAction.ToggleSearchNoPassword: SetSearchNoPassword(!searchNoPassword); break;
+            case TitleButtonAction.RefreshRoomList: RefreshRoomListNow(); break;
+            case TitleButtonAction.ConfirmJoinDialog: ConfirmJoinDialog(); break;
+            case TitleButtonAction.CloseJoinDialog: CloseJoinDialog(); break;
+
             case TitleButtonAction.CreateServer: CreateServer(); break;
-            case TitleButtonAction.PracticeSolo: StartSolo(); break;
             case TitleButtonAction.MaxPlayersDown: ChangeMaxPlayers(-1); break;
             case TitleButtonAction.MaxPlayersUp: ChangeMaxPlayers(1); break;
-            case TitleButtonAction.UseInternet: SetCreateLan(false); break;
-            case TitleButtonAction.UseLan: SetCreateLan(true); break;
-            case TitleButtonAction.TogglePrivate: TogglePrivate(); break;
             case TitleButtonAction.SetPublic: SetCreatePrivate(false); break;
             case TitleButtonAction.SetPrivate: SetCreatePrivate(true); break;
-            case TitleButtonAction.SetLan: SetCreateLan(true); break;
-
-            case TitleButtonAction.OpenFindPrivate: ShowPage(Page.Multi); break;
-            case TitleButtonAction.JoinPrivate: JoinPrivate(); break;
+            case TitleButtonAction.SetLan: SetCreateLan(); break;
 
             case TitleButtonAction.TabSound: ShowSettingsTab(SettingsTab.Sound); break;
             case TitleButtonAction.TabGraphics: ShowSettingsTab(SettingsTab.Graphics); break;
@@ -669,7 +501,7 @@ public class TitleScreen : MonoBehaviour
         }
     }
 
-    /// <summary>その Action のボタン全部に「選ばれている」見た目を付け外しする（タブ・切り替え）。</summary>
+    /// <summary>その Action のボタン全部に「選ばれている」見た目を付け外しする。</summary>
     private void SetSelectedLook(TitleButtonAction action, bool selected)
     {
         foreach (TitleMenuButton look in buttons)
@@ -685,51 +517,41 @@ public class TitleScreen : MonoBehaviour
     // 画面の切り替え
     // ------------------------------------------------------------
 
-    /// <summary>
-    /// **画面（ページ）を切り替える。** その画面だけを出し、中身をいまの値で出し直してから、
-    /// コントローラーなら最初の項目を選んでおく。
-    /// LAN の部屋の知らせは、マルチプレイの画面（一覧がある）を出している間だけ聞く。
-    /// </summary>
+    /// <summary>画面を切り替え、中身を今の値で出し直し、コントローラーなら最初の項目を選ぶ。</summary>
     private void ShowPage(Page page)
     {
         FinishTabletSlide();
         current = page;
-        SetLanListening(page == Page.Multi);
-        if (page == Page.Multi)
+        SetLanListening(page == Page.FindRoom);
+        if (page == Page.FindRoom)
         {
-            // 前に開いたときのカードが残っていても、必ず並べ直す
             joinableSignature = null;
         }
 
-        // タブレットの画面（マルチプレイ・部屋を探す・部屋を作る）の間は、後ろにメインの画面も出したままにする（2026/10/27）
+        // タブレットの画面の間は、後ろにメインの画面も出したままにする
         bool tablet = IsTabletPage(page);
         foreach (KeyValuePair<Page, GameObject> pair in pages)
         {
             pair.Value.SetActive(pair.Key == page || (tablet && pair.Key == Page.Main));
         }
 
-        // タブレットが閉じた状態から開いたときだけ、右から出てくる（タブレットの中で画面を移るときは動かさない）
+        // 閉じた状態から開いたときだけ、右から出す
         if (tablet && !tabletOpen)
         {
             StartTabletSlide(pages.TryGetValue(page, out GameObject opened) ? opened : null);
         }
         tabletOpen = tablet;
 
-        // タブレットが開いている間は、メインの「マルチプレイ」を選ばれている見た目にする
         SetSelectedLook(TitleButtonAction.OpenMulti, tablet);
+        UiPointer.StickScrollTarget = page == Page.FindRoom ? JoinableScrollRect() : null;
 
-        // 部屋を探す画面の一覧は、スクロールの要る長さなら右スティックでスクロールできる
-        UiPointer.StickScrollTarget = page == Page.Multi ? JoinableScrollRect() : null;
-
-        // 画面ごとの中身を、いまの値で出し直す
-        // （左上の「名前：○○」と名前の欄は、ロビーで名前がランダムに付くようになったので 2026/10/27 に消した）
         switch (page)
         {
             case Page.Create:
                 RefreshCreatePage();
                 break;
-            case Page.Multi:
-                RefreshMultiPage();
+            case Page.FindRoom:
+                RefreshFindRoomPage();
                 break;
             case Page.Settings:
                 ShowSettingsTab(settingsTab);
@@ -740,8 +562,8 @@ public class TitleScreen : MonoBehaviour
         {
             RefreshInputs(shown);
 
-            // 部屋を探す画面は、部屋があれば一番上の部屋から選ぶ（検索欄から始めると、入力に入ってしまうため）
-            if (page == Page.Multi && joinableCards.Count > 0 && joinableCards[0] != null)
+            // 部屋を探す画面は、部屋があれば一番上の部屋を選ぶ（検索欄から始めると入力に入ってしまうため）
+            if (page == Page.FindRoom && joinableCards.Count > 0 && joinableCards[0] != null)
             {
                 SelectForGamepad(joinableCards[0]);
             }
@@ -753,38 +575,32 @@ public class TitleScreen : MonoBehaviour
     }
 
     // ------------------------------------------------------------
-    // タブレット（2026/10/27・大槻さんの絵コンテ）
+    // タブレット
     // ------------------------------------------------------------
 
-    /// <summary>タブレットが右から出てくるのにかける秒数。</summary>
     private const float TabletSlideSeconds = 0.25f;
 
-    /// <summary>タブレットが出てくる前の、右へずらしておく距離（画面を 1920×1080 としたときのピクセル）。</summary>
+    /// <summary>出てくる前に右へずらしておく距離（1920×1080 のときのピクセル）。</summary>
     private const float TabletSlideDistance = 900f;
 
-    /// <summary>出てくる途中のタブレットの枠（動いていなければ null）と、出始めてからの秒数。</summary>
     private RectTransform slidingTablet;
     private float tabletSlideTime;
 
-    /// <summary>タブレットの枠の、もとの位置（ずらす前）。枠ごとに最初に動かすときに覚える。</summary>
+    /// <summary>タブレットの枠の、ずらす前の位置。</summary>
     private readonly Dictionary<RectTransform, Vector2> tabletHome = new Dictionary<RectTransform, Vector2>();
 
-    /// <summary>右下の操作の案内（タブレットの画面ごとに1つずつある）。</summary>
     private readonly List<Text> tabletHints = new List<Text>();
 
-    /// <summary>案内にいま出しているのが、コントローラー用か（同じ文字を毎フレーム入れ直さないため。null はまだ何も出していない）。</summary>
+    /// <summary>操作の案内に今出しているのがコントローラー用か（null はまだ出していない）。</summary>
     private bool? tabletHintForGamepad;
 
-    /// <summary>
-    /// **タブレットに出す画面か。** マルチプレイを選ぶと、メインの画面は左に出したまま、右にタブレットが出てきて、その中で選ぶ（2026/10/27）。
-    /// 設定は今までどおり画面全体に出す。
-    /// </summary>
+    /// <summary>タブレットに出す画面か（マルチプレイ・部屋を探す・部屋を作る）。</summary>
     private static bool IsTabletPage(Page page)
     {
-        return page == Page.MultiMenu || page == Page.Multi || page == Page.Create;
+        return page == Page.MultiMenu || page == Page.FindRoom || page == Page.Create;
     }
 
-    /// <summary>その画面のタブレットの枠を右へずらし、<see cref="UpdateTabletSlide"/> で元の位置まで動かし始める。</summary>
+    /// <summary>その画面のタブレットの枠を右へずらし、元の位置へ動かし始める。</summary>
     private void StartTabletSlide(GameObject page)
     {
         FinishTabletSlide();
@@ -805,7 +621,7 @@ public class TitleScreen : MonoBehaviour
         panel.anchoredPosition = tabletHome[panel] + new Vector2(TabletSlideDistance, 0f);
     }
 
-    /// <summary>出てくる途中のタブレットを、少しずつ元の位置へ動かす（はじめ速く、最後はゆっくり）。</summary>
+    /// <summary>出てくる途中のタブレットを、少しずつ元の位置へ動かす。</summary>
     private void UpdateTabletSlide()
     {
         if (slidingTablet == null)
@@ -824,7 +640,7 @@ public class TitleScreen : MonoBehaviour
         }
     }
 
-    /// <summary>出てくる途中のタブレットがあれば、すぐ元の位置に置く（途中で別の画面へ移ったとき）。</summary>
+    /// <summary>出てくる途中のタブレットを、すぐ元の位置に置く。</summary>
     private void FinishTabletSlide()
     {
         if (slidingTablet != null)
@@ -834,7 +650,7 @@ public class TitleScreen : MonoBehaviour
         }
     }
 
-    /// <summary>その画面の中のタブレットの枠（印 TabletPanel）。無ければ null（古い版のプレハブ）。</summary>
+    /// <summary>その画面の中のタブレットの枠（印 TabletPanel）。</summary>
     private static RectTransform TabletPanelOf(GameObject page)
     {
         foreach (TitlePart part in page.GetComponentsInChildren<TitlePart>(true))
@@ -848,10 +664,7 @@ public class TitleScreen : MonoBehaviour
         return null;
     }
 
-    /// <summary>
-    /// **右下の操作の案内を、最後に触った物に合わせて出し分ける。**（2026/10/27・大槻さん）
-    /// コントローラー … 「A 確認　B 戻る」（PlayStation のコントローラーなら「× 確認　○ 戻る」）／キーボード・マウス … 「Esc 戻る」
-    /// </summary>
+    /// <summary>操作の案内を、最後に触った物（コントローラーかキーボード）に合わせて出し分ける。</summary>
     private void UpdateTabletHints()
     {
         bool gamepad = UiPointer.LastInputWasGamepad && Gamepad.current != null;
@@ -875,17 +688,16 @@ public class TitleScreen : MonoBehaviour
         }
     }
 
-    /// <summary>部屋を探す画面の、部屋の一覧のスクロール（右スティックで動かす先）。無ければ null。</summary>
+    /// <summary>部屋の一覧のスクロール（右スティックで動かす先）。</summary>
     private ScrollRect JoinableScrollRect()
     {
         GameObject content = PartObject(TitlePartRole.JoinableListContent);
         return content != null ? content.GetComponentInParent<ScrollRect>(true) : null;
     }
 
-    /// <summary>1つ前の画面へ戻る。</summary>
+    /// <summary>1つ前の画面へ戻る（参加の確認の窓が開いていれば、窓を閉じるだけ）。</summary>
     private void GoBack()
     {
-        // 参加の確認の窓が開いていれば、窓を閉じるだけ
         if (IsJoinDialogOpen())
         {
             CloseJoinDialog();
@@ -898,33 +710,28 @@ public class TitleScreen : MonoBehaviour
             case Page.Settings:
                 ShowPage(Page.Main);
                 break;
-            case Page.Multi:
+            case Page.FindRoom:
             case Page.Create:
                 ShowPage(Page.MultiMenu);
                 break;
-
-            // メインには戻る先が無いので、何もしない
         }
     }
 
-    /// <summary>「サーバーを作る」の画面を、いまの選び方（人数・公開のしかた）で出し直す。</summary>
+    /// <summary>部屋を作る画面を、今の選び方（人数・公開のしかた）で出し直す。</summary>
     private void RefreshCreatePage()
     {
         SetText(TitlePartRole.MaxPlayersText, $"{createMaxPlayers} 人");
-        // □パブリック □プライベート □LAN は、どれか1つだけにチェックが付く（2026/10/15。前は「つなぎかた（インターネット／LAN）」が別の行だった）
+
         bool publicRoom = !createLan && !createPrivate;
         bool privateRoom = !createLan && createPrivate;
         SetText(TitlePartRole.PublicCheckText, CheckMark(publicRoom));
         SetText(TitlePartRole.PrivateCheckText, CheckMark(privateRoom));
         SetText(TitlePartRole.LanCheckText, CheckMark(createLan));
-        // 新しいプレハブは SetPublic／SetPrivate／SetLan、版 6 より前のプレハブは UseInternet／UseLan のボタン（両方に見た目を付ける）
         SetSelectedLook(TitleButtonAction.SetPublic, publicRoom);
         SetSelectedLook(TitleButtonAction.SetPrivate, privateRoom);
         SetSelectedLook(TitleButtonAction.SetLan, createLan);
-        SetSelectedLook(TitleButtonAction.UseInternet, !createLan);
-        SetSelectedLook(TitleButtonAction.UseLan, createLan);
 
-        // パスワードはインターネットの部屋だけ（LAN では使わない）
+        // パスワードはインターネットの部屋だけ
         GameObject passwordRow = PartObject(TitlePartRole.PasswordRow);
         if (passwordRow != null)
         {
@@ -934,10 +741,7 @@ public class TitleScreen : MonoBehaviour
         RefreshCodeBox();
     }
 
-    /// <summary>
-    /// 「サーバーを作る」の下の枠。参加する人に何を伝えればよいかを出す
-    /// （LAN ならこのPCのIPアドレス、インターネットなら参加コードの出る場所）。
-    /// </summary>
+    /// <summary>部屋を作る画面の下の枠に、参加する人へ伝えることを出す。</summary>
     private void RefreshCodeBox()
     {
         if (createLan)
@@ -953,7 +757,6 @@ public class TitleScreen : MonoBehaviour
         }
     }
 
-    /// <summary>チェックの印。付いていれば「■」、外れていれば「□」。</summary>
     private static string CheckMark(bool on)
     {
         return on ? "■" : "□";
@@ -965,23 +768,16 @@ public class TitleScreen : MonoBehaviour
         RefreshCreatePage();
     }
 
-    private void SetCreateLan(bool lan)
+    private void SetCreateLan()
     {
-        createLan = lan;
+        createLan = true;
         RefreshCreatePage();
     }
 
-    /// <summary>パブリック／プライベートを入れ替える（古い版のプレハブの、1つのボタンで切り替えるチェック用）。</summary>
-    private void TogglePrivate()
-    {
-        createPrivate = !createPrivate;
-        RefreshCreatePage();
-    }
-
-    /// <summary>パブリック（false）かプライベート（true）かを決める。押したほうにだけチェックが付く。</summary>
+    /// <summary>パブリック（false）かプライベート（true）を選ぶ。</summary>
     private void SetCreatePrivate(bool value)
     {
-        createLan = false; // パブリック・プライベートはインターネットの部屋
+        createLan = false;
         createPrivate = value;
         RefreshCreatePage();
     }
@@ -1000,17 +796,14 @@ public class TitleScreen : MonoBehaviour
     // つなぐ
     // ------------------------------------------------------------
 
-    /// <summary>インターネットでつなぐ係（NetworkManager に付いている）。見つからなければ null。</summary>
+    /// <summary>NetworkManager に付いている InternetConnection。無ければ null。</summary>
     private static InternetConnection Internet()
     {
         NetworkManager manager = NetworkManager.Singleton;
         return manager != null ? manager.GetComponent<InternetConnection>() : null;
     }
 
-    /// <summary>
-    /// 「サーバーを作成」。LAN ならこのPCがホストになって同じネットワークに部屋を知らせる。
-    /// インターネットなら <see cref="InternetConnection"/> に部屋を作ってもらう（パブリック／プライベート・パスワード）。
-    /// </summary>
+    /// <summary>「サーバーを作成」。LAN ならホストになって部屋を知らせ、インターネットなら部屋を作ってもらう。</summary>
     private void CreateServer()
     {
         NetworkManager manager = NetworkManager.Singleton;
@@ -1025,8 +818,6 @@ public class TitleScreen : MonoBehaviour
         if (createLan)
         {
             StartLanHost(manager);
-
-            // **同じネットワークに部屋を知らせる**（「サーバーを探す → LAN」の一覧に自動で出る。2026/10/15）
             if (manager.IsServer)
             {
                 LanRoomDiscovery.StartAdvertising(serverName, createMaxPlayers);
@@ -1044,112 +835,78 @@ public class TitleScreen : MonoBehaviour
         internet.HostGame(serverName, createMaxPlayers, createPrivate, createPassword.Trim());
     }
 
-    /// <summary>サーバーの名前を入れなかったときの名前：「（自分の名前）のサーバー」。名前も無ければ「StarSweepers」。</summary>
+    /// <summary>名前を入れなかったときのサーバーの名前。</summary>
     private static string DefaultServerName()
     {
         return string.IsNullOrWhiteSpace(GameSettings.PlayerName) ? "StarSweepers" : $"{GameSettings.PlayerName} のサーバー";
     }
 
-    /// <summary>LAN（同じ場所のPC同士）のホストになる。1人で練習するときも同じ（ほかの人が入ってこないだけ）。</summary>
+    /// <summary>LAN のホストになる（どのネットワークから来た人も受け付ける）。</summary>
     private static void StartLanHost(NetworkManager manager)
     {
         if (manager.NetworkConfig.NetworkTransport is UnityTransport transport)
         {
-            // 3つ目の「0.0.0.0」は、どのネットワークから来た人も受け付けるという意味（ソロプレイは「127.0.0.1」でこのPCの中だけ）。
-            // 1つ目のアドレスは参加する側がつなぎに行く先で、ホストでは使わない
             transport.SetConnectionData("127.0.0.1", transport.ConnectionData.Port, "0.0.0.0");
         }
 
         manager.StartHost();
     }
 
-    /// <summary>「プライベートサーバーを探す」の「参加する」。参加コードが空なら何もしない（パスワードは空でもよい）。</summary>
-    private void JoinPrivate()
-    {
-        InternetConnection internet = Internet();
-        if (internet != null && !string.IsNullOrWhiteSpace(privateCode))
-        {
-            internet.JoinGame(privateCode.Trim(), joinPassword.Trim());
-        }
-    }
-
     // ------------------------------------------------------------
-    // ソロプレイ・マルチプレイ（2026/10/19・大槻さんの絵コンテ）
+    // プラクティス・部屋を探す
     // ------------------------------------------------------------
 
-    /// <summary>サーバー検索設定を覚えておく場所（PlayerPrefs）。</summary>
     private const string SearchPublicKey = "StarSweepers.SearchPublic";
     private const string SearchFriendsKey = "StarSweepers.SearchFriends";
     private const string SearchNoPasswordKey = "StarSweepers.SearchNoPassword";
 
-    /// <summary>
-    /// 部屋番号（合言葉）の文字数。検索欄にこの文字数をすべて入れると、一覧に無い番号（プライベートの部屋）も「入ってみる」行として出す。
-    /// </summary>
+    /// <summary>部屋番号の文字数（全部入れると、一覧に無いプライベートの部屋も出す）。</summary>
     private const int RoomCodeLength = 6;
 
-    /// <summary>公開のサーバーの一覧を何秒ごとに取り直すか（短いと、頼みすぎ（429）で断られる）。</summary>
+    /// <summary>公開の部屋の一覧を取り直す間隔（短いと頼みすぎで断られる）。</summary>
     private const float PublicRefreshSeconds = 5f;
 
-    /// <summary>公開のサーバーの一覧を取れなかったとき、次に取り直すまでの秒数。</summary>
+    /// <summary>公開の部屋の一覧を取れなかったときに、次に取り直すまでの秒数。</summary>
     private const float PublicRetrySeconds = 15f;
 
-    /// <summary>フレンドのサーバーを何秒ごとに探し直すか。</summary>
     private const float FriendRefreshSeconds = 10f;
 
-    /// <summary>Steam にフレンドの様子を頼んでから、届くのを待って読むまでのミリ秒（1000 ＝ 1秒）。</summary>
+    /// <summary>Steam にフレンドの様子を頼んでから、読むまで待つミリ秒。</summary>
     private const int FriendReplyWaitMilliseconds = 1000;
 
-    // サーバー検索設定（■パブリックサーバー ■フレンドのサーバー）。最初にマルチプレイの画面を開いたときに PlayerPrefs から読む
+    // 検索の設定（■パブリック ■フレンド ■パスワード不要）。最初に部屋を探す画面を開いたときに読む
     private bool searchPublic = true;
     private bool searchFriends = true;
+    private bool searchNoPassword = true;
     private bool searchSettingsLoaded;
 
-    /// <summary>■パスワード不要：パスワードのかかった部屋を一覧に出さない（2026/10/22。2026/10/27 から最初はチェックあり）。</summary>
-    private bool searchNoPassword = true;
-
-    // 一覧に並べる元（取り直すたびに入れ替わる）
     private readonly List<ISessionInfo> publicSessions = new List<ISessionInfo>();
 
-    /// <summary>公開のサーバーの一覧を取れなかった理由（一覧の下に出す。取れたら空）。</summary>
+    /// <summary>公開の部屋の一覧を取れなかった理由（一覧の下に出す）。</summary>
     private string publicProblem = string.Empty;
 
-    /// <summary>次に公開のサーバーの一覧を取り直してよい時刻（Time.unscaledTime の秒）。</summary>
     private float nextPublicQueryTime;
 
-    /// <summary>フレンドのサーバーを探せないときの理由（Steam が動いていない など。一覧の下に出す）。</summary>
+    /// <summary>フレンドの部屋を探せない理由（一覧の下に出す）。</summary>
     private string friendStatus = string.Empty;
 
-    /// <summary>次にフレンドの部屋を探し直してよい時刻（Time.unscaledTime の秒。0 にすると次のフレームですぐ探す）。</summary>
     private float nextFriendQueryTime;
 
-    /// <summary>参加可能なサーバーの一覧の1行ぶん（LAN・公開・フレンドのどれか）。</summary>
+    /// <summary>部屋の一覧の1行ぶん（LAN・公開・フレンド・番号で入る部屋のどれか）。</summary>
     private struct JoinableEntry
     {
         public string Name;
-
-        /// <summary>人数の文字（例：「3/8」）。</summary>
         public string Players;
-
-        /// <summary>満員か（人数の横に「満員」と出て、押しても何もしない）。</summary>
         public bool Full;
-
-        /// <summary>部屋番号（合言葉）。分からない部屋（LAN・番号を書いていない古い版のホスト）は空。</summary>
         public string Code;
-
-        /// <summary>パスワードがかかっているか（鍵の印を出す。■パスワード不要 なら一覧に出さない）。</summary>
         public bool Locked;
-
-        /// <summary>行を押したときにすること。</summary>
         public UnityEngine.Events.UnityAction Join;
 
-        /// <summary>どのサーバーかを見分ける文字（「lan:」「pub:」「friend:」「code:」で始まる）。並べ直すかどうかの判定に使う。</summary>
+        /// <summary>どの部屋かを見分ける文字（並べ直すかの判定に使う）。</summary>
         public string Key;
     }
 
-    /// <summary>
-    /// **プラクティス**（2026/10/22 まではソロプレイという名前だった。中身は同じ）。このPCの中だけで動くホストになって、そのままロビーへ（移すのは <see cref="TitleSceneFlow"/>）。
-    /// ほかのPCからは入れない（オフライン）。のちのち CPU を足して1人でも遊べるようにする予定。
-    /// </summary>
+    /// <summary>プラクティス。このPCの中だけのホストになる（ロビーへは TitleSceneFlow が移す）。</summary>
     private static void StartSolo()
     {
         NetworkManager manager = NetworkManager.Singleton;
@@ -1161,27 +918,25 @@ public class TitleScreen : MonoBehaviour
 
         if (manager.NetworkConfig.NetworkTransport is UnityTransport transport)
         {
-            // ほかのPCから入れないように、このPCの中だけで待つ
             transport.SetConnectionData("127.0.0.1", transport.ConnectionData.Port, "127.0.0.1");
         }
 
         manager.StartHost();
     }
 
-    /// <summary>マルチプレイの画面を開いたとき。検索設定のチェックを出し、一覧をすぐ取り直す。</summary>
-    private void RefreshMultiPage()
+    /// <summary>部屋を探す画面を開いたとき。検索の設定を出し、一覧をすぐ取り直す。</summary>
+    private void RefreshFindRoomPage()
     {
         if (!searchSettingsLoaded)
         {
             searchSettingsLoaded = true;
             searchPublic = PlayerPrefs.GetInt(SearchPublicKey, 1) != 0;
             searchFriends = PlayerPrefs.GetInt(SearchFriendsKey, 1) != 0;
-            searchNoPassword = PlayerPrefs.GetInt(SearchNoPasswordKey, 1) != 0; // 最初はチェックあり（2026/10/27・大槻さん）
+            searchNoPassword = PlayerPrefs.GetInt(SearchNoPasswordKey, 1) != 0;
         }
 
         RefreshSearchChecks();
 
-        // 開いたときは、取り直してよい間隔なら、すぐ探す（連打で 429 にならないように、間隔は守る）
         nextFriendQueryTime = 0f;
         joinableSignature = null;
         UpdateJoinableList();
@@ -1191,13 +946,13 @@ public class TitleScreen : MonoBehaviour
     {
         SetText(TitlePartRole.SearchPublicCheckText, CheckMark(searchPublic));
         SetText(TitlePartRole.SearchFriendsCheckText, CheckMark(searchFriends));
+        SetText(TitlePartRole.SearchNoPasswordCheckText, CheckMark(searchNoPassword));
         SetSelectedLook(TitleButtonAction.ToggleSearchPublic, searchPublic);
         SetSelectedLook(TitleButtonAction.ToggleSearchFriends, searchFriends);
-        SetText(TitlePartRole.SearchNoPasswordCheckText, CheckMark(searchNoPassword));
         SetSelectedLook(TitleButtonAction.ToggleSearchNoPassword, searchNoPassword);
     }
 
-    /// <summary>■パスワード不要 のチェック。覚えておき、一覧を並べ直す。</summary>
+    /// <summary>■パスワード不要 を切り替えて覚え、一覧を並べ直す。</summary>
     private void SetSearchNoPassword(bool value)
     {
         searchNoPassword = value;
@@ -1207,10 +962,7 @@ public class TitleScreen : MonoBehaviour
         joinableSignature = null;
     }
 
-    /// <summary>
-    /// 「募集中の部屋」の横の ⟳。公開の部屋とフレンドの部屋を、すぐ取り直す
-    /// （頼みすぎ（429）にならない間隔は <see cref="InternetConnection.QueryPublicSessionsAsync"/> が守る）。
-    /// </summary>
+    /// <summary>一覧の ⟳。公開とフレンドの部屋をすぐ取り直す。</summary>
     private void RefreshRoomListNow()
     {
         nextPublicQueryTime = 0f;
@@ -1218,16 +970,13 @@ public class TitleScreen : MonoBehaviour
         joinableSignature = null;
     }
 
-    /// <summary>
-    /// 検索欄（部屋番号で検索）に入っている文字。前後の空白と「#」を除き、大文字にそろえる（合言葉は大文字の英数字）。
-    /// 値は参加コードの欄と同じ <see cref="privateCode"/> を使う。
-    /// </summary>
+    /// <summary>検索欄の文字（前後の空白と「#」を除き、大文字にそろえる）。</summary>
     private string RoomCodeSearch()
     {
         return (privateCode ?? string.Empty).Trim().TrimStart('#').Trim().ToUpperInvariant();
     }
 
-    /// <summary>■パブリックサーバー のチェック。覚えておき、一覧を並べ直す（取り直しの間隔は変えない）。</summary>
+    /// <summary>■パブリック を切り替えて覚え、一覧を並べ直す。</summary>
     private void SetSearchPublic(bool value)
     {
         searchPublic = value;
@@ -1237,7 +986,7 @@ public class TitleScreen : MonoBehaviour
         joinableSignature = null;
     }
 
-    /// <summary>■フレンドのサーバー のチェック。覚えておき、フレンドの部屋をすぐ探し直す。</summary>
+    /// <summary>■フレンド を切り替えて覚え、フレンドの部屋をすぐ探し直す。</summary>
     private void SetSearchFriends(bool value)
     {
         searchFriends = value;
@@ -1248,19 +997,12 @@ public class TitleScreen : MonoBehaviour
         joinableSignature = null;
     }
 
-    /// <summary>
-    /// **参加可能なサーバーの一覧。** マルチプレイの画面を開いている間、毎フレーム呼ぶ。
-    ///
-    /// ・**LAN の部屋は、チェックに関係なく、いつも一番上**（同じネットワークにいる時点で一緒に遊ぶのが決まっているため。大槻さん）
-    /// ・その下に、■パブリックサーバー なら公開のサーバー、■フレンドのサーバー なら Steam のフレンドの部屋
-    /// ・公開のサーバーは5秒ごと、フレンドは10秒ごとに取り直す。中身が変わったときだけ並べ直す
-    /// </summary>
+    /// <summary>部屋の一覧を間隔をあけて取り直し、中身が変わったときだけ並べ直す（毎フレーム呼ぶ）。</summary>
     private void UpdateJoinableList()
     {
         float now = Time.unscaledTime;
 
-        // 取り直すのは、前の取り直しが終わっていて、間隔が空いたときだけ（結果は非同期で publicSessions／friendRooms に入る）。
-        // クイックプレイの途中は、インターネットの係を取り合わないように公開のサーバーは取らない
+        // クイックマッチの途中は、インターネットの係を取り合わないように取らない
         if (searchPublic && !searching && !quickPlaying && now >= nextPublicQueryTime)
         {
             nextPublicQueryTime = now + PublicRefreshSeconds;
@@ -1273,7 +1015,6 @@ public class TitleScreen : MonoBehaviour
             SearchFriendsForList();
         }
 
-        // 並べる中身が前と同じなら、カードは作り直さない
         List<JoinableEntry> entries = CollectJoinable();
         string signature = JoinableSignatureOf(entries);
         if (signature == joinableSignature)
@@ -1285,10 +1026,7 @@ public class TitleScreen : MonoBehaviour
         RebuildJoinableCards(entries);
     }
 
-    /// <summary>
-    /// 一覧に出るもの（チェック・理由の文字・各行の中身）を1本の文字にする。
-    /// これが前と同じなら、画面に出ている一覧も同じ（<see cref="joinableSignature"/>）。
-    /// </summary>
+    /// <summary>一覧に出るもの全部を1本の文字にする（前と同じなら並べ直さない）。</summary>
     private string JoinableSignatureOf(List<JoinableEntry> entries)
     {
         StringBuilder signature = new StringBuilder();
@@ -1303,15 +1041,7 @@ public class TitleScreen : MonoBehaviour
         return signature.ToString();
     }
 
-    /// <summary>
-    /// 一覧に並べる行を、上から順に集める：LAN の部屋 → 公開のサーバー（■パブリック）→ フレンドの部屋（■フレンド）。
-    /// 押したときに使う値（アドレス・ID・参加コード）は、ここで取り出してから渡しておく。
-    ///
-    /// **部屋番号で検索**（2026/10/22・大槻さん）：検索欄に文字があれば、番号にその文字が入っている部屋だけを、
-    /// 番号がその文字で始まるもの → 途中に入っているもの の順に並べる（番号の分からない LAN の部屋は出さない）。
-    /// **プライベートの部屋は一覧に出てこないので、番号を {RoomCodeLength} 文字すべて入れたときだけ**「入ってみる」行を出す。
-    /// ■パスワード不要 なら、パスワードのかかった部屋は出さない。
-    /// </summary>
+    /// <summary>一覧に並べる行を集める（LAN → 公開 → フレンドの順。検索欄があれば番号で絞る）。</summary>
     private List<JoinableEntry> CollectJoinable()
     {
         List<JoinableEntry> all = new List<JoinableEntry>();
@@ -1327,6 +1057,7 @@ public class TitleScreen : MonoBehaviour
             AddFriendEntries(all);
         }
 
+        // 番号がその文字で始まる部屋 → 途中に入っている部屋の順
         string search = RoomCodeSearch();
         List<JoinableEntry> startsWith = new List<JoinableEntry>();
         List<JoinableEntry> contains = new List<JoinableEntry>();
@@ -1358,6 +1089,7 @@ public class TitleScreen : MonoBehaviour
 
         startsWith.AddRange(contains);
 
+        // プライベートの部屋は一覧に出ないので、番号を全部入れたときだけ「入ってみる」行を出す
         if (search.Length == RoomCodeLength && !exactFound)
         {
             startsWith.Add(PrivateCodeEntry(search));
@@ -1366,10 +1098,7 @@ public class TitleScreen : MonoBehaviour
         return startsWith;
     }
 
-    /// <summary>
-    /// 一覧に無い部屋番号（プライベートの部屋など）に「入ってみる」行。番号を全部入れたときだけ出す。
-    /// パスワードがかかっているかは入ってみるまで分からないので、まず「参加しますか？」を出し、断られたらパスワードを聞く。
-    /// </summary>
+    /// <summary>一覧に無い部屋番号に「入ってみる」行（パスワードで断られたら聞き直す）。</summary>
     private JoinableEntry PrivateCodeEntry(string code)
     {
         string roomName = $"部屋番号 #{code}";
@@ -1392,7 +1121,7 @@ public class TitleScreen : MonoBehaviour
         };
     }
 
-    /// <summary>LAN の部屋（チェックに関係なく、いつも一番上）。押すと、そのままつなぎに行く（確認の窓は出さない）。</summary>
+    /// <summary>LAN の部屋の行（押すと確認なしでつなぐ）。</summary>
     private void AddLanEntries(List<JoinableEntry> entries)
     {
         foreach (LanRoomDiscovery.Room room in LanRoomDiscovery.Rooms)
@@ -1410,7 +1139,7 @@ public class TitleScreen : MonoBehaviour
         }
     }
 
-    /// <summary>公開のサーバー（■パブリックサーバー のとき）。押すと、参加の確認の窓を出す。</summary>
+    /// <summary>公開の部屋の行（押すと参加の確認の窓を出す）。</summary>
     private void AddPublicEntries(List<JoinableEntry> entries)
     {
         foreach (ISessionInfo info in publicSessions)
@@ -1426,7 +1155,6 @@ public class TitleScreen : MonoBehaviour
                 Locked = hasPassword,
                 Players = $"{PlayersIn(info)}/{info.MaxPlayers}",
                 Full = info.AvailableSlots <= 0 || info.IsLocked,
-                // 押したら「参加しますか？」／「パスワードを入力してください」の窓を出す（2026/10/19）
                 Join = () => OpenJoinDialog(roomName, hasPassword, password =>
                 {
                     InternetConnection internet = Internet();
@@ -1439,10 +1167,7 @@ public class TitleScreen : MonoBehaviour
         }
     }
 
-    /// <summary>
-    /// Steam のフレンドの部屋（■フレンドのサーバー のとき）。押すと、参加の確認の窓を出す。
-    /// 満員かどうかは Steam からは分からないので、いつも「参加する」にしておく（満員なら入るときに断られる）。
-    /// </summary>
+    /// <summary>Steam のフレンドの部屋の行（満員かは分からないので、いつも押せる）。</summary>
     private void AddFriendEntries(List<JoinableEntry> entries)
     {
         foreach (SteamFriendRoom room in friendRooms)
@@ -1470,32 +1195,27 @@ public class TitleScreen : MonoBehaviour
         }
     }
 
-    /// <summary>公開のサーバーにいま何人いるか（定員 − 空き。0 より小さくはしない）。</summary>
+    /// <summary>公開の部屋に今いる人数。</summary>
     private static int PlayersIn(ISessionInfo info)
     {
         return Mathf.Max(0, info.MaxPlayers - info.AvailableSlots);
     }
 
     // ------------------------------------------------------------
-    // 参加の確認の窓（2026/10/19・大槻さん）
+    // 参加の確認の窓
     // ------------------------------------------------------------
 
-    /// <summary>「参加する」「はい」を押したときに入る処理（パスワードを渡す）。</summary>
+    /// <summary>「はい」「参加する」で呼ぶ処理（パスワードを渡す）。</summary>
     private System.Action<string> pendingJoin;
 
-    /// <summary>窓で、パスワードを入れて入るか（パスワードの付いたサーバー）。</summary>
     private bool pendingNeedsPassword;
 
     /// <summary>窓から入ろうとして、結果を待っているか（失敗したら窓に理由を出す）。</summary>
     private bool joinDialogWaiting;
 
-    /// <summary>
-    /// パスワードがかかっているか、入ってみるまで分からない部屋か（番号で入るプライベートの部屋。2026/10/22）。
-    /// まずパスワードなしで入ってみて、パスワードで断られたら、窓をパスワードを聞く形に変える。
-    /// </summary>
+    /// <summary>パスワードがあるか入ってみるまで分からない部屋か（番号で入る部屋）。</summary>
     private bool pendingPasswordUnknown;
 
-    /// <summary>窓に出している部屋の名前（パスワードを聞く形に変えるときに使う）。</summary>
     private string pendingRoomName = string.Empty;
 
     private bool IsJoinDialogOpen()
@@ -1504,20 +1224,12 @@ public class TitleScreen : MonoBehaviour
         return dialog != null && dialog.activeSelf;
     }
 
-    /// <summary>
-    /// **参加の確認の窓を出す。** 公開・フレンドのサーバーを一覧で押したとき。
-    /// ・パスワードなし … 「「○○」に参加しますか？」と「はい」「いいえ」
-    /// ・パスワードあり … 「パスワードを入力してください」と入力欄、「参加する」「やめる」。違ったら「パスワードが間違えています」
-    /// **パスワードを聞くのは、パスワードがかかっている部屋だけ**（2026/10/22・大槻さん）。
-    /// passwordUnknown（番号で入るプライベートの部屋）は「参加しますか？」で始め、パスワードで断られたら聞く形に変える。
-    /// </summary>
+    /// <summary>参加の確認の窓を出す（パスワードのある部屋なら、パスワードを聞く形）。</summary>
     private void OpenJoinDialog(string roomName, bool needsPassword, System.Action<string> join, bool passwordUnknown = false)
     {
         GameObject dialog = PartObject(TitlePartRole.JoinDialog);
         if (dialog == null)
         {
-            // プレハブに窓が無い（古いプレハブ）。確かめずにそのまま入る
-            join?.Invoke(joinPassword.Trim());
             return;
         }
 
@@ -1531,7 +1243,6 @@ public class TitleScreen : MonoBehaviour
 
         dialog.SetActive(true);
 
-        // コントローラーでは「はい／参加する」を選んでおく
         foreach (TitleMenuButton look in dialog.GetComponentsInChildren<TitleMenuButton>(true))
         {
             if (look.Action == TitleButtonAction.ConfirmJoinDialog)
@@ -1542,7 +1253,7 @@ public class TitleScreen : MonoBehaviour
         }
     }
 
-    /// <summary>窓の見出し・ボタンの文字・パスワードの欄を、パスワードを聞く形（true）か「参加しますか？」の形（false）にする。</summary>
+    /// <summary>窓を、パスワードを聞く形（true）か「参加しますか？」の形（false）にする。</summary>
     private void SetJoinDialogMode(bool needsPassword)
     {
         pendingNeedsPassword = needsPassword;
@@ -1566,7 +1277,7 @@ public class TitleScreen : MonoBehaviour
         }
     }
 
-    /// <summary>「はい」「参加する」。パスワードが要るのに空なら、窓に「パスワードを入力してください」と出す。</summary>
+    /// <summary>「はい」「参加する」。部屋に入りに行く（結果は UpdateBusyOverlay が窓に出す）。</summary>
     private void ConfirmJoinDialog()
     {
         if (pendingJoin == null)
@@ -1589,7 +1300,6 @@ public class TitleScreen : MonoBehaviour
             return;
         }
 
-        // 結果は待たずに戻る。失敗したら、UpdateBusyOverlay が joinDialogWaiting を見て、窓の中に理由を出す
         SetText(TitlePartRole.JoinDialogMessage, string.Empty);
         joinDialogWaiting = true;
         pendingJoin(password);
@@ -1608,7 +1318,7 @@ public class TitleScreen : MonoBehaviour
         }
     }
 
-    /// <summary>公開のサーバーの一覧を取る（一覧に並べる用。取れなかったら15秒待つ）。</summary>
+    /// <summary>一覧に並べる公開の部屋を取る（取れなかったら少し待つ）。</summary>
     private async void QueryPublicForList()
     {
         InternetConnection internet = Internet();
@@ -1627,19 +1337,18 @@ public class TitleScreen : MonoBehaviour
         List<ISessionInfo> sessions = await internet.QueryPublicSessionsAsync();
         searching = false;
 
-        // 待っている間にこの画面が消えた（ロビーへ移った など）ときは何もしない。
-        // Unity では、消えた物も「== null」で true になる
+        // 待っている間に画面が消えた（Unity では消えた物も == null になる）
         if (this == null)
         {
             return;
         }
 
-        // 取れなかったら、理由を一覧の下に出し、失敗の状態を消しておく（つないでいる途中の表示に「失敗」と出さないため）
         publicSessions.Clear();
         if (sessions == null)
         {
             publicProblem = (string.IsNullOrEmpty(internet.Message) ? "公開のサーバーの一覧を取れませんでした" : internet.Message) +
                             $"（{PublicRetrySeconds:0}秒後にもう一度探します）";
+            // 失敗のままにすると、つないでいる途中の表示に「失敗」と出てしまう
             internet.ClearFailure();
             nextPublicQueryTime = Time.unscaledTime + PublicRetrySeconds;
         }
@@ -1650,10 +1359,7 @@ public class TitleScreen : MonoBehaviour
         }
     }
 
-    /// <summary>
-    /// Steam のフレンドのうち、このゲームで部屋に入っている人を探す（一覧に並べる用。<see cref="SteamFriendsService"/>）。
-    /// フレンドの様子は届くまで少しかかるので、頼んでから少し待って読む。
-    /// </summary>
+    /// <summary>Steam のフレンドのうち、このゲームの部屋にいる人を探す。</summary>
     private async void SearchFriendsForList()
     {
         if (!SteamFriendsService.IsAvailable)
@@ -1668,7 +1374,6 @@ public class TitleScreen : MonoBehaviour
         await System.Threading.Tasks.Task.Delay(FriendReplyWaitMilliseconds);
         searchingFriends = false;
 
-        // 待っている間にこの画面が消えたときは何もしない（QueryPublicForList と同じ）
         if (this == null)
         {
             return;
@@ -1679,7 +1384,7 @@ public class TitleScreen : MonoBehaviour
         friendStatus = string.Empty;
     }
 
-    /// <summary>一覧のカードを全部消して、entries の順に作り直す。一覧の下の文字（見つからない・取れない理由）も出し直す。</summary>
+    /// <summary>一覧のカードを全部作り直し、一覧の下の文字も出し直す。</summary>
     private void RebuildJoinableCards(List<JoinableEntry> entries)
     {
         foreach (GameObject card in joinableCards)
@@ -1703,9 +1408,7 @@ public class TitleScreen : MonoBehaviour
         SetText(TitlePartRole.JoinableListMessage, JoinableListMessageOf(entries.Count));
     }
 
-    /// <summary>
-    /// 一覧の下に出す文字。1つも無いときの案内と、公開のサーバー・フレンドのサーバーを取れなかった理由を、改行でつなぐ。
-    /// </summary>
+    /// <summary>一覧の下に出す文字（見つからないときの案内と、取れなかった理由）。</summary>
     private string JoinableListMessageOf(int entryCount)
     {
         StringBuilder message = new StringBuilder();
@@ -1734,7 +1437,7 @@ public class TitleScreen : MonoBehaviour
         return message.ToString();
     }
 
-    /// <summary>見本のカード（JoinableCardTemplate）を複製して、1行ぶんを一覧に足す。押すとそのサーバーに入る。</summary>
+    /// <summary>見本のカードを複製して1行ぶんを足し、押したらその部屋に入るようにする。</summary>
     private GameObject AddJoinableCard(Transform content, JoinableEntry entry)
     {
         GameObject card = Instantiate(joinableCardTemplate, content);
@@ -1744,50 +1447,32 @@ public class TitleScreen : MonoBehaviour
         foreach (TitlePart part in card.GetComponentsInChildren<TitlePart>(true))
         {
             Text text = part.GetComponent<Text>();
-            if (text == null)
+            switch (part.Role)
             {
-                continue;
-            }
-
-            if (part.Role == TitlePartRole.ServerCardName)
-            {
-                text.text = entry.Name;
-            }
-            else if (part.Role == TitlePartRole.ServerCardPlayers)
-            {
-                // 行そのものが押すボタンの形（2026/10/22）では、満員は人数の横に出す
-                text.text = entry.Full ? $"{entry.Players} 満員" : entry.Players;
-            }
-            else if (part.Role == TitlePartRole.ServerCardCode)
-            {
-                text.text = string.IsNullOrEmpty(entry.Code) ? string.Empty : $"#{entry.Code}";
+                case TitlePartRole.ServerCardName:
+                    if (text != null) text.text = entry.Name;
+                    break;
+                case TitlePartRole.ServerCardPlayers:
+                    if (text != null) text.text = entry.Full ? $"{entry.Players} 満員" : entry.Players;
+                    break;
+                case TitlePartRole.ServerCardCode:
+                    if (text != null) text.text = string.IsNullOrEmpty(entry.Code) ? string.Empty : $"#{entry.Code}";
+                    break;
+                case TitlePartRole.ServerCardLock:
+                    part.gameObject.SetActive(entry.Locked);
+                    break;
             }
         }
 
-        // 鍵の印（パスワードがかかっている部屋だけ出す）
-        foreach (TitlePart part in card.GetComponentsInChildren<TitlePart>(true))
-        {
-            if (part.Role == TitlePartRole.ServerCardLock)
-            {
-                part.gameObject.SetActive(entry.Locked);
-            }
-        }
-
+        // 見本のボタンの Action は使わず、この行の Join をつなぐ（満員なら何もつながない）
         foreach (TitleMenuButton look in card.GetComponentsInChildren<TitleMenuButton>(true))
         {
-            // 「参加する」ボタンの文字だけ書き換える（行そのものがボタンのときは、文字が部屋の名前なので触らない）
-            if (look.Label != null && look.Label.GetComponent<TitlePart>() == null)
-            {
-                look.Label.text = entry.Full ? "満員" : "参加する";
-            }
-
             Button button = look.GetComponent<Button>();
             if (button == null)
             {
                 continue;
             }
 
-            // 見本のボタンの Action（JoinListedServer）は使わず、この行の Join だけをつなぐ。満員なら何もつながない
             button.onClick.RemoveAllListeners();
             if (!entry.Full && entry.Join != null)
             {
@@ -1799,31 +1484,17 @@ public class TitleScreen : MonoBehaviour
     }
 
     // ------------------------------------------------------------
-    // クイックプレイ（2026/10/15・大槻さん）
+    // クイックマッチ
     // ------------------------------------------------------------
 
-    /// <summary>クイックプレイで、公開のサーバーを探している・入ろうとしている途中か（二度押し防止）。</summary>
     private bool quickPlaying;
 
-    /// <summary>
-    /// クイックプレイで部屋に入れず、次の部屋を試すまでの間に出す文。それ以外のときは null。
-    /// 次の部屋に入りに行くまでの一瞬、つないでいる途中の表示が消えてちらつかないようにする（<see cref="ChooseBusyContent"/>）。
-    /// </summary>
+    /// <summary>次の部屋を試すまでの間に出す文（その間に表示が消えてちらつかないため）。</summary>
     private string quickPlayNotice;
 
-    /// <summary>クイックプレイが、一覧の取り直しが終わるのを待つとき、何ミリ秒ごとに確かめるか。</summary>
     private const int QuickPlayWaitStepMilliseconds = 100;
 
-    /// <summary>
-    /// **クイックプレイ。** 公開されているサーバー（パブリック）を探して入る。
-    ///
-    /// ・入れるサーバー（満員でない・鍵がかかっていない・パスワードなし）を、**人の多い順に**試す
-    ///   （人がばらばらの部屋に分かれないように）
-    /// ・**入れなかったら、エラーで止めずに次の部屋を試す**（2026/10/28・大槻さん。相手のゲームと中身（版）が違うと、つないだ直後に相手から切られる）
-    /// ・どこにも入れなかった・1つも無かったら、**初期の設定でパブリックのサーバーを作る**（名前は「（名前）のサーバー」・定員・パスワードなし）
-    ///
-    /// 探している途中・入る途中の表示は、つないでいる途中の表示（<see cref="UpdateBusyOverlay"/>）がそのまま出す。
-    /// </summary>
+    /// <summary>クイックマッチ。入れる公開の部屋に人の多い順に入り、無ければ部屋を作る。</summary>
     private async void QuickPlay()
     {
         if (quickPlaying)
@@ -1850,24 +1521,21 @@ public class TitleScreen : MonoBehaviour
         }
     }
 
-    /// <summary><see cref="QuickPlay"/> の中身（終わったら、呼んだ側が二度押し防止を外す）。</summary>
+    /// <summary><see cref="QuickPlay"/> の中身。</summary>
     private async System.Threading.Tasks.Task QuickPlayAsync(InternetConnection internet)
     {
-        // 参加可能なサーバーの一覧を取っている途中なら、終わるまで待つ（インターネットの係は1つのことしかできないため）
+        // 一覧を取っている途中なら終わるまで待つ（インターネットの係は1つのことしかできない）
         while (searching && this != null)
         {
             await System.Threading.Tasks.Task.Delay(QuickPlayWaitStepMilliseconds);
         }
 
-        // 待っている間に画面が消えた、またはほかの作業（入る・作る）が始まっていたらやめる
         if (this == null || internet.IsBusy)
         {
             return;
         }
 
         List<ISessionInfo> sessions = await internet.QueryPublicSessionsAsync();
-
-        // 一覧を取れなかった（つながっていない など）。理由は、つないでいる途中の表示に「戻る」と一緒に出る
         if (this == null || sessions == null)
         {
             return;
@@ -1881,7 +1549,7 @@ public class TitleScreen : MonoBehaviour
                 return;
             }
 
-            // つなぐ準備から失敗した（インターネットにつながっていない など）。ほかの部屋でも同じなので、ここでやめる（理由は表示に出る）
+            // つなぐ準備から失敗した（ほかの部屋でも同じなので、やめる）
             if (internet.State == InternetConnection.Phase.Failed)
             {
                 return;
@@ -1896,10 +1564,7 @@ public class TitleScreen : MonoBehaviour
         internet.HostGame(serverName, SpaceJunkTeams.MaxPlayers, false, string.Empty);
     }
 
-    /// <summary>
-    /// すぐ入れるサーバー（空きがある・鍵がかかっていない・パスワードなし）を、**人の多い順**に並べたもの。クイックプレイはこの順に試す。
-    /// 人数が同じなら、一覧で先にあったほうが先（テスト：<c>QuickPlayOrderTests</c>）。
-    /// </summary>
+    /// <summary>すぐ入れる部屋を、人の多い順に並べる（同じ人数なら一覧の順）。</summary>
     public static List<ISessionInfo> OpenSessionsFullestFirst(List<ISessionInfo> sessions)
     {
         List<ISessionInfo> open = new List<ISessionInfo>();
@@ -1911,18 +1576,15 @@ public class TitleScreen : MonoBehaviour
             }
         }
 
-        // OrderByDescending は、人数が同じものの並びを変えない（List.Sort は変えることがある）
+        // OrderByDescending は同じ人数の並びを変えない
         return open.OrderByDescending(info => PlayersIn(info)).ToList();
     }
 
     // ------------------------------------------------------------
-    // 見つかった LAN の部屋（「LANのサーバーに参加する」画面。2026/10/15・大槻さん「LAN の部屋の自動表示も残して」）
+    // LAN の部屋
     // ------------------------------------------------------------
 
-    /// <summary>
-    /// LAN の部屋の知らせを聞くか（「LANのサーバーに参加する」画面を開いている間だけ聞く）。
-    /// 2026/10/19 からは、その画面の代わりに**マルチプレイの画面**を開いている間だけ聞く（<see cref="ShowPage"/>）。
-    /// </summary>
+    /// <summary>LAN の部屋の知らせを聞き始める・やめる。</summary>
     private void SetLanListening(bool listen)
     {
         if (listen == lanListening)
@@ -1941,7 +1603,7 @@ public class TitleScreen : MonoBehaviour
         }
     }
 
-    /// <summary>一覧で選んだ LAN の部屋に入る（IPアドレスとポートは、部屋の知らせに入っていたもの）。</summary>
+    /// <summary>一覧で選んだ LAN の部屋に入る。</summary>
     private void JoinLanRoom(string address, ushort port)
     {
         NetworkManager manager = NetworkManager.Singleton;
@@ -1950,7 +1612,6 @@ public class TitleScreen : MonoBehaviour
             return;
         }
 
-        lanAddress = address; // つないでいる途中の表示に出す
         if (manager.NetworkConfig.NetworkTransport is UnityTransport transport)
         {
             transport.SetConnectionData(address, port);
@@ -1960,13 +1621,10 @@ public class TitleScreen : MonoBehaviour
     }
 
     // ------------------------------------------------------------
-    // ホストに切られて戻ってきたとき（2026/10/15）
+    // ホストに切られて戻ってきたとき
     // ------------------------------------------------------------
 
-    /// <summary>
-    /// **ホストに切られて戻ってきたときは、その理由を出す**（例：「満員です（最大8人）」）。
-    /// つないでいる途中の表示と同じ枠に出し、「OK」で閉じる（<see cref="UpdateBusyOverlay"/>）。
-    /// </summary>
+    /// <summary>ホストに切られて戻ってきたなら、その理由を出す用に取っておく。</summary>
     private void TakeDisconnectReason()
     {
         NetworkManager manager = NetworkManager.Singleton;
@@ -1976,12 +1634,9 @@ public class TitleScreen : MonoBehaviour
             return;
         }
 
-        // 出しても出さなくても「見た」ことにする（次にタイトルに戻ったとき、同じ理由を出し直さないため）
         shownDisconnectReason = reason;
 
-        // **Netcode が自分で付ける記録（「[Disconnect Event]…TransportShutdown」など）は出さない。**（2026/10/19・大槻さんの報告）
-        // 自分で通信を止めた（ホストがタイトルに戻った など）ときにも付くので、出すと「入れませんでした」と誤って見えた。
-        // 出すのは、ホストが切るときに付けた理由（「満員です（最大8人）」など）だけ
+        // 「[」で始まるのは Netcode が自分で付ける記録（自分で止めたときにも付く）なので出さない
         if (reason.StartsWith("["))
         {
             return;
@@ -1991,12 +1646,10 @@ public class TitleScreen : MonoBehaviour
     }
 
     // ------------------------------------------------------------
-    // フレンドのサーバー（Steam。2026/10/6・大槻さん「スプラみたいにフレンドのサーバーを出したい」）
+    // Steam から頼まれた参加・つないでいる途中の表示
     // ------------------------------------------------------------
 
-    /// <summary>
-    /// Steam のフレンド一覧の「ゲームに参加」で頼まれた部屋に入る（タイトル画面にいて、まだつながっていないときだけ）。
-    /// </summary>
+    /// <summary>Steam のフレンド一覧の「ゲームに参加」で頼まれた部屋に入る。</summary>
     private void JoinFromSteamRequest()
     {
         if (string.IsNullOrEmpty(SteamFriendsService.PendingJoinCode) || IsConnected())
@@ -2015,12 +1668,7 @@ public class TitleScreen : MonoBehaviour
         internet.JoinGame(code, joinPassword.Trim());
     }
 
-    /// <summary>
-    /// つないでいる途中・失敗したときの表示。
-    /// ・インターネット：準備中・作っている・入ろうとしている → 説明を出す。失敗 → 理由と「戻る」
-    /// ・LAN：つなぎに行っている → 説明と「やめる」
-    /// ・つながった → ホストがロビーへ移すまでの間「移動しています」
-    /// </summary>
+    /// <summary>つないでいる途中・失敗したときの表示を出し入れする。</summary>
     private void UpdateBusyOverlay()
     {
         GameObject overlay = PartObject(TitlePartRole.BusyOverlay);
@@ -2034,16 +1682,11 @@ public class TitleScreen : MonoBehaviour
         ShowBusyOverlay(overlay, message, buttonLabel, action);
     }
 
-    /// <summary>
-    /// つないでいる途中の表示に、いま何を出すかを決める（上の条件ほど優先）。出さないときは message が null。
-    /// ボタンを出すときは buttonLabel と action（押したときにすること）が入る。
-    /// ※ 参加の確認の窓から入って失敗したときだけは、ここで窓に理由を書いて失敗を消す（表示は出さない）。
-    /// </summary>
+    /// <summary>つないでいる途中の表示に何を出すかを決める（出さないときは message が null）。</summary>
     private void ChooseBusyContent(InternetConnection internet, NetworkManager manager,
         out string message, out string buttonLabel, out UnityEngine.Events.UnityAction action)
     {
-        // LAN でつなぎに行っている途中：通信は始めた（IsListening）が、ホストでもなく、まだつながってもいない。
-        // インターネットで部屋に入る途中も同じ形になるので、それは除く
+        // LAN でつなぎに行っている途中（インターネットで入る途中も同じ形になるので除く）
         bool lanConnecting = manager != null && manager.IsListening && !manager.IsServer && !manager.IsConnectedClient &&
                              (internet == null || internet.State != InternetConnection.Phase.Joining);
 
@@ -2055,24 +1698,21 @@ public class TitleScreen : MonoBehaviour
         {
             message = "つながりました。ロビーに移動しています…";
         }
-        // 参加可能なサーバーの一覧を取っている間は出さない（一覧の中に「探しています」が出る）
+        // 一覧を取っている間は出さない
         else if (internet != null && internet.IsBusy && !searching)
         {
             message = string.IsNullOrEmpty(internet.Message) ? "つないでいます…" : internet.Message;
         }
-        // クイックプレイで部屋に入れず、次の部屋を試しに行くまでの一瞬（表示を消さない。2026/10/28）
         else if (quickPlayNotice != null)
         {
             message = quickPlayNotice;
         }
-        // 失敗はどの画面でも出す（一覧から入るときに、パスワードが違うと分かるように。一覧の検索の失敗は、一覧の中に出してすぐ消す）
-        // 参加の確認の窓から入ろうとして失敗した：つないでいる途中の表示ではなく、窓の中に理由を出す（2026/10/19）
+        // 参加の確認の窓から入って失敗したら、表示ではなく窓の中に理由を出す
         else if (internet != null && internet.State == InternetConnection.Phase.Failed && joinDialogWaiting)
         {
             joinDialogWaiting = false;
             if (internet.LastJoinFailedByPassword && pendingPasswordUnknown && !pendingNeedsPassword)
             {
-                // 番号で入ったらパスワードで断られた：パスワードを聞く形に変える（2026/10/22）
                 SetJoinDialogMode(true);
                 SetText(TitlePartRole.JoinDialogMessage, "この部屋にはパスワードがかかっています");
             }
@@ -2092,23 +1732,20 @@ public class TitleScreen : MonoBehaviour
         }
         else if (!string.IsNullOrEmpty(disconnectNotice) && (manager == null || !manager.IsListening))
         {
-            // ホストに切られて戻ってきた理由（満員など）。「OK」で閉じる（2026/10/15）
             message = disconnectNotice;
             buttonLabel = "OK";
             action = () => disconnectNotice = null;
         }
         else if (lanConnecting)
         {
-            message = $"LAN のサーバー（{lanAddress}）につないでいます…\nつながらないときは、IPアドレスと、同じネットワークにいるかを確かめてください。";
+            string address = manager.NetworkConfig.NetworkTransport is UnityTransport transport ? transport.ConnectionData.Address : "?";
+            message = $"LAN のサーバー（{address}）につないでいます…\nつながらないときは、IPアドレスと、同じネットワークにいるかを確かめてください。";
             buttonLabel = "やめる";
             action = () => manager.Shutdown();
         }
     }
 
-    /// <summary>
-    /// つないでいる途中の表示を出し入れし、文字とボタンを入れ替える。
-    /// コントローラーでボタンを選んでおくのは、表示を出した瞬間だけ（出ている間は選び直さない）。
-    /// </summary>
+    /// <summary>つないでいる途中の表示を出し入れし、文字とボタンを入れ替える。</summary>
     private void ShowBusyOverlay(GameObject overlay, string message, string buttonLabel, UnityEngine.Events.UnityAction action)
     {
         Button busyButton = PartComponent<Button>(TitlePartRole.BusyButton);
@@ -2117,6 +1754,8 @@ public class TitleScreen : MonoBehaviour
         if (overlay.activeSelf != show)
         {
             overlay.SetActive(show);
+
+            // コントローラーでボタンを選ぶのは、出した瞬間だけ
             if (show && buttonLabel != null && busyButton != null)
             {
                 SelectForGamepad(busyButton.gameObject);
@@ -2153,10 +1792,7 @@ public class TitleScreen : MonoBehaviour
     // 設定
     // ------------------------------------------------------------
 
-    /// <summary>
-    /// 設定の行（<see cref="TitleSettingRow"/>）に処理をつなぐ。スライダーは動かしたら、「＜」「＞」は押したら値を変え、その行を出し直す。
-    /// どの行が何の設定かは Kind で決まる（<see cref="SetSliderValue"/> / <see cref="Step"/> / <see cref="RefreshSettingRow"/>）。
-    /// </summary>
+    /// <summary>設定の行のスライダーと「＜」「＞」に処理をつなぐ。</summary>
     private void WireSettings()
     {
         resolutions = UniqueResolutions();
@@ -2196,7 +1832,7 @@ public class TitleScreen : MonoBehaviour
         }
     }
 
-    /// <summary>設定のタブを切り替える。選んだタブの中身だけを出し、全部の行をいまの値で出し直す。</summary>
+    /// <summary>設定のタブを切り替え、全部の行を今の値で出し直す。</summary>
     private void ShowSettingsTab(SettingsTab tab)
     {
         settingsTab = tab;
@@ -2210,8 +1846,7 @@ public class TitleScreen : MonoBehaviour
         SetSelectedLook(TitleButtonAction.TabGraphics, tab == SettingsTab.Graphics);
         SetSelectedLook(TitleButtonAction.TabGeneral, tab == SettingsTab.General);
 
-        // 開くたびに、いまの値を出し直す（ポーズ画面で変えた値にも合わせる）
-        // ※ タブを切り替えても、まだ「適用」していない解像度・画面モードの選択は、いまの画面の値に戻る
+        // まだ「適用」していない解像度・画面モードの選択は、今の画面の値に戻る
         resolutionIndex = Mathf.Max(0, FindCurrentResolution(resolutions));
         pendingScreenMode = Screen.fullScreenMode;
 
@@ -2221,10 +1856,7 @@ public class TitleScreen : MonoBehaviour
         }
     }
 
-    /// <summary>
-    /// スライダーの端の値を決める（プレハブで変えられていても、ここで上書きする）。
-    /// 音量は 0〜1（1 ＝ 100%）、マウス感度は 0.2〜3 倍、フレームレート上限は 30〜240 fps。
-    /// </summary>
+    /// <summary>スライダーの端の値を決める（プレハブの値を上書きする）。</summary>
     private static void SetupSliderRange(TitleSettingRow row)
     {
         switch (row.Kind)
@@ -2244,7 +1876,7 @@ public class TitleScreen : MonoBehaviour
         }
     }
 
-    /// <summary>スライダーを動かしたとき。値はすぐ <see cref="GameSettings"/> に入れる（すぐ効く。覚えておくのも GameSettings の仕事）。</summary>
+    /// <summary>スライダーを動かした値を GameSettings に入れる（すぐ効く）。</summary>
     private static void SetSliderValue(TitleSettingKind kind, float value)
     {
         switch (kind)
@@ -2256,21 +1888,16 @@ public class TitleScreen : MonoBehaviour
                 GameSettings.MouseSensitivity = value;
                 break;
             case TitleSettingKind.FrameRateLimit:
-                // 10 fps きざみにそろえる（例：57 → 60）
                 GameSettings.FrameRateLimit = Mathf.RoundToInt(value / 10f) * 10;
                 break;
         }
     }
 
-    /// <summary>
-    /// 「＜」（delta = -1）・「＞」（delta = +1）を押したとき。端まで行ったら反対の端へ回る。
-    /// 解像度と画面モードは選ぶだけで、「適用」を押すまで画面には効かない。ほかはすぐ <see cref="GameSettings"/> に入れる。
-    /// </summary>
+    /// <summary>「＜」（-1）「＞」（+1）で値を1つ進める（端まで行ったら反対の端へ回る）。</summary>
     private void Step(TitleSettingKind kind, int delta)
     {
         switch (kind)
         {
-            // 2つしかないので、どちらを押しても入れ替える
             case TitleSettingKind.ControllerType:
                 GameSettings.ControllerOperation = GameSettings.ControllerOperation == ControllerOperationType.TypeA
                     ? ControllerOperationType.TypeB
@@ -2280,13 +1907,12 @@ public class TitleScreen : MonoBehaviour
             case TitleSettingKind.Resolution:
                 if (resolutions.Length > 0)
                 {
-                    // 個数を足してから割った余りを取るのは、先頭で「＜」を押したときに負の番号にならず、最後へ回るようにするため
                     resolutionIndex = (resolutionIndex + delta + resolutions.Length) % resolutions.Length;
                 }
                 break;
 
             case TitleSettingKind.ScreenMode:
-                // いまの画面モードが選べる3つに無い（最大化ウィンドウ など）ときは、先頭から
+                // 選べる3つに無い画面モードのときは、先頭から
                 int index = System.Array.IndexOf(ScreenModes, pendingScreenMode);
                 index = index < 0 ? 0 : (index + delta + ScreenModes.Length) % ScreenModes.Length;
                 pendingScreenMode = ScreenModes[index];
@@ -2306,7 +1932,7 @@ public class TitleScreen : MonoBehaviour
         }
     }
 
-    /// <summary>設定の1行に、いまの値を出す。</summary>
+    /// <summary>設定の1行に、今の値を出す。</summary>
     private void RefreshSettingRow(TitleSettingRow row)
     {
         string text;
@@ -2340,7 +1966,7 @@ public class TitleScreen : MonoBehaviour
             case TitleSettingKind.VSync:
                 text = GameSettings.VSync ? "ON" : "OFF";
                 break;
-            default: // 画質（Quality）
+            default: // 画質
                 string[] qualities = QualitySettings.names;
                 text = qualities.Length == 0
                     ? "—"
@@ -2359,7 +1985,7 @@ public class TitleScreen : MonoBehaviour
         }
     }
 
-    /// <summary>「解像度／スクリーンモードを適用」。選んでおいた解像度と画面モードを、ここで初めて画面に効かせる。</summary>
+    /// <summary>「解像度／スクリーンモードを適用」。選んだ解像度と画面モードを画面に効かせる。</summary>
     private void ApplyScreen()
     {
         if (resolutions.Length > 0)
@@ -2369,7 +1995,6 @@ public class TitleScreen : MonoBehaviour
         }
         else
         {
-            // 解像度の一覧が空のときは、画面モードだけ変える
             Screen.fullScreenMode = pendingScreenMode;
         }
     }
@@ -2378,7 +2003,7 @@ public class TitleScreen : MonoBehaviour
     // 補助
     // ------------------------------------------------------------
 
-    /// <summary>その印（Role）の付いた部品。プレハブに無ければ null（古いプレハブでも止まらないように、使う側で null を確かめる）。</summary>
+    /// <summary>その印（Role）の付いた部品。無ければ null。</summary>
     private GameObject PartObject(TitlePartRole role)
     {
         return parts.TryGetValue(role, out TitlePart part) && part != null ? part.gameObject : null;
@@ -2395,7 +2020,7 @@ public class TitleScreen : MonoBehaviour
         return PartComponent<Text>(role);
     }
 
-    /// <summary>その印の付いた文字を書き換える。部品が無ければ何もしない。</summary>
+    /// <summary>その印の付いた文字を書き換える（部品が無ければ何もしない）。</summary>
     private void SetText(TitlePartRole role, string value)
     {
         Text text = PartText(role);
@@ -2405,7 +2030,7 @@ public class TitleScreen : MonoBehaviour
         }
     }
 
-    /// <summary>このPCのIPアドレス（LAN でホストになるとき、参加する人に伝える番号）。</summary>
+    /// <summary>このPCのIPアドレス（LAN のホストが参加する人に伝える番号）。</summary>
     public static string LocalAddresses()
     {
         List<string> found = new List<string>();
@@ -2438,7 +2063,7 @@ public class TitleScreen : MonoBehaviour
         return found.Count > 0 ? string.Join(" ／ ", found) : "（見つかりませんでした）";
     }
 
-    /// <summary>同じ大きさの解像度を1つにまとめた一覧（リフレッシュレート違いを除く）。</summary>
+    /// <summary>同じ大きさの解像度を1つにまとめた一覧。</summary>
     private static Resolution[] UniqueResolutions()
     {
         List<Resolution> list = new List<Resolution>();
@@ -2452,10 +2077,7 @@ public class TitleScreen : MonoBehaviour
         return list.ToArray();
     }
 
-    /// <summary>
-    /// いまの画面の大きさが、一覧の何番目か。一覧に無ければ最後（ふつうは一番大きい解像度）。
-    /// 一覧が空なら -1（呼ぶ側で 0 にそろえる）。
-    /// </summary>
+    /// <summary>今の画面の大きさが一覧の何番目か（無ければ最後、一覧が空なら -1）。</summary>
     private static int FindCurrentResolution(Resolution[] list)
     {
         for (int i = 0; i < list.Length; i++)
@@ -2483,10 +2105,7 @@ public class TitleScreen : MonoBehaviour
         }
     }
 
-    /// <summary>
-    /// コントローラーがつながっていれば、その画面の最初の項目を選んでおく（十字キーで動かせるように）。
-    /// **入力欄は、ほかに項目が無いときだけ選ぶ**（入力欄から始めると文字の入力に入ってしまうため。2026/10/27）。
-    /// </summary>
+    /// <summary>コントローラーがあれば、その画面の最初の項目を選ぶ（入力欄はほかに無いときだけ）。</summary>
     private static void SelectFirstForGamepad(GameObject page)
     {
         if (Gamepad.current == null || page == null || EventSystem.current == null)
@@ -2509,7 +2128,7 @@ public class TitleScreen : MonoBehaviour
         EventSystem.current.SetSelectedGameObject(first != null ? first.gameObject : null);
     }
 
-    /// <summary>コントローラーがつながっていれば、その項目を選んでおく（コントローラーが無いときは何もしない）。</summary>
+    /// <summary>コントローラーがあれば、その項目を選ぶ。</summary>
     private static void SelectForGamepad(GameObject target)
     {
         if (Gamepad.current != null && EventSystem.current != null)
@@ -2518,7 +2137,7 @@ public class TitleScreen : MonoBehaviour
         }
     }
 
-    /// <summary>UIのクリックを受け取る仕組みがなければ作る（ポーズ画面と同じ。シーンが変わっても残す）。</summary>
+    /// <summary>UI のクリックを受け取る EventSystem が無ければ作る（シーンが変わっても残す）。</summary>
     private static void EnsureEventSystem()
     {
         if (EventSystem.current != null)
