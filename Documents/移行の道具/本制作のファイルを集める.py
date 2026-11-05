@@ -125,10 +125,17 @@ while changed:
     #  (a) 持っていくクラスのインスペクター拡張（CustomEditor / CustomPropertyDrawer）
     #  (b) 自動テスト（*Tests.cs）で、使っているクラスがすべて揃っている物
     #  (c) 起動時に動く物（InitializeOnLoad）で、使っているクラスがすべて揃っている物
+    #  (e) エディタ用ではないが、**再生開始時に自分で生まれる物**（RuntimeInitializeOnLoadMethod）。
+    #      どこからも参照されないので (1)〜(3) では拾えない。使っているクラスがすべて揃っている物だけ足す
+    #      （2026/11/5：TitleSceneFlow と NetworkManagerCleanup を落として、ホストになってもロビーへ移らなくなった）
     for f in all_cs:
-        if f in inc or not is_editor(f):
+        if f in inc:
             continue
         r = refs(f)
+        if not is_editor(f):
+            if "RuntimeInitializeOnLoadMethod" in src_text[f] and r <= inc:
+                inc.add(f); pulled_by_code[f] = "(runtime: self-starting, deps all included)"; changed = True
+            continue
         why = None
         targets = editor_for.get(f, set())
         if targets and any(any(g in inc for g in name_to_files.get(t, ())) for t in targets):
