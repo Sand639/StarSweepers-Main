@@ -239,8 +239,13 @@ StarSweepers/                          ← リポジトリのルート
     │   ├── Art/                  見た目の素材（Materials／Models／Shaders／Sprites／Textures）
     │   ├── Prefabs/              プレハブ。**役割で分ける**（Player＝体、Item＝物資・爆弾、Gimmick＝仕掛け、
     │   │                         System＝試合の進行役・通信・カメラ、UI＝画面、Effect＝演出）
-    │   ├── Scripts/              スクリプト。**役割で分ける**（Player／Hook／Item／Gimmick／Match＝試合の進行／
-    │   │                         Lobby／Camera／Bot／Network／UI／Effect／Input／Common）。エディタ用は各フォルダの Editor/
+    │   ├── Scripts/              スクリプト。**どのシーンで使うかで分け、その中を役割で分ける**（2026/11/6）。エディタ用は各フォルダの Editor/
+    │   │   ├── TitleScene/       タイトルだけで使う物（UI＝タイトル画面、TitleSceneFlow＝タイトルとロビーの行き来）
+    │   │   ├── Lobby/            ロビーだけで使う物（UI＝ロビーの画面・リアクション、Gimmick＝ロビーの端末・チームの場所など）
+    │   │   ├── Game/             ゲームの中身（ロビーでも動く）：Player＝体、Hook＝フック、Item＝物資・爆弾、Gimmick＝仕掛け、
+    │   │   │                     Match＝試合の進行、Camera、Bot、Effect＝演出、UI＝試合中の表示
+    │   │   ├── Common/           どのシーンでも使う土台：Input＝入力、Network＝通信、Settings＝設定・ポーズ画面、UI＝ポインター・フォント
+    │   │   └── SG_Character/・SG_Stage/  Hansさんのスクリプト（動かす前に本人の了承が要る）
     │   ├── Resources/            名前で読み込むもの（タイトル・ロビーの画面のプレハブ、ボタンのテーマ、名前タグ）
     │   └── Scenes/               シーン（直下の SpaceJunkMapList.asset は、使うマップの一覧）
     │       ├── MainLoop/             タイトルとロビー（TitleScene・SpaceJunkLobby）
@@ -300,6 +305,8 @@ StarSweepers/                          ← リポジトリのルート
 また、**C#スクリプトのファイル名は中のクラス名と必ず同じ**にすること。違うとUnityが認識しない。
 
 > `StarSweepers/Assets/` の中は、**2026/11/5 に役割で分けた構成に整理した**（上の図。1つずつの対応は `実装計画/フォルダ整理の対応表.md`）。
+> **`Scripts/` だけは 2026/11/6 に、どのシーンで使うか（TitleScene／Lobby／Game／Common）で分け直した**（1つずつの対応は `実装計画/スクリプトのシーン別フォルダの対応表.md`）。
+> 新しいスクリプトは、タイトルだけ・ロビーだけで使うならその フォルダ、ゲームの中身なら `Game/`、どのシーンでも使う土台なら `Common/` の、役割のフォルダに入れる。
 > AIは `Assets/` 以下に新しいフォルダを勝手に作らず、**置き場所を確認してから**作業すること。新しいファイルは、上の図の役割のフォルダに入れる。
 > ただし**検証用シーンの置き場所は `Assets/Scenes/Test/`、ステージ（マップ）は `Assets/Scenes/Stage/` に決まっている**
 > （`Documents/シーンとプレハブの作り方.md`）。
@@ -432,7 +439,7 @@ git push
 
 ```
 【やりたいこと】プレイヤーが2段ジャンプできるようにしたい
-【関係する場所】Assets/Scripts/Player 付近 / SampleScene
+【関係する場所】Assets/Scripts/Game/Player 付近 / SampleScene
 【完成の条件】空中で1回だけ追加でジャンプでき、着地したら回数がリセットされる
 ```
 
@@ -720,3 +727,4 @@ Unityは `.meta` ファイルで各アセットの参照を管理しているた
 | 11/5（木） | Claude Code | リポジトリ構成の図を、大槻さんの整理に合わせた（タイトルとロビーは `Scenes/MainLoop/`。`STAGE_〜` より前の世代のマップ `SpaceJunkMap01〜04` は消したので `Scenes/Old/` を外した） |
 | 11/5（木） | Claude Code | リポジトリ構成とドキュメント役割表に `スクリプトの使われ方の一覧.md` を追加（大槻さんの依頼。コード整理の前に読む地図）。ルールの部分は変えていない |
 | 11/6（金） | Claude Code | リポジトリ構成とドキュメント役割表に `スクリプトの説明/` を追加（大槻さんの依頼。コードのコメントを短くし、詳しい説明はここに書く）。ルールの部分は変えていない |
+| 11/6（金） | Claude Code | **`Scripts/` を、どのシーンで使うか（TitleScene／Lobby／Game／Common）で分け直した**（大槻さんの依頼）。リポジトリ構成の図を書き換え、**新しいスクリプトの置き場所の決まり**（タイトルだけ・ロビーだけならそのフォルダ、ゲームの中身は `Game/`、どのシーンでも使う土台は `Common/`）を足した。依頼文の例の場所も直した |

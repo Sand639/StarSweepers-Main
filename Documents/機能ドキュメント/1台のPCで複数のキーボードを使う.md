@@ -38,13 +38,13 @@
 
 | 種類 | パス |
 | --- | --- |
-| スクリプト | `Assets/Scripts/Input/RawInputKeyboard.cs`（Windowsからキーボードごとの入力を受け取る） |
-| スクリプト | `Assets/Scripts/Input/RawKeyMap.cs`（キーの番号を Unity の `Key` に直す表） |
-| スクリプト | `Assets/Scripts/Input/MultiKeyboardDevice.cs`（キーボード1台分の状態） |
-| スクリプト | `Assets/Scripts/Input/MultiKeyboardManager.cs`（シーンに置く管理役） |
+| スクリプト | `Assets/Scripts/Common/Input/RawInputKeyboard.cs`（Windowsからキーボードごとの入力を受け取る） |
+| スクリプト | `Assets/Scripts/Common/Input/RawKeyMap.cs`（キーの番号を Unity の `Key` に直す表） |
+| スクリプト | `Assets/Scripts/Common/Input/MultiKeyboardDevice.cs`（キーボード1台分の状態） |
+| スクリプト | `Assets/Scripts/Common/Input/MultiKeyboardManager.cs`（シーンに置く管理役） |
 | スクリプト | `Assets/Scripts/Input/MultiKeyboardTestHud.cs`（確認用の画面表示） |
-| スクリプト | `Assets/Scripts/Input/UnityKeyboardBridge.cs`（受け取ったキーを Unity の `Keyboard.current` へ流し直す） |
-| スクリプト | `Assets/Scripts/Input/UnityMouseBridge.cs`（マウス版。受け取った移動量を `Mouse.current.delta` へ流し直す） |
+| スクリプト | `Assets/Scripts/Common/Input/UnityKeyboardBridge.cs`（受け取ったキーを Unity の `Keyboard.current` へ流し直す） |
+| スクリプト | `Assets/Scripts/Common/Input/UnityMouseBridge.cs`（マウス版。受け取った移動量を `Mouse.current.delta` へ流し直す） |
 | シーン | まだ無い。空の GameObject に `MultiKeyboardManager` と `MultiKeyboardTestHud` を付けて再生すれば確認できる |
 
 ### 使い方（プログラマー向け）
@@ -166,3 +166,4 @@ Windows では、1つのプログラムが「キーボード（マウス）の�
 | 2026/10/6 | Claude Code | Unity の入力へ流し直す橋渡しを追加（小野田さんの依頼）。止まるのはキーと移動量の2つだけだった検証結果を反映 |
 | 2026/10/7 | Claude Code | 固定登録（`SetFixedDevices`）を追加したことと、席ごとの入力（`席ごとの入力と機器の固定登録.md`）への案内を追記 |
 | 2026/11/5 | Claude Code | フォルダ整理に合わせて、場所の書き込みを新しい場所に直した（対応は `実装計画/フォルダ整理の対応表.md`） |
+| 2026/11/6 | Claude Code | スクリプトのフォルダ分け直し（TitleScene・Lobby・Game・Common）に合わせて、スクリプトの場所の書き込みを新しい場所に直した（対応は `実装計画/スクリプトのシーン別フォルダの対応表.md`） |

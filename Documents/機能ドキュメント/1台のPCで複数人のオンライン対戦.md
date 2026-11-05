@@ -45,18 +45,18 @@
 
 | 種類 | パス |
 | --- | --- |
-| スクリプト（新規） | `Assets/Scripts/Input/LocalMultiplayer.cs`（このPCの人数・人ごとの番号・席の管理役の用意） |
-| スクリプト（変更） | `Assets/Scripts/Match/SpaceJunkSession.cs`（ホストが2人目以降を出す／消す。チーム分けの席を人ごとにした） |
-| スクリプト（変更） | `Assets/Scripts/Lobby/SpaceJunkLobbyUI.cs`（「このPCで遊ぶ人数」の小窓・人数をホストへ伝える） |
-| スクリプト（変更） | `Assets/Scripts/Lobby/SpaceJunkLobbyScreen.cs` ／ `SpaceJunkNameplate.cs` ／ `SpaceJunkRoundIntro.cs`（develop の取り込みで合わせた：一覧の「▶」・頭の上の名前とチームの色を人ごとに見る／始まりの演出は1人目に寄る） |
-| スクリプト（変更） | `Assets/Scripts/Player/FishingNetPlayer.cs`（そのPCの何人目か `LocalSeat`・人ごとの番号 `PlayerKey`） |
-| スクリプト（変更） | `Assets/Scripts/Player/SpaceJunkPlayerSetup.cs`（チームを人ごとに見る・戻るキーを席ごとに・カメラとレーダーは1人目だけ） |
-| スクリプト（変更） | `Assets/Scripts/Hook/HookChargeUI.cs`（ゲージを人ごとに複製して頭の上に出す `CreateOverhead`。2026/10/8） |
-| スクリプト（変更） | `Assets/Scripts/Item/FishingNetSupply.cs`（物の取り合いで「どの人か」を参加番号で見分ける） |
-| スクリプト（変更） | `Assets/Scripts/Hook/HookAimAssist.cs`（狙い方の切り替えを席ごとに・表示は1人目だけ） |
-| スクリプト（変更） | `Assets/Scripts/UI/SpaceJunkRadar.cs` ／ `SpaceJunkLobbyTerminal.cs`（チームを人ごとに見る／端末に近いかは1人目で見る） |
-| スクリプト（変更） | `Assets/Scripts/Input/PlayerInputSource.cs`（キー＋コントローラのボタンを席ごとに読む `WasPressed` を追加） |
-| スクリプト（変更） | `Assets/Scripts/Input/InputSeatManager.cs` ほか（シーンをまたいで残る管理役を作る `CreatePersistent`） |
+| スクリプト（新規） | `Assets/Scripts/Common/Input/LocalMultiplayer.cs`（このPCの人数・人ごとの番号・席の管理役の用意） |
+| スクリプト（変更） | `Assets/Scripts/Game/Match/SpaceJunkSession.cs`（ホストが2人目以降を出す／消す。チーム分けの席を人ごとにした） |
+| スクリプト（変更） | `Assets/Scripts/Lobby/UI/SpaceJunkLobbyUI.cs`（「このPCで遊ぶ人数」の小窓・人数をホストへ伝える） |
+| スクリプト（変更） | `Assets/Scripts/Lobby/UI/SpaceJunkLobbyScreen.cs` ／ `SpaceJunkNameplate.cs` ／ `SpaceJunkRoundIntro.cs`（develop の取り込みで合わせた：一覧の「▶」・頭の上の名前とチームの色を人ごとに見る／始まりの演出は1人目に寄る） |
+| スクリプト（変更） | `Assets/Scripts/Game/Player/FishingNetPlayer.cs`（そのPCの何人目か `LocalSeat`・人ごとの番号 `PlayerKey`） |
+| スクリプト（変更） | `Assets/Scripts/Game/Player/SpaceJunkPlayerSetup.cs`（チームを人ごとに見る・戻るキーを席ごとに・カメラとレーダーは1人目だけ） |
+| スクリプト（変更） | `Assets/Scripts/Game/Hook/HookChargeUI.cs`（ゲージを人ごとに複製して頭の上に出す `CreateOverhead`。2026/10/8） |
+| スクリプト（変更） | `Assets/Scripts/Game/Item/FishingNetSupply.cs`（物の取り合いで「どの人か」を参加番号で見分ける） |
+| スクリプト（変更） | `Assets/Scripts/Game/Hook/HookAimAssist.cs`（狙い方の切り替えを席ごとに・表示は1人目だけ） |
+| スクリプト（変更） | `Assets/Scripts/Game/UI/SpaceJunkRadar.cs` ／ `SpaceJunkLobbyTerminal.cs`（チームを人ごとに見る／端末に近いかは1人目で見る） |
+| スクリプト（変更） | `Assets/Scripts/Common/Input/PlayerInputSource.cs`（キー＋コントローラのボタンを席ごとに読む `WasPressed` を追加） |
+| スクリプト（変更） | `Assets/Scripts/Common/Input/InputSeatManager.cs` ほか（シーンをまたいで残る管理役を作る `CreatePersistent`） |
 
 **シーン・プレハブは変更していない。** 2人目以降は、NetworkManager の Player Prefab（`SpaceJunkPlayer.prefab`）からホストが出す。
 
@@ -123,3 +123,4 @@
 | 2026/10/15 | Claude Code | 全体の最大人数を8人に戻したことを反映（大槻さんの依頼） |
 | 2026/10/21 | Claude Code | ホストのPCの16人目以降をデバッグ用のボットに使うことを追記（宇宙ごみを集めるボット） |
 | 2026/11/5 | Claude Code | フォルダ整理に合わせて、場所の書き込みを新しい場所に直した（対応は `実装計画/フォルダ整理の対応表.md`） |
+| 2026/11/6 | Claude Code | スクリプトのフォルダ分け直し（TitleScene・Lobby・Game・Common）に合わせて、スクリプトの場所の書き込みを新しい場所に直した（対応は `実装計画/スクリプトのシーン別フォルダの対応表.md`） |
