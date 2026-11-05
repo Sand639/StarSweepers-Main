@@ -32,7 +32,7 @@ public class ExplosiveObject : MonoBehaviour
     [Tooltip("巻き込まれたプレイヤーが動けなくなる秒数")]
     [SerializeField] private float playerStunSeconds = 2f;
 
-    [Tooltip("爆発の見た目。Prefabs/FishingExplosion を入れる")]
+    [Tooltip("爆発の見た目。Prefabs/Effect/FishingExplosion を入れる")]
     [SerializeField] private ExplosionEffect explosionEffectPrefab;
 
     [Header("危なさの見せ方")]

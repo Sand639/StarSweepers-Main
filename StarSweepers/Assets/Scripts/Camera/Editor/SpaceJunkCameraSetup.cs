@@ -18,7 +18,7 @@ using UnityEngine;
 /// </summary>
 public static class SpaceJunkCameraSetup
 {
-    private const string CameraPrefabPath = "Assets/Prefabs/SpaceJunk/Online/SpaceJunkStageCamera.prefab";
+    private const string CameraPrefabPath = "Assets/Prefabs/System/SpaceJunkStageCamera.prefab";
     private const string TestScenePath = "Assets/Scenes/Test/SpaceJunkTeamCameraTest.unity";
 
     /// <summary>

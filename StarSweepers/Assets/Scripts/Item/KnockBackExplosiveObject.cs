@@ -7,7 +7,7 @@ using UnityEngine;
 /// ExplosiveObject を継承するため、既存のフック・通信・カウントダウンがそのまま使える。
 /// </summary>
 /// <remarks>
-/// プレハブ：`Assets/Prefabs/Sou/KnockBackBoom.prefab`（通常の爆弾のスクリプトをこれに差し替えたもの）。
+/// プレハブ：`Assets/Prefabs/Item/KnockBackBoom.prefab`（通常の爆弾のスクリプトをこれに差し替えたもの）。
 /// 親の <see cref="ExplosiveObject"/> が「範囲内の誰に・何に当たったか」を調べ、
 /// ここは**当たった相手に何をするか**だけを差し替えている。
 /// 親から継承して見える Player Stun Seconds は、この爆弾では使わない。

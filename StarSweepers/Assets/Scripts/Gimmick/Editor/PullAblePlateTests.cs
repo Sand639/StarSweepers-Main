@@ -33,9 +33,9 @@ using UnityEngine.SceneManagement;
 /// </summary>
 public class PullAblePlateTests
 {
-    private const string PlatePrefabPath = "Assets/Prefabs/SpaceJunk/Gimmick/PullAblePlate.prefab";
-    private const string AnchorPrefabPath = "Assets/Prefabs/SpaceJunk/Gimmick/PullAblePlateAnchor.prefab";
-    private const string Stage05ScenePath = "Assets/Scenes/Prototype/SpaceJunk/Stage/STAGE_05.unity";
+    private const string PlatePrefabPath = "Assets/Prefabs/Gimmick/PullAblePlate.prefab";
+    private const string AnchorPrefabPath = "Assets/Prefabs/Gimmick/PullAblePlateAnchor.prefab";
+    private const string Stage05ScenePath = "Assets/Scenes/Stage/STAGE_05.unity";
 
     /// <summary>床は通信に対応した部品（NetworkBehaviour）であるはず。オンラインで床の位置をホストが決めるため。</summary>
     [Test]

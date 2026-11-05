@@ -23,9 +23,9 @@ using UnityEngine.SceneManagement;
 public static class PullAblePlateOnlineSetup
 {
     private const string PlatePrefabPath =
-        "Assets/Prefabs/SpaceJunk/Gimmick/PullAblePlate.prefab";
+        "Assets/Prefabs/Gimmick/PullAblePlate.prefab";
     private const string Stage05ScenePath =
-        "Assets/Scenes/Prototype/SpaceJunk/Stage/STAGE_05.unity";
+        "Assets/Scenes/Stage/STAGE_05.unity";
 
     /// <summary>
     /// プレハブの設定 → STAGE_05 の保存、の順に行う。

@@ -15,7 +15,7 @@ using UnityEngine.SceneManagement;
 public class Stage03MeteorSetupTests
 {
     private const string ScenePath =
-        "Assets/Scenes/Prototype/SpaceJunk/Stage/STAGE_03.unity";
+        "Assets/Scenes/Stage/STAGE_03.unity";
 
     /// <summary>
     /// STAGE_03 を開いたら → 管理役（MeteorManager）が1つ、落下範囲（MeteorArea）が8つあり、

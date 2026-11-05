@@ -19,8 +19,8 @@ using UnityEngine.SceneManagement;
 ///
 /// ## やること
 ///
-/// 1. `Assets/Prefabs/SpaceJunk/Online/SpaceJunkRound.prefab` が無ければ作る（NetworkObject ＋ SpaceJunkRound）
-/// 2. `Assets/Scenes/Prototype/SpaceJunk/` の下のシーンのうち、SpaceJunkRound があるものを1つずつ開き、
+/// 1. `Assets/Prefabs/System/SpaceJunkRound.prefab` が無ければ作る（NetworkObject ＋ SpaceJunkRound）
+/// 2. `Assets/Scenes/` の下のシーンのうち、SpaceJunkRound があるものを1つずつ開き、
 ///    今の進行役を**プレハブを置いたものに入れ替える**
 ///    ・位置・親・並び順・名前・レイヤー・タグ・オン／オフは引き継ぐ
 ///    ・SpaceJunkRound の値は引き継ぐ（**プレハブと違う値だけ、そのマップの上書きとして残る**）
@@ -31,7 +31,7 @@ using UnityEngine.SceneManagement;
 /// </summary>
 public static class SpaceJunkRoundPrefabSetup
 {
-    public const string PrefabPath = "Assets/Prefabs/SpaceJunk/Online/SpaceJunkRound.prefab";
+    public const string PrefabPath = "Assets/Prefabs/System/SpaceJunkRound.prefab";
 
     [MenuItem("Tools/StarSweepers/ラウンドの進行役をプレハブにして全マップを置き換える")]
     public static void ReplaceAllMaps()

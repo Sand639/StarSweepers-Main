@@ -30,8 +30,8 @@ using UnityEngine.SceneManagement;
 /// </summary>
 public static class SpaceJunkTeamCameraSetup
 {
-    private const string SourcePath = SpaceJunkSetup.MapSceneFolder + "/SpaceJunkMap01.unity";
-    private const string DestinationPath = SpaceJunkSetup.MapSceneFolder + "/SpaceJunkMap01TeamCam.unity";
+    private const string SourcePath = SpaceJunkSetup.OldMapSceneFolder + "/SpaceJunkMap01.unity";
+    private const string DestinationPath = SpaceJunkSetup.OldMapSceneFolder + "/SpaceJunkMap01TeamCam.unity";
 
     /// <summary>
     /// Map01 を複製してカメラを差し替え、ビルドの一覧・マップの一覧に入れて点検する。

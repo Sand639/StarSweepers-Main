@@ -8,7 +8,7 @@ using UnityEngine;
 /// ・引っ張り終わった時点でどの床に乗っているかをもう一度調べる。途中で降りていたら何もしない
 /// ・動く向きは「床の中心 → アンカー」の水平方向。アンカーの高さは関係ない
 ///
-/// プレハブは `Assets/Prefabs/SpaceJunk/Gimmick/PullAblePlateAnchor.prefab`。
+/// プレハブは `Assets/Prefabs/Gimmick/PullAblePlateAnchor.prefab`。
 /// どの床に付くものでもなく、場外に何個でも置ける（置いた位置がそのまま動く向きになる）。
 /// </summary>
 [RequireComponent(typeof(Collider))]

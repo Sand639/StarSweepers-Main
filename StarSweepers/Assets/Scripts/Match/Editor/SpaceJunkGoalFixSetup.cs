@@ -11,7 +11,7 @@ using UnityEngine.SceneManagement;
 ///
 /// ## なぜ要るか
 ///
-/// `Assets/Prefabs/Fish/Online/GoalArea.prefab` は**釣りのゴール**（`FishingNetPocket`）で、
+/// `Assets/Prefabs/System/GoalArea.prefab` は**釣りのゴール**（`FishingNetPocket`）で、
 /// 宇宙ごみのゴール（`SpaceJunkGoal`）は付いていない。今あるマップは、作るツールが自動で付け替えていたので動いていた。
 /// 手で GoalArea を置くと釣りのゴールのままなので、**「〇〇チームのゴールがありません」になってゲームが進まない**
 /// （2026/10/1：大槻さんが作った SpaceJunkMap05 で実際に起きた）。

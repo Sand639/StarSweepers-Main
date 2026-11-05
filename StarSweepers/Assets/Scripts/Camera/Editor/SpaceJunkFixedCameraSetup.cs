@@ -42,8 +42,8 @@ using UnityEngine.SceneManagement;
 /// </summary>
 public static class SpaceJunkFixedCameraSetup
 {
-    private const string SourcePath = SpaceJunkSetup.MapSceneFolder + "/SpaceJunkMap01.unity";
-    private const string DestinationPath = SpaceJunkSetup.MapSceneFolder + "/SpaceJunkMap01Fixed.unity";
+    private const string SourcePath = SpaceJunkSetup.OldMapSceneFolder + "/SpaceJunkMap01.unity";
+    private const string DestinationPath = SpaceJunkSetup.OldMapSceneFolder + "/SpaceJunkMap01Fixed.unity";
 
     /// <summary>見下ろす角度（度）。ふだんの追いかけるカメラと同じにしてある。</summary>
     private const float PitchDegrees = 60f;

@@ -10,7 +10,7 @@ using UnityEngine.SceneManagement;
 ///
 /// | メニュー（`Tools > StarSweepers > Space Junk > Meteor >`） | すること |
 /// | --- | --- |
-/// | `Create Prefabs` | `Assets/Prefabs/SpaceJunk/Gimmick/Meteor/` に、隕石攻撃の6つのプレハブと3つのマテリアルを作る。**すでにある物は上書きしない** |
+/// | `Create Prefabs` | `Assets/Prefabs/Gimmick/Meteor/` に、隕石攻撃の6つのプレハブと3つのマテリアルを作る。**すでにある物は上書きしない** |
 /// | `Add To Current Scene` | いま開いているシーンに管理役（MeteorManager）を置き、**選んでいる床**それぞれに落下範囲（MeteorArea）を子として足す |
 /// | `Install Into STAGE_03` | STAGE_03 を開き、ドーナツ床の上に8方向の落下範囲を置いて、管理役の数値を決めた値にして保存する |
 ///
@@ -20,8 +20,8 @@ using UnityEngine.SceneManagement;
 public static class SpaceJunkMeteorSetup
 {
     public const string Stage03ScenePath =
-        "Assets/Scenes/Prototype/SpaceJunk/Stage/STAGE_03.unity";
-    public const string PrefabFolder = "Assets/Prefabs/SpaceJunk/Gimmick/Meteor";
+        "Assets/Scenes/Stage/STAGE_03.unity";
+    public const string PrefabFolder = "Assets/Prefabs/Gimmick/Meteor";
     public const string ManagerPrefabPath = PrefabFolder + "/MeteorManager.prefab";
     public const string AreaPrefabPath = PrefabFolder + "/MeteorArea.prefab";
     public const string StrikePrefabPath = PrefabFolder + "/MeteorStrikeEvent.prefab";

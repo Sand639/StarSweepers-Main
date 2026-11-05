@@ -19,8 +19,8 @@ using UnityEngine;
 public static class PlayerSeatTestSetup
 {
     private const string ScenePath = "Assets/Scenes/Test/PlayerSeatTest.unity";
-    private const string PlayerPrefabPath = "Assets/Prefabs/SpaceJunk/Online/SpaceJunkPlayer.prefab";
-    private const string SupplyPrefabPath = "Assets/Prefabs/Fish/FishingSupply.prefab";
+    private const string PlayerPrefabPath = "Assets/Prefabs/Player/SpaceJunkPlayer.prefab";
+    private const string SupplyPrefabPath = "Assets/Prefabs/Item/FishingSupply.prefab";
 
     /// <summary>正方形の床の一辺（m）。四方の壁もこの長さで、床の縁に立てる。</summary>
     private const float FloorSize = 24f;

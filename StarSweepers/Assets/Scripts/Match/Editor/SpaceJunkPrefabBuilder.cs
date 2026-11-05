@@ -7,9 +7,9 @@ using UnityEngine.InputSystem;
 /// **宇宙ごみ集めで使うプレハブを組み立てる置き場。**
 ///
 /// 作るもの：
-///   ・`Assets/Prefabs/SpaceJunk/Online/SpaceJunkSession.prefab` … 試合の係（ラウンドをまたいで生き続ける）
-///   ・`Assets/Prefabs/SpaceJunk/Online/SpaceJunkPlayer.prefab` … 1人分の本体
-///   ・`Assets/Prefabs/SpaceJunk/Online/SpaceJunkPlate/Circuit/Fuel.prefab` … 素材3種類
+///   ・`Assets/Prefabs/System/SpaceJunkSession.prefab` … 試合の係（ラウンドをまたいで生き続ける）
+///   ・`Assets/Prefabs/Player/SpaceJunkPlayer.prefab` … 1人分の本体
+///   ・`Assets/Prefabs/Item/SpaceJunkPlate/Circuit/Fuel.prefab` … 素材3種類
 ///
 /// ## 釣りのものを壊さないために
 ///
@@ -30,15 +30,24 @@ using UnityEngine.InputSystem;
 /// </summary>
 internal static class SpaceJunkPrefabBuilder
 {
-    public const string PrefabFolder = "Assets/Prefabs/SpaceJunk";
-    public const string OnlinePrefabFolder = PrefabFolder + "/Online";
+    // 2026/11/5 のフォルダ整理で、`Assets/Prefabs/SpaceJunk/Online` にまとめていたプレハブを、役割ごとの置き場所に分けた
+    public const string PrefabFolder = "Assets/Prefabs";
 
-    public const string SessionPrefabPath = OnlinePrefabFolder + "/SpaceJunkSession.prefab";
-    public const string PlayerPrefabPath = OnlinePrefabFolder + "/SpaceJunkPlayer.prefab";
+    /// <summary>試合の進行役・通信・カメラ・ゴール。</summary>
+    public const string SystemPrefabFolder = PrefabFolder + "/System";
 
-    public const string PlatePrefabPath = OnlinePrefabFolder + "/SpaceJunkPlate.prefab";
-    public const string CircuitPrefabPath = OnlinePrefabFolder + "/SpaceJunkCircuit.prefab";
-    public const string FuelPrefabPath = OnlinePrefabFolder + "/SpaceJunkFuel.prefab";
+    /// <summary>プレイヤーの体。</summary>
+    public const string PlayerPrefabFolder = PrefabFolder + "/Player";
+
+    /// <summary>物資（宇宙船の素材）。</summary>
+    public const string ItemPrefabFolder = PrefabFolder + "/Item";
+
+    public const string SessionPrefabPath = SystemPrefabFolder + "/SpaceJunkSession.prefab";
+    public const string PlayerPrefabPath = PlayerPrefabFolder + "/SpaceJunkPlayer.prefab";
+
+    public const string PlatePrefabPath = ItemPrefabFolder + "/SpaceJunkPlate.prefab";
+    public const string CircuitPrefabPath = ItemPrefabFolder + "/SpaceJunkCircuit.prefab";
+    public const string FuelPrefabPath = ItemPrefabFolder + "/SpaceJunkFuel.prefab";
 
     /// <summary>
     /// 通信で出せるプレハブの一覧（Netcode が最初に作るファイル）。ここに入っていないプレハブは、ホストが出しても他の人に出ない。
@@ -48,7 +57,9 @@ internal static class SpaceJunkPrefabBuilder
     /// <summary>プレハブの置き場を用意する。</summary>
     public static void EnsureFolders()
     {
-        FishingSceneBuilder.EnsureFolder(OnlinePrefabFolder);
+        FishingSceneBuilder.EnsureFolder(SystemPrefabFolder);
+        FishingSceneBuilder.EnsureFolder(PlayerPrefabFolder);
+        FishingSceneBuilder.EnsureFolder(ItemPrefabFolder);
     }
 
     // ------------------------------------------------------------

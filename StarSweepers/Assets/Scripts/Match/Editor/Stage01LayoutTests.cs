@@ -19,7 +19,7 @@ using UnityEngine.SceneManagement;
 public class Stage01LayoutTests
 {
     private const string ScenePath =
-        "Assets/Scenes/Prototype/SpaceJunk/Stage/STAGE_01.unity";
+        "Assets/Scenes/Stage/STAGE_01.unity";
 
     [Test]
     public void Stage01_LiftFloorsConnectTheGroundAndTheTopOfTheBase()

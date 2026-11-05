@@ -12,7 +12,7 @@ using UnityEngine.SceneManagement;
 ///
 /// ## やること
 ///
-/// 1. 一覧が無ければ作る（`Assets/Scenes/Prototype/SpaceJunk/SpaceJunkMapList.asset`）
+/// 1. 一覧が無ければ作る（`Assets/Scenes/SpaceJunkMapList.asset`）
 ///    - **最初に作るときだけ**、いまある `SpaceJunkMap〜` のシーンを入れておく
 ///    - **Map03・Map04 は作りかけなので「ロビーに出す」を外して入れる**（2026/9/22・大槻さん）
 /// 2. ロビーのシーンの画面（`SpaceJunkLobbyUI`）に、この一覧を結びつける

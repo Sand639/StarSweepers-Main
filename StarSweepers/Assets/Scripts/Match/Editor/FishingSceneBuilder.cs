@@ -40,31 +40,30 @@ internal static class FishingSceneBuilder
     // **プレハブを別のフォルダへ移したら、ここも直すこと。**
     // ここが合っていないと、ツールが「必要な物がありません」で止まるか、
     // 古い場所にプレハブを作り直して**二重になる**。
-    /// <summary>どの遊びでも使う共通のプレハブ（PlayerRig など）。</summary>
-    public const string CommonPrefabFolder = PrefabFolder + "/Common";
+    // 2026/11/5 のフォルダ整理で、遊びごとの置き場所（Common／Fish/Offline／Fish/Online／Fish/Online/Gimmick）をやめて、
+    // **役割ごとの置き場所**にした。対応は `Documents/実装計画/フォルダ整理の対応表.md`。
+    /// <summary>プレイヤーの体（PlayerRig・FishingOnlinePlayer など）。</summary>
+    public const string PlayerPrefabFolder = PrefabFolder + "/Player";
 
-    /// <summary>釣りのプレハブ全体の置き場所。</summary>
-    public const string FishPrefabFolder = PrefabFolder + "/Fish";
+    /// <summary>物資・爆発物と、それを出すスポナー。</summary>
+    public const string ItemPrefabFolder = PrefabFolder + "/Item";
 
-    /// <summary>釣りの1人用だけで使うプレハブ。</summary>
-    public const string FishOfflinePrefabFolder = FishPrefabFolder + "/Offline";
-
-    /// <summary>釣りのオンラインで使うプレハブ（プレイヤー・ゴール・仕組み一式）。</summary>
-    public const string FishOnlinePrefabFolder = FishPrefabFolder + "/Online";
-
-    /// <summary>オンラインで降ってくる物（物資・爆発物）。</summary>
-    public const string FishOnlineGimmickFolder = FishOnlinePrefabFolder + "/Gimmick";
+    /// <summary>見た目の演出（爆発など）。</summary>
+    public const string EffectPrefabFolder = PrefabFolder + "/Effect";
 
     // ---- シーンの置き場所 ----
     /// <summary>ロビー・会場・機能ごとの検証シーン。</summary>
     public const string SceneFolder = "Assets/Scenes/Test";
 
-    /// <summary>**遊ぶためのマップ**（`FishingMap〜`）の置き場所。プロトタイプのステージはここ。</summary>
-    public const string MapSceneFolder = "Assets/Scenes/Prototype/Fish";
+    /// <summary>
+    /// **遊ぶためのマップ**（`FishingMap〜`）の置き場所。
+    /// 釣りのマップはこのリポジトリには無い（旧リポジトリにある）。作るなら、`STAGE_〜` より前の世代のマップと同じ `Scenes/Old` に置く。
+    /// </summary>
+    public const string MapSceneFolder = "Assets/Scenes/Old";
 
-    private const string PlayerRigPath = CommonPrefabFolder + "/PlayerRig.prefab";
+    private const string PlayerRigPath = PlayerPrefabFolder + "/PlayerRig.prefab";
     // ※ FishingSpawnerSetup.ExplosionPrefabPath も同じ場所を指している。動かすときは両方直す
-    private const string ExplosionPrefabPath = FishPrefabFolder + "/FishingExplosion.prefab";
+    private const string ExplosionPrefabPath = EffectPrefabFolder + "/FishingExplosion.prefab";
     private const string RopeMaterialPath = MaterialFolder + "/Rope.mat";
     private const string InputActionsPath = "Assets/InputSystem_Actions.inputactions";
 
@@ -98,9 +97,9 @@ internal static class FishingSceneBuilder
         EnsureFolder(SceneFolder);
         EnsureFolder(MapSceneFolder);
         EnsureFolder(MaterialFolder);
-        EnsureFolder(CommonPrefabFolder);
-        EnsureFolder(FishOfflinePrefabFolder);
-        EnsureFolder(FishOnlineGimmickFolder);
+        EnsureFolder(PlayerPrefabFolder);
+        EnsureFolder(ItemPrefabFolder);
+        EnsureFolder(EffectPrefabFolder);
     }
 
     /// <summary>

@@ -6,7 +6,7 @@ using UnityEngine;
 /// <summary>
 /// 1回分の隕石攻撃。予告、落下、爆風、見た目の後片付けまでを受け持つ。
 ///
-/// <see cref="MeteorManager"/> がホストで1発ごとに出すプレハブ（`Assets/Prefabs/SpaceJunk/Gimmick/Meteor/`）。
+/// <see cref="MeteorManager"/> がホストで1発ごとに出すプレハブ（`Assets/Prefabs/Gimmick/Meteor/`）。
 /// 置かれた位置が爆心。流れは **地面の予告を出す → 着弾の Fall Seconds 前から隕石が上空から落ちてくる →
 /// 着弾で爆風（吹き飛ばし・スタン・導火線の点火）と爆発の見た目 → 見た目が消えたら自分を消す**。
 ///

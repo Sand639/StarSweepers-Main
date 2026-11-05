@@ -22,8 +22,8 @@ using UnityEngine.TestTools;
 /// </summary>
 public class SweeperOnlineTests
 {
-    private const string PlayerPrefabPath = "Assets/Prefabs/SpaceJunk/Online/SpaceJunkSweeperPlayer.prefab";
-    private const string SupplyPrefabPath = "Assets/Prefabs/SpaceJunk/Online/SpaceJunkPlate.prefab";
+    private const string PlayerPrefabPath = "Assets/Prefabs/Player/SpaceJunkSweeperPlayer.prefab";
+    private const string SupplyPrefabPath = "Assets/Prefabs/Item/SpaceJunkPlate.prefab";
     private const string NetworkPrefabsPath = "Assets/DefaultNetworkPrefabs.asset";
     private const ushort Port = 17991;
 

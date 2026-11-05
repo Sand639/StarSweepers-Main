@@ -30,10 +30,10 @@ using UnityEngine.SceneManagement;
 public static class SpaceJunkDuelMapSetup
 {
     /// <summary>複製元のマップ。</summary>
-    private const string SourcePath = SpaceJunkSetup.MapSceneFolder + "/SpaceJunkMap01.unity";
+    private const string SourcePath = SpaceJunkSetup.OldMapSceneFolder + "/SpaceJunkMap01.unity";
 
     /// <summary>作るマップの置き場所。</summary>
-    public const string DestinationPath = SpaceJunkSetup.MapSceneFolder + "/SpaceJunkMapDuelEW.unity";
+    public const string DestinationPath = SpaceJunkSetup.OldMapSceneFolder + "/SpaceJunkMapDuelEW.unity";
 
     /// <summary>ロビーに出す名前。</summary>
     private const string DisplayName = "1対1（東西）";

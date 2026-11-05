@@ -15,11 +15,11 @@ using UnityEngine.SceneManagement;
 ///
 /// ## できるもの
 ///
-///   ・`SpaceJunkLobby.unity`（2026/10/1 から `Assets/Scenes/Prototype/SpaceJunk/`。ツールは名前で探す） … つないで待ち合わせる部屋。
+///   ・`SpaceJunkLobby.unity`（2026/11/5 から `Assets/Scenes/Main/`。ツールは名前で探す） … つないで待ち合わせる部屋。
 ///     **設定端末**が置いてあり、ホストだけが近づいて `E` で詳細設定を開ける
-///   ・`Assets/Scenes/Prototype/SpaceJunk/SpaceJunkMap01〜03.unity` …
+///   ・`Assets/Scenes/Old/SpaceJunkMap01〜03.unity` …
 ///     **釣りのマップをコピーして、中の部品を宇宙ごみ用に差し替えたもの**
-///   ・`Assets/Prefabs/SpaceJunk/Online/` … 試合の係・プレイヤー・素材3種類
+///   ・`Assets/Prefabs/System/`・`Player/`・`Item/` … 試合の係・プレイヤー・素材3種類
 ///
 /// ## 釣りを壊さないために
 ///
@@ -44,10 +44,21 @@ using UnityEngine.SceneManagement;
 public static class SpaceJunkSetup
 {
     public const string LobbySceneName = "SpaceJunkLobby";
-    public const string MapSceneFolder = "Assets/Scenes/Prototype/SpaceJunk";
+    /// <summary>
+    /// シーン全体の置き場所（2026/11/5 のフォルダ整理で `Assets/Scenes/Prototype/SpaceJunk` から変えた）。
+    /// この中の `Main`（タイトルとロビー）・`Stage`（STAGE_〜）・`Old`（その前の世代のマップ）・`HansStages` に分かれている。
+    /// 使うマップの一覧（SpaceJunkMapList.asset）はこの直下。
+    /// </summary>
+    public const string MapSceneFolder = "Assets/Scenes";
+
+    /// <summary>タイトルとロビーのシーンの置き場所。</summary>
+    public const string MainSceneFolder = MapSceneFolder + "/Main";
+
+    /// <summary>`STAGE_〜` より前の世代のマップ（SpaceJunkMap01〜）の置き場所。</summary>
+    public const string OldMapSceneFolder = MapSceneFolder + "/Old";
 
     /// <summary>ロビーがどこにも無いときに、新しく作る場所。</summary>
-    private const string DefaultLobbyScenePath = MapSceneFolder + "/" + LobbySceneName + ".unity";
+    private const string DefaultLobbyScenePath = MainSceneFolder + "/" + LobbySceneName + ".unity";
 
     /// <summary>
     /// **ロビーのシーンの置き場所。名前（SpaceJunkLobby）で探す**ので、Unity の中で移動しても追いかける。
@@ -102,10 +113,11 @@ public static class SpaceJunkSetup
     /// </summary>
     private static readonly string[,] MapSources =
     {
-        { "Assets/Scenes/Test/FishingMap01.unity", MapSceneFolder + "/SpaceJunkMap01.unity" },
-        { "Assets/Scenes/Test/FishingMap02.unity", MapSceneFolder + "/SpaceJunkMap02.unity" },
-        { "Assets/Scenes/Prototype/Fish/FishingMap03.unity", MapSceneFolder + "/SpaceJunkMap03.unity" },
-        { "Assets/Scenes/Test/FishingOnline.unity", MapSceneFolder + "/SpaceJunkMap04.unity" }
+        // コピー元の釣りマップは、このリポジトリには無い（旧リポジトリにある）。コピー先だけ、今の置き場所に合わせてある
+        { "Assets/Scenes/Test/FishingMap01.unity", OldMapSceneFolder + "/SpaceJunkMap01.unity" },
+        { "Assets/Scenes/Test/FishingMap02.unity", OldMapSceneFolder + "/SpaceJunkMap02.unity" },
+        { "Assets/Scenes/Prototype/Fish/FishingMap03.unity", OldMapSceneFolder + "/SpaceJunkMap03.unity" },
+        { "Assets/Scenes/Test/FishingOnline.unity", OldMapSceneFolder + "/SpaceJunkMap04.unity" }
     };
 
     /// <summary>
@@ -121,7 +133,8 @@ public static class SpaceJunkSetup
         }
 
         FishingSceneBuilder.EnsureFolders();
-        FishingSceneBuilder.EnsureFolder(MapSceneFolder);
+        FishingSceneBuilder.EnsureFolder(MainSceneFolder);
+        FishingSceneBuilder.EnsureFolder(OldMapSceneFolder);
         SpaceJunkPrefabBuilder.EnsureFolders();
 
         InputActionAsset inputActions = FishingSceneBuilder.LoadInputActions();
@@ -156,7 +169,7 @@ public static class SpaceJunkSetup
             "【宇宙ごみ】ロビーとマップを作りました。\n" +
             "ロビー　: " + LobbyScenePath + "\n" +
             "マップ　: " + mapList + "\n" +
-            "プレハブ: " + SpaceJunkPrefabBuilder.OnlinePrefabFolder + "\n" +
+            "プレハブ: " + SpaceJunkPrefabBuilder.PrefabFolder + "\n" +
             "\n遊び方：\n" +
             "1. " + LobbySceneName + ".unity を開いて再生\n" +
             "2. 「インターネットで遊ぶ」→「部屋を作る」（合言葉が出るまで10〜20秒）\n" +

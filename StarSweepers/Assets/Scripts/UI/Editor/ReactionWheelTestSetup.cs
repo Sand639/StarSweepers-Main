@@ -7,7 +7,7 @@ using UnityEngine;
 ///
 /// | メニュー | すること |
 /// | --- | --- |
-/// | `Tools > StarSweepers > リアクション > プレハブを作る（無ければ）` | `Assets/Prefabs/Common/ReactionSystem.prefab` を作る。**あれば作り直さない** |
+/// | `Tools > StarSweepers > リアクション > プレハブを作る（無ければ）` | `Assets/Prefabs/UI/ReactionSystem.prefab` を作る。**あれば作り直さない** |
 /// | `Tools > StarSweepers > リアクション > 検証シーンを作り直す` | `Assets/Scenes/Test/ReactionWheelTest.unity` を作る（あれば上書き） |
 /// | `Tools > StarSweepers > リアクション > ロビーに置く（ゲームで試す）` | ロビーのシーンに `ReactionSystem` を1つ置いて保存する（もうあれば何もしない） |
 ///
@@ -15,7 +15,7 @@ using UnityEngine;
 /// </summary>
 public static class ReactionWheelTestSetup
 {
-    private const string PrefabPath = "Assets/Prefabs/Common/ReactionSystem.prefab";
+    private const string PrefabPath = "Assets/Prefabs/UI/ReactionSystem.prefab";
     private const string ScenePath = "Assets/Scenes/Test/ReactionWheelTest.unity";
     private const string LobbySceneName = "SpaceJunkLobby";
 

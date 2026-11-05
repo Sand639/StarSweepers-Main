@@ -7,7 +7,7 @@ using UnityEngine;
 /// 隕石攻撃のプレハブを作るメニュー（<see cref="SpaceJunkMeteorSetup.CreateMeteorPrefabs"/>）を
 /// 実際に動かし、**必要な6つのプレハブが、動くのに要る部品付きで出来上がるか**を確かめるテスト。
 ///
-/// 足りないプレハブは本当に `Assets/Prefabs/SpaceJunk/Gimmick/Meteor/` へ作られる
+/// 足りないプレハブは本当に `Assets/Prefabs/Gimmick/Meteor/` へ作られる
 /// （すでにある物は上書きしない）。通信で出す物の一覧への登録も行われる。
 /// </summary>
 public class SpaceJunkMeteorSetupTests
