@@ -1,0 +1,267 @@
+using System.IO;
+using System.Linq;
+using Unity.Netcode;
+using Unity.Netcode.Transports.UTP;
+using UnityEditor;
+using UnityEditor.SceneManagement;
+using UnityEngine;
+using UnityEngine.SceneManagement;
+
+/// <summary>
+/// 【一時的な調査用。コミットしない】タイトルから再生して、ホスト役または参加者役を自動で演じ、
+/// 「誰がどこにいて、見えているか」をログと PNG に残す。
+/// 起動：Unity.exe -batchmode -projectPath … -executeMethod TempSpawnProbe.Run -probeMode host|client -probeOut 出力フォルダ -logFile …
+/// ホスト役：部屋を作る → ロビー → ボット1人 → 参加者が来たら数秒後に試合開始 → 試合中を記録して終了。
+/// 参加者役：つながるまで繰り返し参加 → 数秒おきに記録 → 切れたら終了。
+/// </summary>
+[InitializeOnLoad]
+public static class TempSpawnProbe
+{
+    private const string Flag = "TempSpawnProbe.Active";
+    private const string OutKey = "TempSpawnProbe.Out";
+    private const string ModeKey = "TempSpawnProbe.Mode";
+    private const string StepKey = "TempSpawnProbe.Step";
+    private const string TimeKey = "TempSpawnProbe.T";
+    private const string StartKey = "TempSpawnProbe.Start";
+    private const string ShotKey = "TempSpawnProbe.Shot";
+    private const ushort Port = 17993;
+
+    static TempSpawnProbe()
+    {
+        if (SessionState.GetBool(Flag, false))
+        {
+            EditorApplication.update += Tick;
+        }
+    }
+
+    public static void Run()
+    {
+        string[] args = System.Environment.GetCommandLineArgs();
+        string outDir = ".";
+        string mode = "host";
+        for (int i = 0; i < args.Length - 1; i++)
+        {
+            if (args[i] == "-probeOut") outDir = args[i + 1];
+            if (args[i] == "-probeMode") mode = args[i + 1];
+        }
+
+        SessionState.SetBool(Flag, true);
+        SessionState.SetString(OutKey, outDir);
+        SessionState.SetString(ModeKey, mode);
+        SessionState.SetInt(StepKey, 0);
+        SessionState.SetInt(ShotKey, 0);
+        SessionState.SetFloat(TimeKey, 0f);
+        SessionState.SetFloat(StartKey, 0f);
+        EditorSceneManager.OpenScene("Assets/Scenes/Prototype/SpaceJunk/MainScene/TitleScene.unity");
+        EditorApplication.update += Tick;
+        EditorApplication.EnterPlaymode();
+    }
+
+    private static float Now => (float)EditorApplication.timeSinceStartup;
+    private static string Mode => SessionState.GetString(ModeKey, "host");
+
+    private static void Next(int step)
+    {
+        SessionState.SetInt(StepKey, step);
+        SessionState.SetFloat(TimeKey, Now);
+        Debug.Log($"[PROBE] {Mode} step -> {step}（シーン：{SceneManager.GetActiveScene().name}）");
+    }
+
+    private static void Tick()
+    {
+        if (!EditorApplication.isPlaying)
+        {
+            return;
+        }
+
+        // 画面なしの Unity では、放っておくとゲームのフレームが進まない。エラーで一時停止になっていたら解除する
+        Application.runInBackground = true;
+        if (EditorApplication.isPaused)
+        {
+            EditorApplication.isPaused = false;
+        }
+        EditorApplication.QueuePlayerLoopUpdate();
+
+        if (SessionState.GetFloat(TimeKey, 0f) <= 0f)
+        {
+            SessionState.SetFloat(TimeKey, Now);
+            SessionState.SetFloat(StartKey, Now);
+            return;
+        }
+
+        int step = SessionState.GetInt(StepKey, 0);
+        float waited = Now - SessionState.GetFloat(TimeKey, 0f);
+
+        // どちらの役も、3分たったら必ず終わる
+        if (Now - SessionState.GetFloat(StartKey, 0f) > 180f)
+        {
+            Debug.Log("[PROBE] 時間切れ");
+            Finish(3);
+            return;
+        }
+
+        try
+        {
+            if (Mode == "host") TickHost(step, waited);
+            else TickClient(step, waited);
+        }
+        catch (System.Exception e)
+        {
+            Debug.LogError("[PROBE] 例外：" + e);
+            Finish(2);
+        }
+    }
+
+    private static void SetAddress(NetworkManager manager)
+    {
+        UnityTransport transport = manager.GetComponent<UnityTransport>();
+        transport.SetConnectionData("127.0.0.1", Port, "127.0.0.1");
+    }
+
+    private static int OwnerCount => FishingNetPlayer.All.Select(p => p.OwnerClientId).Distinct().Count();
+
+    private static void TickHost(int step, float waited)
+    {
+        switch (step)
+        {
+            case 0:
+                if (waited < 3f) return;
+                SetAddress(NetworkManager.Singleton);
+                Debug.Log($"[PROBE] StartHost={NetworkManager.Singleton.StartHost()}");
+                Next(1);
+                break;
+
+            case 1: // ロビーに着いたら、ボットを1人足す
+                if (waited < 5f || SpaceJunkSession.Current == null) return;
+                SpaceJunkSession.Current.ServerSetTeamCount(2);
+                SpaceJunkSession.Current.ServerSetFixedMap("STAGE_01", false);
+                SpaceJunkSession.Current.ServerSetBotCount(1);
+                Next(2);
+                break;
+
+            case 2: // 参加者が来るのを待つ
+                if (OwnerCount < 2) return;
+                Debug.Log("[PROBE] 参加者が来た");
+                Next(3);
+                break;
+
+            case 3: // ロビーで 8 秒いっしょにいる（その間に参加者役がロビーを記録する）
+                if (waited < 8f) return;
+                Dump("lobby");
+                SpaceJunkSession.Current.ServerStartMatch();
+                Next(4);
+                break;
+
+            case 4:
+                if (waited < 7f) return;
+                Dump("match_intro");
+                Next(5);
+                break;
+
+            case 5:
+                if (waited < 16f) return;
+                Dump("match_play");
+                Next(6);
+                break;
+
+            case 6: // 参加者役が最後の記録を取るのを待ってから終わる
+                if (waited < 4f) return;
+                Finish(0);
+                break;
+        }
+    }
+
+    private static void TickClient(int step, float waited)
+    {
+        NetworkManager manager = NetworkManager.Singleton;
+        switch (step)
+        {
+            case 0:
+                if (waited < 3f) return;
+                SetAddress(manager);
+                Debug.Log($"[PROBE] StartClient={manager.StartClient()}");
+                Next(1);
+                break;
+
+            case 1: // つながるまで待つ。5 秒でつながらなければやり直す
+                if (manager.IsConnectedClient)
+                {
+                    Debug.Log($"[PROBE] つながった（自分の番号：{manager.LocalClientId}）");
+                    Next(2);
+                    return;
+                }
+                if (waited > 5f)
+                {
+                    manager.Shutdown();
+                    Next(0);
+                }
+                break;
+
+            case 2: // 4 秒おきに記録する。切れたら終わる
+                if (!manager.IsConnectedClient)
+                {
+                    Debug.Log("[PROBE] 切れたので終わる");
+                    Finish(0);
+                    return;
+                }
+                if (waited < 4f) return;
+                int shot = SessionState.GetInt(ShotKey, 0);
+                SessionState.SetInt(ShotKey, shot + 1);
+                Dump($"{shot:00}_{SceneManager.GetActiveScene().name}");
+                SessionState.SetFloat(TimeKey, Now);
+                break;
+        }
+    }
+
+    private static void Dump(string label)
+    {
+        NetworkManager manager = NetworkManager.Singleton;
+        Debug.Log($"[PROBE] ==== {Mode} {label}（シーン：{SceneManager.GetActiveScene().name}）プレイヤー {FishingNetPlayer.All.Count} 人／自分の番号 {(manager != null ? manager.LocalClientId : 999)} frame={Time.frameCount} ====");
+        foreach (FishingNetPlayer p in FishingNetPlayer.All)
+        {
+            Renderer[] rs = p.GetComponentsInChildren<Renderer>(true);
+            Renderer[] shown = rs.Where(r => r.enabled && r.gameObject.activeInHierarchy).ToArray();
+            Renderer model = rs.FirstOrDefault(r => r.name == "Model");
+            Debug.Log($"[PROBE] {p.name} owner={p.OwnerClientId} seat={p.LocalSeat} isOwner={p.IsOwner} active={p.gameObject.activeInHierarchy} scene={p.gameObject.scene.name} " +
+                      $"pos={p.transform.position:F2} scale={p.transform.lossyScale:F2} renderers={shown.Length}/{rs.Length} " +
+                      $"model={(model != null ? $"enabled={model.enabled} active={model.gameObject.activeInHierarchy} bounds={model.bounds.center:F1}/{model.bounds.size:F1} scale={model.transform.lossyScale:F2}" : "無し")}");
+        }
+
+        foreach (Camera c in Camera.allCameras)
+        {
+            Debug.Log($"[PROBE] camera {c.name} pos={c.transform.position:F1} rot={c.transform.eulerAngles:F0} mask={c.cullingMask} depth={c.depth}");
+        }
+
+        Capture(label);
+    }
+
+    private static void Capture(string label)
+    {
+        const int w = 1280, h = 720;
+        RenderTexture rt = new RenderTexture(w, h, 24);
+        foreach (Camera c in Camera.allCameras.OrderBy(c => c.depth))
+        {
+            RenderTexture old = c.targetTexture;
+            c.targetTexture = rt;
+            c.Render();
+            c.targetTexture = old;
+        }
+
+        RenderTexture.active = rt;
+        Texture2D tex = new Texture2D(w, h, TextureFormat.RGB24, false);
+        tex.ReadPixels(new Rect(0, 0, w, h), 0, 0);
+        tex.Apply();
+        RenderTexture.active = null;
+        string dir = SessionState.GetString(OutKey, ".");
+        File.WriteAllBytes(Path.Combine(dir, $"{Mode}_{label}.png"), tex.EncodeToPNG());
+        Object.DestroyImmediate(tex);
+        rt.Release();
+    }
+
+    private static void Finish(int code)
+    {
+        SessionState.SetBool(Flag, false);
+        Debug.Log($"[PROBE] finish {code}");
+        EditorApplication.Exit(code);
+    }
+}
