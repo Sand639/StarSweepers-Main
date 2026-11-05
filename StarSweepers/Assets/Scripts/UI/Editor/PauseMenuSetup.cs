@@ -15,7 +15,7 @@ using UnityEngine.InputSystem;
 /// </summary>
 public static class PauseMenuSetup
 {
-    private const string PrefabPath = "Assets/Prefabs/Common/PauseMenu.prefab";
+    private const string PrefabPath = "Assets/Prefabs/UI/PauseMenu.prefab";
     private const string InputActionsPath = "Assets/InputSystem_Actions.inputactions";
 
     [MenuItem("Tools/StarSweepers/アーカイブ/共通の部品/ポーズ画面を置く")]

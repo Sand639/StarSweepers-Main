@@ -28,7 +28,7 @@
 | 検証シーン | `Assets/Scenes/Test/GameTimerUITest.unity` |
 | プレハブ | `Assets/Resources/GameTimerUI.prefab` |
 | フォント | `Assets/TextMesh Pro/Resources/Fonts & Materials/LiberationSans SDF.asset`（TextMeshPro Essential Resources） |
-| 画像 | 背景 `Assets/Scenes/Test/shotaro/UI_Timer_Back.png`、白いリングゲージ `Assets/Scenes/Test/shotaro/UI_Timer_Radial.png` |
+| 画像 | 背景 `Assets/Art/Sprites/UI_Timer_Back.png`、白いリングゲージ `Assets/Art/Sprites/UI_Timer_Radial.png` |
 
 ## 設定できる値（インスペクターの項目）
 
@@ -59,3 +59,4 @@
 | 2026/10/8 | 鈴木 翔太郎（実装補助：Codex） | 完成見本画像をゲージから外し、TextMeshProと透過リングへ分離。12時から時計回りに空く向きへ調整 |
 | 2026/10/8 | 鈴木 翔太郎（実装補助：Codex） | TextMeshProのフォント資産を設定し、色見本に近い落ち着いた3色へ調整 |
 | 2026/10/8 | 鈴木 翔太郎（実装補助：Codex） | 提供された `UI_Timer_Radial.png` をゲージに設定し、残り割合の時計回り表示に合わせてFill方向を修正 |
+| 2026/11/5 | Claude Code | フォルダ整理に合わせて、場所の書き込みを新しい場所に直した（対応は `実装計画/フォルダ整理の対応表.md`） |

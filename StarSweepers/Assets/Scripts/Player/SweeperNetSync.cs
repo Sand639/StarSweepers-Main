@@ -5,7 +5,7 @@ using UnityEngine;
 /// <summary>
 /// **プレイヤー（本実装）を、宇宙ごみのオンラインで動かすための上乗せ。**（2026/10/28・小野田さんの依頼）
 ///
-/// 宇宙ごみのオンラインの体（`Assets/Prefabs/SpaceJunk/Online/SpaceJunkSweeperPlayer.prefab`）にだけ付ける。
+/// 宇宙ごみのオンラインの体（`Assets/Prefabs/Player/SpaceJunkSweeperPlayer.prefab`）にだけ付ける。
 /// 参加番号・名前・チーム分け・出てくる場所・カメラは、今の体と同じ部品（<see cref="FishingNetPlayer"/>・<see cref="SpaceJunkPlayerSetup"/>）がそのまま受け持つ。
 /// ここでやるのは次の4つ。
 ///

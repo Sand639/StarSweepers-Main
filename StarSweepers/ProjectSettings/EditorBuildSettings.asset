@@ -6,55 +6,37 @@ EditorBuildSettings:
   serializedVersion: 2
   m_Scenes:
   - enabled: 1
-    path: Assets/Scenes/Prototype/SpaceJunk/MainScene/TitleScene.unity
+    path: Assets/Scenes/MainLoop/TitleScene.unity
     guid: eef331577ac16e6488c9dd4a0af4c7bc
   - enabled: 1
-    path: Assets/Scenes/Prototype/SpaceJunk/MainScene/SpaceJunkLobby.unity
+    path: Assets/Scenes/MainLoop/SpaceJunkLobby.unity
     guid: 007da50d74b225f48aa0a5289b5db978
   - enabled: 1
-    path: Assets/Scenes/Prototype/SpaceJunk/SpaceJunkMap01.unity
-    guid: e09ae51e15c7b6b42a67bd18b6fec0f7
-  - enabled: 1
-    path: Assets/Scenes/Prototype/SpaceJunk/SpaceJunkMap02.unity
-    guid: 7ae955111be76a24a844f20d1629ae3a
-  - enabled: 1
-    path: Assets/Scenes/Prototype/SpaceJunk/SpaceJunkMap03.unity
-    guid: dc7bbf9cf5a4b4d468c0dee5d99c5b5a
-  - enabled: 1
-    path: Assets/Scenes/Prototype/SpaceJunk/SpaceJunkMap04.unity
-    guid: b2d0f8678e6762d4c8772e3dc97e74b2
-  - enabled: 1
-    path: Assets/Scenes/Prototype/SpaceJunk/SpaceJunkMap01Fixed.unity
-    guid: 08fd351c105fd3b4997a959175e597d3
-  - enabled: 1
-    path: Assets/Scenes/Prototype/SpaceJunk/SpaceJunkMap01TeamCam.unity
-    guid: 9df372df960c19a4696c8aef662a7cff
-  - enabled: 1
-    path: Assets/Scenes/Prototype/SpaceJunk/Stage/STAGE_01.unity
+    path: Assets/Scenes/Stage/STAGE_01.unity
     guid: e7bdbdc9ac9aaa14f968fe8859d7c13d
   - enabled: 1
-    path: Assets/Scenes/Prototype/SpaceJunk/Stage/STAGE_02.unity
+    path: Assets/Scenes/Stage/STAGE_02.unity
     guid: 8a4927a91b4ea2c4a90c9e120df1b0a6
   - enabled: 1
-    path: Assets/Scenes/Prototype/SpaceJunk/Stage/STAGE_03.unity
+    path: Assets/Scenes/Stage/STAGE_03.unity
     guid: 362314188fb38064c8243264d5c5b226
   - enabled: 1
-    path: Assets/Scenes/Prototype/SpaceJunk/Stage/STAGE_04.unity
+    path: Assets/Scenes/Stage/STAGE_04.unity
     guid: a193ab951a232bf41bb989db284f36ab
   - enabled: 1
-    path: Assets/Scenes/Prototype/SpaceJunk/Stage/STAGE_05.unity
+    path: Assets/Scenes/Stage/STAGE_05.unity
     guid: 3d91a38bd5e44aa49950b4139a3a7a7e
   - enabled: 1
-    path: Assets/Scenes/Prototype/SpaceJunk/Stage/STAGE_06.unity
+    path: Assets/Scenes/Stage/STAGE_06.unity
     guid: 6bcb86547aa4af447a8edab30a767437
   - enabled: 1
-    path: Assets/Scenes/Prototype/SpaceJunk/Stage/STAGE_07.unity
+    path: Assets/Scenes/Stage/STAGE_07.unity
     guid: 4abeb5a4636b30647b8382ab0a48e395
   - enabled: 1
-    path: Assets/Scenes/Prototype/SpaceJunk/Stage/STAGE_06^^.unity
+    path: Assets/Scenes/Stage/STAGE_06^^.unity
     guid: 7d8a551d15796014d8a9cd7380c1c1ca
   - enabled: 1
-    path: Assets/Scenes/Prototype/SpaceJunk/Stage/STAGE_07(New).unity
+    path: Assets/Scenes/Stage/STAGE_07(New).unity
     guid: 6ad51495980945547acf0e149c15b3c5
   m_configObjects:
     com.unity.input.settings.actions: {fileID: -944628639613478452, guid: 052faaac586de48259a63d0c4782560b, type: 3}

@@ -215,7 +215,7 @@ ping 192.168.10.1
 | 種類 | パス |
 | --- | --- |
 | スクリプト | `Assets/Scripts/Network/NetworkPlayer.cs`（プレイヤー1人分） |
-| スクリプト | `Assets/Scripts/Network/LocalPlayerCamera.cs`（自分を追いかけるカメラ） |
+| スクリプト | `Assets/Scripts/Camera/LocalPlayerCamera.cs`（自分を追いかけるカメラ） |
 | スクリプト | `Assets/Scripts/Network/LanConnectionUi.cs`（接続の仮画面） |
 | スクリプト | `Assets/Scripts/Network/LanAutoStart.cs`（起動引数での自動接続） |
 | スクリプト | `Assets/Scripts/Network/LanConnectionLogger.cs`（接続状況のログ） |
@@ -225,7 +225,7 @@ ping 192.168.10.1
 | スクリプト | `Assets/Scripts/Network/PushableBox.cs`（みんなで押せる箱） |
 | スクリプト（エディタ用） | `Assets/Scripts/Network/Editor/LanPlayTestSetup.cs`（シーン生成ツール） |
 | スクリプト（エディタ用） | `Assets/Scripts/Network/Editor/LanTestBuilder.cs`（検証用ビルド作成ツール） |
-| プレハブ | `Assets/Prefabs/Common/NetworkPlayer.prefab` |
+| プレハブ | `Assets/Prefabs/Player/NetworkPlayer.prefab` |
 | シーン | `Assets/Scenes/Test/LanPlayTest.unity` |
 | マテリアル | `Assets/Art/Materials/NetworkPlayerBody.mat` ほか2つ |
 | 入力設定 | `Assets/InputSystem_Actions.inputactions`（**既存のものを使用。変更していない**） |
@@ -430,3 +430,4 @@ LanPlayTest
 | 2026/10/13 | Claude Code | タイトル画面の作り直しで、LAN の部屋が一覧に自動で出るようになったこと（LanRoomDiscovery）を追記 |
 | 2026/10/15 | Claude Code | タイトル画面を前の画面に戻したので、LAN の部屋が出る場所を「LANのサーバーに参加する」画面の一覧に書き直した |
 | 2026/10/19 | Claude Code | タイトルの組み替えで、LAN の部屋はマルチプレイの画面の一覧の一番上に出るようになり、IP アドレスを打つ欄はなくなったことを反映 |
+| 2026/11/5 | Claude Code | フォルダ整理に合わせて、場所の書き込みを新しい場所に直した（対応は `実装計画/フォルダ整理の対応表.md`） |

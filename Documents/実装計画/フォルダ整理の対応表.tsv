@@ -63,8 +63,8 @@ Prefabs/SpaceJunk/Online/SpaceJunkStageCamera.prefab	Prefabs/System/SpaceJunkSta
 Prefabs/SpaceJunk/Online/SpaceJunkSweeperPlayer.prefab	Prefabs/Player/SpaceJunkSweeperPlayer.prefab
 Prefabs/SpaceJunk/Online/Train.prefab	Prefabs/Gimmick/Train.prefab
 Scenes/Prototype/SpaceJunk/HansStages/HansStage01_Ver01.unity	Scenes/HansStages/HansStage01_Ver01.unity
-Scenes/Prototype/SpaceJunk/MainScene/SpaceJunkLobby.unity	Scenes/Main/SpaceJunkLobby.unity
-Scenes/Prototype/SpaceJunk/MainScene/TitleScene.unity	Scenes/Main/TitleScene.unity
+Scenes/Prototype/SpaceJunk/MainScene/SpaceJunkLobby.unity	Scenes/MainLoop/SpaceJunkLobby.unity
+Scenes/Prototype/SpaceJunk/MainScene/TitleScene.unity	Scenes/MainLoop/TitleScene.unity
 Scenes/Prototype/SpaceJunk/SpaceJunkMap01.unity	Scenes/Old/SpaceJunkMap01.unity
 Scenes/Prototype/SpaceJunk/SpaceJunkMap01Fixed.unity	Scenes/Old/SpaceJunkMap01Fixed.unity
 Scenes/Prototype/SpaceJunk/SpaceJunkMap01TeamCam.unity	Scenes/Old/SpaceJunkMap01TeamCam.unity

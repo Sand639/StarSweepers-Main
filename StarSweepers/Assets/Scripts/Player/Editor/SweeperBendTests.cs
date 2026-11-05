@@ -17,7 +17,7 @@ using UnityEngine.TestTools;
 /// </summary>
 public class SweeperBendTests
 {
-    private const string PlayerPrefabPath = "Assets/Prefabs/Common/SweeperPlayer.prefab";
+    private const string PlayerPrefabPath = "Assets/Prefabs/Player/SweeperPlayer.prefab";
 
     [UnityTest]
     public IEnumerator NoTurn_PullsStraight()
