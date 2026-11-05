@@ -1029,7 +1029,7 @@ public class SpaceJunkLobbyScreen : MonoBehaviour
             return info;
         }
 
-        return manager.IsServer ? $"LAN：{TitleScreen.LocalAddresses()}" : "LAN でつないでいます";
+        return manager.IsServer ? $"LAN：{TitleConnection.LocalAddresses()}" : "LAN でつないでいます";
     }
 
     // ------------------------------------------------------------
