@@ -26,15 +26,24 @@
    ③起動時に動く物（`InitializeOnLoad`）、④`Scripts/Player・UI・Network・Common/Editor/` の道具、のうち**使っているクラスが全部そろっている物だけ**を足した。
 4. 名前で読まれる・設定から参照される `Assets/Resources/`・`Assets/Settings/`・`Assets/TextMesh Pro/` は丸ごと。
 5. 最後に、持ってきたシーン・プレハブ・マテリアルの中の GUID を全部調べ、「旧リポジトリにはあるのにこちらに無い物」が **0 件**になるまで足した。
-6. スクリプトが**パスの文字列で読んでいる**プレハブ（`"Assets/…"`）は、Unity でもクラス名でもたどれない。持ってきたスクリプトを調べて、
+6. **再生開始時に自分で生まれるスクリプト**（`[RuntimeInitializeOnLoadMethod]` で自分を作る物）は、どこからも参照されないので 2・3 では拾えない。
+   最初の移行ではこれを落とし、**ホストになってもロビーへ移らない**（`TitleSceneFlow` が無い）・**重なった NetworkManager が消えない**（`NetworkManagerCleanup` が無い）状態になっていた。
+   2026/11/5 に2つを戻し、道具にも「自分で生まれる物で、使っているクラスがそろっている物は足す」規則を入れた。
+7. スクリプトが**パスの文字列で読んでいる**プレハブ（`"Assets/…"`）は、Unity でもクラス名でもたどれない。持ってきたスクリプトを調べて、
    `Prefabs/Common/SweeperPlayer.prefab`（新しい体。自動テストが読む）・`Prefabs/Common/PauseMenu.prefab`・`Prefabs/Fish/FishingSupply.prefab` の3つを足した。
    同じ調べ方で見つかった**検証シーン 9 個は持ってきていない**（道具が作り直す出力先なので。`SpaceJunkSetup.cs` が読む釣りのマップ `FishingMap01〜03`・`FishingOnline` も無いので、
    その道具の「釣りのマップから作る」系のメニューはこのリポジトリでは動かない）。
-7. `ProjectSettings/`・`Packages/`・`.gitignore`・`.gitattributes`・`AGENTS.md`・`CLAUDE.md`・`.claude/commands/`・`共有フォルダ/` は丸ごと。
+8. `ProjectSettings/`・`Packages/`・`.gitignore`・`.gitattributes`・`AGENTS.md`・`CLAUDE.md`・`.claude/commands/`・`共有フォルダ/` は丸ごと。
    `ProjectSettings/EditorBuildSettings.asset`（ビルドに入れるシーンの一覧）は、持ってきたシーンだけに絞った（25 → 17）。
 
 結果：`Assets/` のファイル 378 件（スクリプト 206 本。旧は 285 本）。**2026/11/5 に、旧リポジトリの `develop` の `21549e0` まで同じ手順で取り込み直した**（移行のあとに、重いデブリ・ボットの新しい体・投げる向きの変更が旧リポジトリへ入っていたため）。画面なしの Unity 6000.3.14f1 で開いて**コンパイルエラー 0 件**を確認した。
 **人が再生しての確認はまだ**（タイトル → ロビー → STAGE を通しで遊べるかを、誰かが確かめること）。
+
+### 「コンパイルが通る」だけでは足りなかった（2026/11/5 の反省）
+
+移行の確認を「コンパイルエラー 0 件・参照 ID の漏れ 0 件」で終えていたが、上の 6 の不具合はどちらにも出ない。
+**移行や大きな整理のあとは、実際にタイトルから試合まで進めて確かめること。** やり方は下の「うまくいったやり方」の
+「ホスト役と参加者役の Unity を2つ同時に動かす」を見ること（道具は `Documents/調査の道具/`）。
 
 ### 旧リポジトリの PR #25（Hansさんのステージ初版）を取り込んだ（2026/11/5）
 
@@ -61,6 +70,36 @@
 - `Assets/Prefabs/` に `Fish/`・`FishingAnchor.prefab`・`GravityRace/`・`Sou/`・`Common/`・`Effect/` の一部が残っているのは、宇宙ごみのプレハブやシーンが参照しているため。消す前に参照元を確かめること。
 - 旧リポジトリの `develop` にこのあと入った変更は、こちらには自動では入らない。**旧リポジトリで作業しないよう**周知すること。
   実際に 11/4〜11/5 に 10 コミット入ってしまい、取り込み直した。もしまた入ったら、`Documents/移行の道具/使い方.md` の手順で取り込み直せる。
+
+---
+
+## ホスト役と参加者役の Unity を2つ同時に動かして、見え方を確かめる（2026/11/5）
+
+> 「参加者の画面で、ほかの人が見えない」のような、**2台いないと出ない不具合**を、1台の PC で AI だけで再現して確かめた方法。
+> 道具は `Documents/調査の道具/ホストと参加者を自動で演じて見え方を記録する.cs.txt`。
+
+1. プロジェクトのフォルダ（`StarSweepers/`）を、`Library` ごと別の場所へ複製する（同じプロジェクトは2つ同時に開けないため。約 2GB・robocopy で 30 秒）。
+2. 道具を、両方の `Assets/Scripts/SpaceJunk/Editor/TempSpawnProbe.cs` として置く（**一時的に置くだけ。終わったら `.cs` と `.meta` を消す**）。
+3. 2つ同時に起動する。片方に `-probeMode host`、もう片方に `-probeMode client` を付ける。
+
+   ```
+   Unity.exe -batchmode -projectPath <複製> -executeMethod TempSpawnProbe.Run -probeMode host -probeOut <出力> -logFile <出力>\host.log
+   Unity.exe -batchmode -projectPath <本体> -executeMethod TempSpawnProbe.Run -probeMode client -probeOut <出力> -logFile <出力>\client.log
+   ```
+
+4. ホスト役は「部屋を作る → ロビー → ボット1人 → 参加者が来たら試合開始」、参加者役は「つながるまで参加をくり返す → 4 秒おきに記録」を自動で行う。
+   ログの `[PROBE]` の行に、プレイヤーごとの位置と「点いている描画の部品の数」が出る。PNG も出るので Read で見られる。約 2 分で両方終わる。
+
+1つの Unity だけで確かめたいとき（大きさ・見た目・試合まで進むか）は、`-probeMode solo` にする。ホスト＋ボット3人で試合まで進めて記録する（複製は要らない）。
+
+**はまった所**
+
+- **画面なしの Unity では、再生に入ってもゲームのフレームが進まないことがある**（9 秒たっても `Time.frameCount` が 1 のまま）。
+  原因は**エラーで一時停止（Console の Error Pause）**。Unity 自身の検索機能が起動時に例外を出し、それで再生が止まっていた。
+  `EditorApplication.update` の中で毎回 `EditorApplication.isPaused = false` と `EditorApplication.QueuePlayerLoopUpdate()` を呼ぶと進む。
+  **「進まない」を不具合の再現と取り違えないよう、最初に `Time.frameCount` をログに出すこと。**
+- 通信は `UnityTransport.SetConnectionData("127.0.0.1", 17993, "127.0.0.1")` で、いつもと違うポートにした（本人が別の Unity で遊んでいても当たらないように）。
+- 本人が Unity で開いているプロジェクトには、この方法は使えない（同じプロジェクトを2つ開けない）。複製を2つ作れば使える。
 
 ---
 
@@ -346,5 +385,6 @@
 | 2026/11/4 | Claude Code | 「次のAIへの伝言」に、シーン名 `STAGE_07(New)` の付け直し待ちと、PR #23 を見送った件を追加 |
 | 2026/11/4 | Claude Code | 「失敗したこと」に、PR #23 の取り込みで、ぶつからなかったファイルがリファクタリングの名前の変更でコンパイルエラーになった件を追加。「次のAIへの伝言」の PR #23 見送りの件を、取り込んだので消した |
 | 2026/11/5 | Claude Code | 「失敗したこと」に、新しい体のボットで Back Distance を信じて立つ場所を決めて外れた件、「うまくいったやり方」に、本物の試合でボットの投げを1回ずつ見届けて数える方法を追加 |
+| 2026/11/5 | Claude Code | 「本制作だけのリポジトリへの移行」に、自分で生まれるスクリプトを落とした件と「コンパイルが通るだけでは足りない」反省を追加。ホスト役と参加者役の Unity を2つ同時に動かして確かめる方法の節を追加 |
 | 2026/11/5 | Claude Code | 「うまくいったやり方」に、Hansさんの PR #25 を取り込んだときの、モデルの大きさの確かめ方とドキュメントの二重行の件を追加 |
 | 2026/11/5 | Claude Code | 「本制作だけのリポジトリへの移行」に、旧リポジトリの PR #25 を取り込んだこと（旧 develop の 33c9aa6 まで）を追加 |
