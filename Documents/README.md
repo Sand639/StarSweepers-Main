@@ -240,9 +240,8 @@ StarSweepers/                          ← リポジトリのルート
     │   │                         Lobby／Camera／Bot／Network／UI／Effect／Input／Common）。エディタ用は各フォルダの Editor/
     │   ├── Resources/            名前で読み込むもの（タイトル・ロビーの画面のプレハブ、ボタンのテーマ、名前タグ）
     │   └── Scenes/               シーン（直下の SpaceJunkMapList.asset は、使うマップの一覧）
-    │       ├── Main/             タイトルとロビー（TitleScene・SpaceJunkLobby）
+    │       ├── MainLoop/             タイトルとロビー（TitleScene・SpaceJunkLobby）
     │       ├── Stage/            ステージ（STAGE_01〜07）
-    │       ├── Old/              STAGE_〜 より前の世代のマップ（SpaceJunkMap01〜04。今もロビーで選べる）
     │       ├── HansStages/       Hansさんのステージ
     │       └── Test/             機能ごとの検証用シーン（ビルドには含めない）
     ├── Packages/
@@ -323,7 +322,7 @@ StarSweepers/                          ← リポジトリのルート
 5. Unity Hub の「プロジェクトを開く」で、`StarSweepers/StarSweepers`（`Assets` が入っている方）フォルダを選ぶ。
    - リポジトリのルートを選ぶと開けないので注意。
 6. 初回起動はライブラリ生成のため時間がかかる。エラーが出た場合はリーダーかAIに相談すること。
-7. `Assets/Scenes/Main/TitleScene.unity` が開ければ成功。ゲームとして遊ぶときは、それを再生する（タイトルから始まる）。
+7. `Assets/Scenes/MainLoop/TitleScene.unity` が開ければ成功。ゲームとして遊ぶときは、それを再生する（タイトルから始まる）。
 
 > `Library/` や `Temp/` などUnityが自動生成するフォルダはGitに含めない設定になっている（`.gitignore` 済み）。
 > 「Gitに出てこないファイルがある」と感じても、それは正常な場合が多い。
@@ -713,3 +712,4 @@ Unityは `.meta` ファイルで各アセットの参照を管理しているた
 | 11/4（水） | Claude Code | **本制作だけのリポジトリへ移行。** 先頭の注意書きを「Mirai01 からの名前変更」から「新リポジトリへの移行」に差し替え、リポジトリの URL 欄を更新。リポジトリ構成の図は旧リポジトリ時点のままなので、**無くなったフォルダ（`Scenes/Test/` の検証シーン、`Scripts/Race/` `Robot/` `Clone/` など）が書かれている**。ルールの部分は変えていない |
 | 11/5（木） | Claude Code | リポジトリの URL 欄に、GitHub に作った本制作用リポジトリ（Sand639/StarSweepers-Main）を書いた |
 | 11/5（木） | Claude Code | **フォルダ整理（大槻さんの依頼）。** リポジトリ構成の図を、役割で分けた新しい `Assets/` の構成に書き換えた。**ルールの変更：ステージの置き場所を `Assets/Scenes/Prototype/` から `Assets/Scenes/Stage/` に変えた**（`AGENTS.md` も同じ）。検証用シーンは今までどおり `Assets/Scenes/Test/`。初回セットアップの確認用シーンを、このリポジトリに無い `SampleScene` から `TitleScene` に直した |
+| 11/5（木） | Claude Code | リポジトリ構成の図を、大槻さんの整理に合わせた（タイトルとロビーは `Scenes/MainLoop/`。`STAGE_〜` より前の世代のマップ `SpaceJunkMap01〜04` は消したので `Scenes/Old/` を外した） |

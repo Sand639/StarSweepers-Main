@@ -57,9 +57,9 @@ internal static class FishingSceneBuilder
 
     /// <summary>
     /// **遊ぶためのマップ**（`FishingMap〜`）の置き場所。
-    /// 釣りのマップはこのリポジトリには無い（旧リポジトリにある）。作るなら、`STAGE_〜` より前の世代のマップと同じ `Scenes/Old` に置く。
+    /// 釣りのマップはこのリポジトリには無い（旧リポジトリにある）。作るなら、ステージと同じ `Scenes/Stage` に置く。
     /// </summary>
-    public const string MapSceneFolder = "Assets/Scenes/Old";
+    public const string MapSceneFolder = "Assets/Scenes/Stage";
 
     private const string PlayerRigPath = PlayerPrefabFolder + "/PlayerRig.prefab";
     // ※ FishingSpawnerSetup.ExplosionPrefabPath も同じ場所を指している。動かすときは両方直す

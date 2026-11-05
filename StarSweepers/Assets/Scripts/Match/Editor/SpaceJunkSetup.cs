@@ -15,9 +15,9 @@ using UnityEngine.SceneManagement;
 ///
 /// ## できるもの
 ///
-///   ・`SpaceJunkLobby.unity`（2026/11/5 から `Assets/Scenes/Main/`。ツールは名前で探す） … つないで待ち合わせる部屋。
+///   ・`SpaceJunkLobby.unity`（2026/11/5 から `Assets/Scenes/MainLoop/`。ツールは名前で探す） … つないで待ち合わせる部屋。
 ///     **設定端末**が置いてあり、ホストだけが近づいて `E` で詳細設定を開ける
-///   ・`Assets/Scenes/Old/SpaceJunkMap01〜03.unity` …
+///   ・`SpaceJunkMap01〜03.unity`（**2026/11/5 に消した。** 今のマップは `Assets/Scenes/Stage/` の STAGE_〜）…
 ///     **釣りのマップをコピーして、中の部品を宇宙ごみ用に差し替えたもの**
 ///   ・`Assets/Prefabs/System/`・`Player/`・`Item/` … 試合の係・プレイヤー・素材3種類
 ///
@@ -46,15 +46,19 @@ public static class SpaceJunkSetup
     public const string LobbySceneName = "SpaceJunkLobby";
     /// <summary>
     /// シーン全体の置き場所（2026/11/5 のフォルダ整理で `Assets/Scenes/Prototype/SpaceJunk` から変えた）。
-    /// この中の `Main`（タイトルとロビー）・`Stage`（STAGE_〜）・`Old`（その前の世代のマップ）・`HansStages` に分かれている。
+    /// この中の `MainLoop`（タイトルとロビー）・`Stage`（STAGE_〜）・`HansStages` に分かれている。
     /// 使うマップの一覧（SpaceJunkMapList.asset）はこの直下。
     /// </summary>
     public const string MapSceneFolder = "Assets/Scenes";
 
     /// <summary>タイトルとロビーのシーンの置き場所。</summary>
-    public const string MainSceneFolder = MapSceneFolder + "/Main";
+    public const string MainSceneFolder = MapSceneFolder + "/MainLoop";
 
-    /// <summary>`STAGE_〜` より前の世代のマップ（SpaceJunkMap01〜）の置き場所。</summary>
+    /// <summary>
+    /// `STAGE_〜` より前の世代のマップ（SpaceJunkMap01〜）の置き場所。
+    /// **その世代のマップは 2026/11/5 に全部消した**（大槻さん）。ここを使う道具（固定カメラ・チームカメラ・東西1対1のマップを作る、宇宙ごみ一式を作る）は、
+    /// 元になる `SpaceJunkMap01` が無いので「見つかりません」と出て止まる。
+    /// </summary>
     public const string OldMapSceneFolder = MapSceneFolder + "/Old";
 
     /// <summary>ロビーがどこにも無いときに、新しく作る場所。</summary>
@@ -134,7 +138,6 @@ public static class SpaceJunkSetup
 
         FishingSceneBuilder.EnsureFolders();
         FishingSceneBuilder.EnsureFolder(MainSceneFolder);
-        FishingSceneBuilder.EnsureFolder(OldMapSceneFolder);
         SpaceJunkPrefabBuilder.EnsureFolders();
 
         InputActionAsset inputActions = FishingSceneBuilder.LoadInputActions();
