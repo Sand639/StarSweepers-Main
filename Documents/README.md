@@ -5,7 +5,7 @@
 | 製作者 | 大槻 海斗 |
 | 作成日 | 2026年8月28日（金） |
 | 最終更新日 | 2026年11月4日（水）　変更者：Claude Code |
-| リポジトリ | （本制作用。GitHub に作成後にここへ URL を書く）　旧：https://github.com/Sand639/StarSweepers |
+| リポジトリ | https://github.com/Sand639/StarSweepers-Main （本制作用）　旧：https://github.com/Sand639/StarSweepers （保管用） |
 
 > ⚠️ **2026/11/4 に、本制作（宇宙ごみ集め）に必要な物だけを集めた、このリポジトリに移りました。**
 > 以前のリポジトリ（https://github.com/Sand639/StarSweepers ）は、釣り・レース・ロボットなどの試作と
@@ -130,7 +130,7 @@
 | 通信（複数人プレイ） | Netcode for GameObjects 2.13.2（Unity公式）／Multiplayer Services SDK 2.3.1（**インターネット越しの合言葉接続用**） |
 | Steam | Steamworks.NET 2025.164.1（**フレンドの部屋を探す機能だけ**に使う。App ID はまだ無いので、テスト用の 480 で動かしている。`機能ドキュメント/Steamのフレンドのサーバー.md`） |
 | エディタ（IDE） | **Visual Studio**（Riderを使っている人はいない。Unity側には両方のパッケージが入っている） |
-| リポジトリ | （本制作用。GitHub に作成後にここへ URL を書く）　旧：https://github.com/Sand639/StarSweepers |
+| リポジトリ | https://github.com/Sand639/StarSweepers-Main （本制作用）　旧：https://github.com/Sand639/StarSweepers （保管用） |
 | 連絡手段 | チームDiscord |
 
 > **Unityのバージョンは 6000.3.14f1 で固定する。**
@@ -704,3 +704,4 @@ Unityは `.meta` ファイルで各アセットの参照を管理しているた
 | 10/27（火） | Codex | Hansさん（デザイナー）をメンバー構成に追加（本人の依頼） |
 | 10/27（火） | Codex（依頼：Hans） | Hansさんのすべての制作物について、変更前に本人と相談して了承を得るルールを追加。キャラクターダミーの大きさを自由に調整できる旧記述も更新 |
 | 11/4（水） | Claude Code | **本制作だけのリポジトリへ移行。** 先頭の注意書きを「Mirai01 からの名前変更」から「新リポジトリへの移行」に差し替え、リポジトリの URL 欄を更新。リポジトリ構成の図は旧リポジトリ時点のままなので、**無くなったフォルダ（`Scenes/Test/` の検証シーン、`Scripts/Race/` `Robot/` `Clone/` など）が書かれている**。ルールの部分は変えていない |
+| 11/5（木） | Claude Code | リポジトリの URL 欄に、GitHub に作った本制作用リポジトリ（Sand639/StarSweepers-Main）を書いた |
