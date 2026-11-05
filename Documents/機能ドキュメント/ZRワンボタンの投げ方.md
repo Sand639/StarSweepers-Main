@@ -57,8 +57,8 @@
 | --- | --- |
 | スクリプト | `Assets/Scripts/Common/GameSettings.cs`（投げ方 `ThrowOperation` を保存する） |
 | スクリプト | `Assets/Scripts/UI/PauseMenu.cs`（設定に「投げ方」の行を足した） |
-| スクリプト | `Assets/Scripts/Fishing/HookController.cs`（ZRワンボタンのときは右だけで撃つ。大型物件にも引っ掛かる） |
-| スクリプト | `Assets/Scripts/Fishing/ThrowController.cs`（前へ投げる動き・スキルチェック・後ろへ引っ張る） |
+| スクリプト | `Assets/Scripts/Hook/HookController.cs`（ZRワンボタンのときは右だけで撃つ。大型物件にも引っ掛かる） |
+| スクリプト | `Assets/Scripts/Hook/ThrowController.cs`（前へ投げる動き・スキルチェック・後ろへ引っ張る） |
 
 **シーンとプレハブは変更していない。** 新しい値（下の表）はスクリプトの初期値で動くので、プレハブを開き直さなくてよい。
 調整したいときは `SpaceJunkPlayer.prefab` の `ThrowController` の「ZRワンボタン」の欄を変える（プレハブを編集することになるので、触る前に一声かける）。
@@ -115,3 +115,4 @@
 | 日付 | 変更者 | 内容 |
 | --- | --- | --- |
 | 2026/10/15 | Claude Code | 新規作成（小野田さんの依頼）。ZRワンボタンの投げ方と、ポーズ画面の「投げ方」の切り替えを追加 |
+| 2026/11/5 | Claude Code | フォルダ整理に合わせて、場所の書き込みを新しい場所に直した（対応は `実装計画/フォルダ整理の対応表.md`） |
