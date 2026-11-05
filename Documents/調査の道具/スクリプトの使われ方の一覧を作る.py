@@ -177,7 +177,10 @@ for f in cs:
     folder = os.path.dirname(f)[len("Assets/Scripts/"):]
     callers_live = {c for c in called_by[f] if c in live}
     callers_ed = {c for c in called_by[f] if is_editor(c)}
-    if f in attached and f not in live_without_old:
+    if "." in short(f):
+        # 「クラス名.機能.cs」は、同じクラスをファイルだけ分けた一部（partial）。使われ方は入口のファイルと同じ
+        state = "― 分けた一部"; note = f"`{short(f).split('.')[0]}` の続き（同じクラスをファイルだけ分けた物）"
+    elif f in attached and f not in live_without_old:
         state = "◇ 古い体だけ"; note = "古い体のプレハブ（SpaceJunkPlayer）にだけ付いている。遊ぶときは新しい体に入れ替わるので、ふだんは動かない"
         if callers_live: note += "。呼ばれる：" + name_list(callers_live, 3)
     elif is_editor(f):
@@ -208,7 +211,7 @@ print(f"<!-- 自動生成：スクリプトの使われ方の一覧を作る.py�
 print()
 print("| 状態 | 本数 |")
 print("| --- | --- |")
-for k in ["◎ シーン・プレハブ", "◎ 自分で生まれる", "○ スクリプトから", "◇ 古い体だけ", "△ 通信の一覧だけ", "△ Hansさんのステージだけ", "× 使われていない", "道具"]:
+for k in ["◎ シーン・プレハブ", "◎ 自分で生まれる", "○ スクリプトから", "◇ 古い体だけ", "△ 通信の一覧だけ", "△ Hansさんのステージだけ", "× 使われていない", "― 分けた一部", "道具"]:
     if counts[k]: print(f"| {k}{'（エディタ用）' if k == '道具' else ''} | {counts[k]} |")
 print()
 for folder in sorted(rows):
