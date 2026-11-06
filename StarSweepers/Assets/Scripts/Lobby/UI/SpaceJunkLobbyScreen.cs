@@ -36,6 +36,8 @@ using UnityEngine.UI;
 /// Esc はこの画面が開いている間はこちらが使う（ポーズ画面には渡さない。<see cref="BlocksEscape"/>）。
 ///
 /// マップの画像は、マップの一覧（`Tools > StarSweepers > 宇宙ごみのマップの一覧を開く`）の **Thumbnail** に入れる。
+///
+/// ファイルの分け方と変数の置き場所は Documents/スクリプトの説明/Lobby/UI/SpaceJunkLobbyScreen.md。
 /// </summary>
 [DisallowMultipleComponent]
 public partial class SpaceJunkLobbyScreen : MonoBehaviour

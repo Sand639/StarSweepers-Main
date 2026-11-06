@@ -33,6 +33,8 @@ using UnityEngine;
 /// **Unity Cloud にこのプロジェクトを登録しておく必要がある。**
 /// 済んでいない場合は、画面にその旨が出るようにしてある。
 /// 手順は `Documents/機能ドキュメント/インターネットでの複数人プレイ.md` を読むこと。
+///
+/// ファイルの分け方と変数の置き場所は Documents/スクリプトの説明/Common/Network/InternetConnection.md。
 /// </summary>
 [RequireComponent(typeof(NetworkManager))]
 public partial class InternetConnection : MonoBehaviour

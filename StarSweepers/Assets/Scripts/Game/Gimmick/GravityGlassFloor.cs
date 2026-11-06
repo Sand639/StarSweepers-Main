@@ -26,6 +26,8 @@ using UnityEngine;
 ///
 /// **床の上面のすぐ上に、人（CharacterController）がいるか**を毎フレーム調べている。
 /// 当たった瞬間を拾う方式（OnCollision）は、CharacterController では呼ばれないため使っていない。
+///
+/// ファイルの分け方と変数の置き場所は Documents/スクリプトの説明/Game/Gimmick/GravityGlassFloor.md。
 /// </summary>
 [RequireComponent(typeof(BoxCollider))]
 public partial class GravityGlassFloor : MonoBehaviour

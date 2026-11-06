@@ -30,6 +30,8 @@ using UnityEngine.InputSystem.LowLevel;
 ///
 /// 使い方：宇宙ごみ用のプレイヤーのプレハブに、釣りの部品と一緒に付ける。
 /// **釣りのプレハブには付けないこと**（釣りの動きが変わってしまう）。
+///
+/// ファイルの分け方と変数の置き場所は Documents/スクリプトの説明/Game/Player/SpaceJunkPlayerSetup.md。
 /// </summary>
 public partial class SpaceJunkPlayerSetup : MonoBehaviour
 {

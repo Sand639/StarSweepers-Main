@@ -29,6 +29,8 @@ using UnityEngine;
 /// 釣り（<c>FishingObjectSpawner</c>）は「物資」と「爆発物」の2種類を、爆発物6：物資1で出していた。
 /// こちらは**素材3種類を均等に出す**のと、**爆発物を出さない**のが違う
 /// （爆発物は入れない、が 2026/9/17 の決まりだったが、2026/10/6 から Bomb Prefab で出せるようにした。STAGE_06）。
+///
+/// ファイルの分け方と変数の置き場所は Documents/スクリプトの説明/Game/Item/SpaceJunkSpawner.md。
 /// </summary>
 public partial class SpaceJunkSpawner : MonoBehaviour
 {

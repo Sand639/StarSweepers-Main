@@ -67,6 +67,8 @@ public enum SpaceJunkIntroStyle
 ///
 /// ラウンドの勝ち数と設定は <see cref="SpaceJunkSession"/> が持っている。
 /// こちらは**シーンと一緒に消える**ので、覚えておきたいものは置かない。
+///
+/// ファイルの分け方と変数の置き場所は Documents/スクリプトの説明/Game/Match/SpaceJunkRound.md。
 /// </summary>
 public partial class SpaceJunkRound : NetworkBehaviour
 {

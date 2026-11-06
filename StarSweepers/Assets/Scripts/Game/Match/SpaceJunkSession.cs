@@ -85,6 +85,8 @@ public struct SpaceJunkPlayerSlot : INetworkSerializable, IEquatable<SpaceJunkPl
 ///    何本先取に届かなければ、結果を見せてから次のマップへ（<see cref="NextRoundAfterDelay"/>）
 /// 5. **試合終了** … 届いたら <see cref="SpaceJunkMatchState.MatchOver"/> にして、結果を見せてからロビーへ戻る
 ///    （<see cref="ReturnToLobbyAfterDelay"/>）。ホストがポーズ画面から打ち切ったときは <see cref="ServerReturnToLobby"/>
+///
+/// ファイルの分け方と変数の置き場所は Documents/スクリプトの説明/Game/Match/SpaceJunkSession.md。
 /// </summary>
 public partial class SpaceJunkSession : NetworkBehaviour
 {

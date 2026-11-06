@@ -55,6 +55,8 @@ using UnityEngine.UI;
 ///
 /// **置き忘れても動く。** シーンのどこにも無ければ、再生したときに自分で1つ作る
 /// （<see cref="AutoCreate"/>）。
+///
+/// ファイルの分け方と変数の置き場所は Documents/スクリプトの説明/Common/Settings/PauseMenu.md。
 /// </summary>
 // Escape を**他の部品より先に**受け取る。
 // カメラ側も Escape を見ているので、順番が決まっていないと取り合いになる

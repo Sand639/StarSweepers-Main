@@ -43,6 +43,8 @@ using UnityEngine;
 ///
 /// イベントを選ぶのも、お題や高価値の種類・重いデブリを決めるのも、得点を数えるのもホスト。
 /// 参加者のPCは下の一覧を受け取って出すだけ（重いデブリの見た目は、一覧を見て各PCが付ける）。
+///
+/// ファイルの分け方と変数の置き場所は Documents/スクリプトの説明/Game/Match/SpaceJunkRound.md。
 /// </summary>
 public partial class SpaceJunkRound
 {

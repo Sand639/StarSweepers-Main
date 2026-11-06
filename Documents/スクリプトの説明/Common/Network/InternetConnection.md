@@ -13,18 +13,28 @@
 長かったので、**1つのクラスのまま、ファイルだけを機能ごとに分けた**（C# の partial という書き方）。
 どのファイルも同じクラスの一部なので、ほかのファイルの変数や関数をそのまま使える。プレハブ・シーン・通信の動きは、分ける前と同じ。
 
-| ファイル | 行数 | 中身 |
-| --- | ---: | --- |
-| `InternetConnection.cs` | 423 | **入口**（設定の値・状態・出入り・Unity から呼ばれる関数・共通の補助） |
-| `InternetConnection.Leave.cs` | 87 | 部屋を出る |
-| `InternetConnection.Setup.cs` | 167 | 準備（サインイン・同じPCでの複数起動） |
-| `InternetConnection.TitleEntry.cs` | 240 | タイトル画面から使う入口（部屋を作る・一覧・番号・版・一覧から入る） |
+| ファイル | 中身 |
+| --- | --- |
+| `InternetConnection.cs` | **入口**（設定の値・状態・出入り・Unity から呼ばれる関数・共通の補助） |
+| `InternetConnection.Leave.cs` | 部屋を出る |
+| `InternetConnection.Setup.cs` | 準備（サインイン・同じPCでの複数起動） |
+| `InternetConnection.TitleEntry.cs` | タイトル画面から使う入口（部屋を作る・一覧・番号・版・一覧から入る） |
+
+## 変数の置き場所
+
+**インスペクターに出る値と、つながり具合の状態は、入口のファイル（`InternetConnection.cs`）にある。** 次の物だけ、使う機能のファイルに置いてある。
+
+| ファイル | 置いてある変数・定数 |
+| --- | --- |
+| `InternetConnection.TitleEntry.cs` | 部屋の一覧を取る間隔（`lastQueryTime`・`QueryIntervalSeconds`・`QueryRateLimitWaitSeconds`・`QueryMaxAttempts`）、部屋に付ける印の名前（`RoomCodePropertyKey`・`VersionPropertyKey`） |
+
+`Leave.cs`・`Setup.cs` には変数は無い。
 
 ## 気をつけること
 
 - **新しい処理は、その機能のファイルに書く。** どれにも当てはまらなければ、入口のファイル（`InternetConnection.cs`）に書く。
 - Unity から呼ばれる関数（`Awake`・`Update` など）は、入口のファイルにまとめてある。
-- インスペクターに出る値は、ほとんど入口のファイルにある。
+- 変数がどのファイルにあるかは、上の「変数の置き場所」を見る。**新しい変数は、使う機能のファイルに置き、上の表にも足す。**
 - クラスの説明（`///` のコメント）は、入口のファイルの先頭にある。
 
 ## 変更ログ
@@ -32,3 +42,4 @@
 | 日付 | 変更者 | 内容 |
 | --- | --- | --- |
 | 2026/11/6 | Claude Code | 新規作成（大槻さんの依頼）。長いスクリプトを機能ごとのファイルに分けたので、分け方を書いた |
+| 2026/11/7 | Claude Code | 「変数の置き場所」を足し、ずれやすい行数の列を表から消した（大槻さんの依頼。AIが読んで気づいた弱点の修正） |
