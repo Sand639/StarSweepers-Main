@@ -2,7 +2,7 @@ using Unity.Netcode;
 using UnityEngine;
 
 /// <summary>
-/// **決まった間隔で上がり下がりする床（エレベーター）。** STAGE_01 の土台のまわり（2026/10/8・大槻さんの設計図）。
+/// **決まった間隔で上がり下がりする床（エレベーター）。** STAGE_Simple の土台のまわり（2026/10/8・大槻さんの設計図）。
 ///
 /// ・下で Wait Bottom Seconds 待つ → Move Seconds かけて Rise Height だけ上がる →
 ///   上で Wait Top Seconds 待つ → Move Seconds かけて下がる、をくり返す

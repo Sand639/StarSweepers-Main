@@ -22,7 +22,7 @@ public enum PullAblePlateDirection
 
 /// <summary>
 /// **8方向の柱をフックで引っ張ると、その向きへ一定距離だけ動く床。上に乗っているプレイヤーも一緒に運ぶ。**
-/// STAGE_05 で使っている。設計のいきさつは `Documents/機能ドキュメント/引っ張れる移動床の再設計案.md`。
+/// STAGE_Island で使っている。設計のいきさつは `Documents/機能ドキュメント/引っ張れる移動床の再設計案.md`。
 ///
 /// 部品の分担：
 /// ・柱（<see cref="PullAblePlatePullPoint"/>）… フックの引っ掛け先。引っ張り終わると <see cref="Pull"/> を呼ぶ

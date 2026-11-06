@@ -2,7 +2,7 @@ using Unity.Netcode;
 using UnityEngine;
 
 /// <summary>
-/// **決まった間隔で、90度ずつ回る床（回転土台）。** STAGE_03 の真ん中の一本道（2026/10/6・大槻さん）。
+/// **決まった間隔で、90度ずつ回る床（回転土台）。** STAGE_Meteor の真ん中の一本道（2026/10/6・大槻さん）。
 ///
 /// ・Interval Seconds（初期値5秒）ごとに、Rotate Seconds（初期値1秒）かけて Step Angle（90度）回る
 /// ・回る向きは Direction で選ぶ（**初期値は時計回り**。上から見て）
