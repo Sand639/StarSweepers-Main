@@ -4,7 +4,7 @@ using UnityEngine.AI;
 using UnityEngine.SceneManagement;
 
 /// <summary>
-/// **ボット（<see cref="SpaceJunkBot"/>）が「どこを歩けるか」を知るための、歩ける床の地図（NavMesh）を作る係。** （2026/10/21）
+/// **ボット（<see cref="SweeperBot"/>）が「どこを歩けるか」を知るための、歩ける床の地図（NavMesh）を作る係。** （2026/10/21）
 ///
 /// ボットが壁に向かって押し続けたり、上の段にある素材へ下から近づこうとしたりしないよう、
 /// **壁を回り込む道**と**同じ高さの床か**を、この地図で調べる（大槻さんの報告：STAGE_Glass1）。

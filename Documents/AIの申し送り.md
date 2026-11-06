@@ -331,6 +331,11 @@
 > 作業を途中で終えたとき、続きを引き継ぐための置き手紙。
 > 終わった話は消してよい。
 
+- **2026/11/7　古い体（フックで投げる体）は「消してよい」と大槻さんが決めた。古い体用のボットだけ先に消した。古い体そのものは、まだ消していない。**
+  - 消した物：`Game/Bot/SpaceJunkBot.cs`・`Game/Bot/Editor/SpaceJunkBotSetup.cs`（Unity の `AssetDatabase.DeleteAsset` で。シーン・プレハブからの参照は 0 件だった）。`SpaceJunkSession.Bots.cs` は、頭を付ける所を `SweeperBot` だけにした。
+  - **古い体そのもの（`Game/Hook/` の `HookController`・`ThrowController` など）を消さなかった理由**：Kyo さん（GitHub は `KyoOn4096`）が Player 系・フック系のファイルを作業中で、大槻さんから「新しい方は触らない方がいい」と言われている。古い体を消すには、フック系を消し、それを呼ぶ Player 系など40本ほどを直す必要があり、その作業とぶつかる。**Kyo さんの作業が develop に入ったあとで、大槻さんに確認してから進めること。**
+  - Kyo さんが触ったファイルは、大槻さんの確認なしに直さない（旧リポジトリで `git log --all --author="kyo.on.04096" --format= --name-only` を見ると分かる。新しい体 `Sweeper〜` 一式も含む）。
+  - 確かめ方：`調査の道具/ホストと参加者を自動で演じて見え方を記録する.cs.txt` を `-probeMode solo` で動かすと、ホスト＋ボット3人の試合を画面なしで進められる（今回は約2分。ログの `[JUNK] 〜チーム が 〜 を入れました` で点が入ったことが分かる）。
 - **2026/11/7　ステージの名前を、全部「`STAGE_` ＋ 特徴」に付け直した**（大槻さんの方針。`STAGE_Simple`・`STAGE_Glass2` など。対応表は `宇宙ごみのマップの作り方.md` の「ステージの名前」）。コードの中のパスの文字列（自動テスト・設置の道具）と、今の状態を説明するドキュメントは置き換えた。**Kyo さんが触ったスクリプト5本（`SpaceJunkCameraModeSwitch`・`SpaceJunkCameraSetup`・`SpaceJunkTeamFollowCamera`・`SpaceJunkMatchUI`・`SpaceJunkRadar`）は、コメントに前の名前が残っている**（動きには関わらない。大槻さんの指示で Kyo さんのファイルは触っていない）。下の行は、その前段の記録。
 - **2026/11/7　シーン名 `STAGE_06^^`・`STAGE_07(New)` の付け直しは済んだ。** `STAGE_08`＝ベルトコンベアー2（長島さん）、`STAGE_09`＝新ガラスの床（Panicbird さん）。大槻さんの了承を得て、Claude Code が画面なしの Unity で `AssetDatabase.RenameAsset` を呼んで付け直した（GUID はそのまま。`git diff -M` で R100）。**マップの一覧の控え（`sceneName`・`scenePath`）は、名前を変えただけでは直らない**ので、同じ道具の中で `Entry.Refresh()` を呼び、ビルドの一覧も GUID から今の場所に直した。長島さん・Panicbird さんが古い名前のシーンを手元で編集していたら、取り込むときに新しい名前のシーンへ変更が入ったかを確かめること。同じ日に、Shift-JIS だった `MovingPlate.cs`・`SpaceJunkLobbyFixedSpawner.cs` を UTF-8 に直した（これで `Assets/Scripts/` は全部 UTF-8）
 
@@ -461,3 +466,4 @@
 | 2026/11/6 | Claude Code | 「長いスクリプトを機能ごとのファイルに分けた」の注意（係のクラスと partial の使い分け、別のクラスが同じファイルにあるとき、ビルドを混ぜない）を足した |
 | 2026/11/7 | Claude Code | 「次のAIへの伝言」のシーン名の付け直し待ち2件を、済んだ記録に差し替えた（`STAGE_08`・`STAGE_09`。やり方と、文字コードを UTF-8 にそろえたことも書いた） |
 | 2026/11/7 | Claude Code | 先頭の注意書きと「次のAIへの伝言」に、ステージの名前を付け直したこと（`STAGE_Simple` など）と、Kyo さんのスクリプトのコメントに前の名前が残っていることを書いた |
+| 2026/11/7 | Claude Code | 「次のAIへの伝言」に、古い体用のボットを消したことと、古い体そのものは Kyo さんの作業が入るまで消さないことを書いた |

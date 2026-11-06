@@ -135,7 +135,7 @@ public static class TempSpawnProbe
             case 1: // ロビーに着いたら、ボットを1人足す
                 if (waited < 5f || SpaceJunkSession.Current == null) return;
                 SpaceJunkSession.Current.ServerSetTeamCount(2);
-                SpaceJunkSession.Current.ServerSetFixedMap("STAGE_01", false);
+                SpaceJunkSession.Current.ServerSetFixedMap("STAGE_Simple", false);
                 SpaceJunkSession.Current.ServerSetBotCount(Mode == "solo" ? 3 : 1);
                 Next(2);
                 break;

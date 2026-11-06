@@ -17,7 +17,7 @@ public partial class SpaceJunkSession
     // だから席（チーム分け）・マップへの移動・出てくる場所は、人のプレイヤーと同じ流れで決まる。
     //
     // 体は人と同じ Player Prefab。**ホストのPCでだけ**、見えないコントローラー（VirtualPlayerInput）と
-    // ボットの頭（SpaceJunkBot）を付けて動かす。ほかのPCには、ふつうの「ほかの人」として届く。
+    // ボットの頭（SweeperBot）を付けて動かす。ほかのPCには、ふつうの「ほかの人」として届く。
 
     /// <summary>
     /// ボットに使う「何人目か」の番号の始まり。**1台で複数人の人数（最大 <see cref="LocalMultiplayer.MaxLocalPlayers"/>）と
@@ -124,14 +124,15 @@ public partial class SpaceJunkSession
             AddSlot(key);
 
             // ホストのPCでだけ、ボットの頭を付ける（見えないコントローラーも一緒に付く）。
-            // 新しい体（SweeperShooter が付いている）なら新しい体のボット、今の体（フック）なら今までのボット（2026/11/5）
+            // ボットの頭は、新しい体（SweeperShooter が付いている）用の SweeperBot だけ。
+            // 古い体（フック）用のボットは 2026/11/7 に消したので、古い体で出たときは頭が付かない
             if (spawned.GetComponent<SweeperShooter>() != null)
             {
                 SweeperBot.AttachTo(spawned);
             }
             else
             {
-                SpaceJunkBot.AttachTo(spawned);
+                Debug.LogWarning("[JUNK] 新しい体のプレハブが見つからず、古い体でボットを出しました。古い体用のボットの頭は無いので、このボットは動きません。");
             }
 
             Debug.Log($"[JUNK] ボット：{NameOf(key)} を出しました（チーム {TeamOf(key)}）。");
