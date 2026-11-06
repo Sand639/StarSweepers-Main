@@ -1,5 +1,13 @@
 # LANでの複数人プレイ
 
+> ⚠️ **この説明に出てくる次の場所は、このリポジトリには無い**（検証シーン・それを作る道具・試作の物。2026/11/4 の移行で、旧リポジトリ https://github.com/Sand639/StarSweepers に置いてきた）。
+> 本文は書き換えていない。**その場所を開く・動かす手順は、このリポジトリではできない。**
+>
+> - `Assets/Scripts/Network/PickupItem.cs`
+> - `Assets/Scripts/Network/Editor/LanPlayTestSetup.cs`
+> - `Assets/Scripts/Network/Editor/LanTestBuilder.cs`
+> - `Assets/Scenes/Test/LanPlayTest.unity`
+
 | 項目 | 内容 |
 | --- | --- |
 | 担当者 | Claude Code（依頼：大槻 海斗） |
@@ -214,15 +222,15 @@ ping 192.168.10.1
 
 | 種類 | パス |
 | --- | --- |
-| スクリプト | `Assets/Scripts/Network/NetworkPlayer.cs`（プレイヤー1人分） |
-| スクリプト | `Assets/Scripts/Camera/LocalPlayerCamera.cs`（自分を追いかけるカメラ） |
-| スクリプト | `Assets/Scripts/Network/LanConnectionUi.cs`（接続の仮画面） |
-| スクリプト | `Assets/Scripts/Network/LanAutoStart.cs`（起動引数での自動接続） |
-| スクリプト | `Assets/Scripts/Network/LanConnectionLogger.cs`（接続状況のログ） |
-| スクリプト | `Assets/Scripts/Network/NetworkStatusHud.cs`（遅れと得点の表示） |
-| スクリプト | `Assets/Scripts/Network/PlayerScore.cs`（得点。ホストのみ書き換え可） |
+| スクリプト | `Assets/Scripts/Common/Network/NetworkPlayer.cs`（プレイヤー1人分） |
+| スクリプト | `Assets/Scripts/Common/Network/LocalPlayerCamera.cs`（自分を追いかけるカメラ） |
+| スクリプト | `Assets/Scripts/Common/Network/LanConnectionUi.cs`（接続の仮画面） |
+| スクリプト | `Assets/Scripts/Common/Network/LanAutoStart.cs`（起動引数での自動接続） |
+| スクリプト | `Assets/Scripts/Common/Network/LanConnectionLogger.cs`（接続状況のログ） |
+| スクリプト | `Assets/Scripts/Common/Network/NetworkStatusHud.cs`（遅れと得点の表示） |
+| スクリプト | `Assets/Scripts/Common/Network/PlayerScore.cs`（得点。ホストのみ書き換え可） |
 | スクリプト | `Assets/Scripts/Network/PickupItem.cs`（触ると点が入るアイテム） |
-| スクリプト | `Assets/Scripts/Network/PushableBox.cs`（みんなで押せる箱） |
+| スクリプト | `Assets/Scripts/Common/Network/PushableBox.cs`（みんなで押せる箱） |
 | スクリプト（エディタ用） | `Assets/Scripts/Network/Editor/LanPlayTestSetup.cs`（シーン生成ツール） |
 | スクリプト（エディタ用） | `Assets/Scripts/Network/Editor/LanTestBuilder.cs`（検証用ビルド作成ツール） |
 | プレハブ | `Assets/Prefabs/Player/NetworkPlayer.prefab` |
@@ -386,7 +394,7 @@ LanPlayTest
 - ~~4人同時は未確認~~ → **2026/9/3に、1台のPCで4つ起動して確認済み。**
   4色とも出て、番号も 0〜3 まで正しく割り当てられた（大槻さんが確認）
 - **画面が仮のもの。** 接続の画面は簡易表示で作ってある。→ 2026/10/6 に**宇宙ごみ集めではタイトル画面（`タイトル画面.md`）からつなぐ**ようにした（「サーバーを作る」の LAN・「サーバーを探す → LAN」）。この仮の画面は検証用シーン（`LanPlayTest.unity` など）で今も使う
-- **2026/10/13〜：IPアドレスを打たずに入れる。** 宇宙ごみ集めのタイトル画面で「サーバーを作る → □LAN」で部屋を作ると、作った PC が1秒ごとに同じネットワークへ部屋を知らせ（UDP のブロードキャスト。ポート 47777）、ほかの PC の**マルチプレイの画面の「参加可能なサーバー」の一番上**に自動で出る（2026/10/19 から。`Assets/Scripts/Network/LanRoomDiscovery.cs`・`タイトル画面.md`）。**IP アドレスを打って入る欄はなくした**（2026/10/19・大槻さん）。Windows のファイアウォールが聞いてきたら許可すること。**ハブだけの環境でも、IPアドレスを手で決める手順（上）は今までどおり必要**（知らせはそのネットワークの中にしか届かない）
+- **2026/10/13〜：IPアドレスを打たずに入れる。** 宇宙ごみ集めのタイトル画面で「サーバーを作る → □LAN」で部屋を作ると、作った PC が1秒ごとに同じネットワークへ部屋を知らせ（UDP のブロードキャスト。ポート 47777）、ほかの PC の**マルチプレイの画面の「参加可能なサーバー」の一番上**に自動で出る（2026/10/19 から。`Assets/Scripts/Common/Network/LanRoomDiscovery.cs`・`タイトル画面.md`）。**IP アドレスを打って入る欄はなくした**（2026/10/19・大槻さん）。Windows のファイアウォールが聞いてきたら許可すること。**ハブだけの環境でも、IPアドレスを手で決める手順（上）は今までどおり必要**（知らせはそのネットワークの中にしか届かない）
 - **視点が回せない。** カメラは後ろから追いかけるだけで、マウスや右スティックでは回らない
 - ~~アイテムを取る・箱を押す動きが未確認~~ → **2026/9/3に大槻さんが確認済み。**
   **全員がアイテムを取れること**と、**ホストと参加者で同じように箱を押せること**を確認した
@@ -431,3 +439,5 @@ LanPlayTest
 | 2026/10/15 | Claude Code | タイトル画面を前の画面に戻したので、LAN の部屋が出る場所を「LANのサーバーに参加する」画面の一覧に書き直した |
 | 2026/10/19 | Claude Code | タイトルの組み替えで、LAN の部屋はマルチプレイの画面の一覧の一番上に出るようになり、IP アドレスを打つ欄はなくなったことを反映 |
 | 2026/11/5 | Claude Code | フォルダ整理に合わせて、場所の書き込みを新しい場所に直した（対応は `実装計画/フォルダ整理の対応表.md`） |
+| 2026/11/6 | Claude Code | スクリプトのフォルダ分け直し（TitleScene・Lobby・Game・Common）に合わせて、スクリプトの場所の書き込みを新しい場所に直した（対応は `実装計画/スクリプトのシーン別フォルダの対応表.md`） |
+| 2026/11/7 | Claude Code | 先頭に、このリポジトリに無い場所（旧リポジトリに置いてきた検証シーン・道具・試作）の注意書きを足した。本文は書き換えていない |

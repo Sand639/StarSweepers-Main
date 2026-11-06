@@ -1,5 +1,14 @@
 # プレイヤーの操作とTPS/FPS切り替え
 
+> ⚠️ **この説明に出てくる次の場所は、このリポジトリには無い**（検証シーン・それを作る道具・試作の物。2026/11/4 の移行で、旧リポジトリ https://github.com/Sand639/StarSweepers に置いてきた）。
+> 本文は書き換えていない。**その場所を開く・動かす手順は、このリポジトリではできない。**
+>
+> - `Assets/Scenes/Test/PlayerRigTest.unity`
+> - `Assets/Prefabs/Common/PlayerRig.prefab`
+> - `Assets/Scripts/Player/Reticle.cs`
+> - `Assets/Scripts/Player/Editor/PlayerRigSetup.cs`
+> - `Assets/Art/Materials/PlayerRigSkin.mat`
+
 | 項目 | 内容 |
 | --- | --- |
 | 担当者 | Claude Code（依頼：大槻 海斗） |
@@ -64,8 +73,8 @@
 
 | 種類 | パス |
 | --- | --- |
-| スクリプト | `Assets/Scripts/Player/PlayerController.cs` |
-| スクリプト | `Assets/Scripts/Player/PlayerViewSwitcher.cs` |
+| スクリプト | `Assets/Scripts/Game/Player/PlayerController.cs` |
+| スクリプト | `Assets/Scripts/Game/Player/PlayerViewSwitcher.cs` |
 | スクリプト | `Assets/Scripts/Player/Reticle.cs`（画面中央の照準） |
 | スクリプト（エディタ用） | `Assets/Scripts/Player/Editor/PlayerRigSetup.cs` |
 | プレハブ | `Assets/Prefabs/Common/PlayerRig.prefab` |
@@ -185,9 +194,11 @@ PlayerRig                 ← CharacterController / PlayerController / PlayerVie
 | 2026/9/1 | Claude Code | マテリアル置き場のフォルダ名を `Matrials` から `Materials`（正しい綴り）に変更 |
 | 2026/9/1 | Claude Code | 画面中央の照準（レティクル）を追加。他の機能から色と大きさを変えられるようにした |
 | 2026/9/2 | Claude Code | 視点を一時的に止める仕組み（LookSuspended）を追記 |
-| 2026/9/6 | Claude Code | **TPSでカメラが壁をすり抜ける問題に対応**（大槻さんの依頼）。体とカメラの間に物があるときだけ、カメラが手前に寄る。向きは変わらない。中身は `Assets/Scripts/Camera/CameraObstacleAvoid.cs` にあり、ロボット側と共通 |
+| 2026/9/6 | Claude Code | **TPSでカメラが壁をすり抜ける問題に対応**（大槻さんの依頼）。体とカメラの間に物があるときだけ、カメラが手前に寄る。向きは変わらない。中身は `Assets/Scripts/Game/Camera/CameraObstacleAvoid.cs` にあり、ロボット側と共通 |
 | 2026/9/7 | Claude Code | **Escape がポーズ画面のものになった**（ポーズ画面を置いたシーンのみ）。あわせて、**設定画面のマウス感度**が視点の速さに掛かるようになった。詳細は `ポーズ画面.md` |
 | 2026/9/8 | Claude Code | **Escape はポーズ画面だけのものになった。** ポーズ画面がどのシーンでも自動で用意されるようになったため、こちらでは Escape を見ていない（クリックでカーソルを固定するのは今までどおり）。詳細は `ポーズ画面.md` |
 | 2026/9/20 | Claude Code | `Tools > StarSweepers` のメニュー整理にあわせて、メニューの場所の書き方を直した（`アーカイブ > ゲーム名 > …`）。**ツールの中身と動きは変わっていない** |
 | 2026/10/7 | Claude Code | 設定の表の見出しを「実装したときの初期値（目安。調整で変わる）」にした（大槻さんの方針：インスペクターの値はレベルデザインで変わるので、細かい数値は目安として扱う） |
 | 2026/11/5 | Claude Code | フォルダ整理に合わせて、場所の書き込みを新しい場所に直した（対応は `実装計画/フォルダ整理の対応表.md`） |
+| 2026/11/6 | Claude Code | スクリプトのフォルダ分け直し（TitleScene・Lobby・Game・Common）に合わせて、スクリプトの場所の書き込みを新しい場所に直した（対応は `実装計画/スクリプトのシーン別フォルダの対応表.md`） |
+| 2026/11/7 | Claude Code | 先頭に、このリポジトリに無い場所（旧リポジトリに置いてきた検証シーン・道具・試作）の注意書きを足した。本文は書き換えていない |

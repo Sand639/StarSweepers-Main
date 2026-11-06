@@ -75,10 +75,10 @@ Steam のアカウントが2つ（フレンド同士）と、PC が2台あると
 
 | 種類 | パス |
 | --- | --- |
-| スクリプト | `Assets/Scripts/Network/SteamFriendsService.cs`（Steam につなぐ・リッチプレゼンス・フレンドの部屋を探す。新規。シーンに置かなくても動く） |
-| 変更 | `Assets/Scripts/Network/InternetConnection.cs`（部屋の名前・人数を外から読めるようにした） |
-| 変更 | `Assets/Scripts/UI/TitleScreen.cs`・`TitleMenuButton.cs`・`TitlePart.cs`・`Editor/TitleScreenPrefabBuilder.cs`（「フレンドのサーバーを探す」の画面。プレハブは作り直さずに足す＝版 4） |
-| 変更 | `Assets/Scripts/Match/Editor/SpaceJunkBuilder.cs`（ビルドに `steam_appid.txt` を入れる） |
+| スクリプト | `Assets/Scripts/Common/Network/SteamFriendsService.cs`（Steam につなぐ・リッチプレゼンス・フレンドの部屋を探す。新規。シーンに置かなくても動く） |
+| 変更 | `Assets/Scripts/Common/Network/InternetConnection.cs`（部屋の名前・人数を外から読めるようにした） |
+| 変更 | `Assets/Scripts/TitleScene/UI/TitleScreen.cs`・`TitleMenuButton.cs`・`TitlePart.cs`・`Editor/TitleScreenPrefabBuilder.cs`（「フレンドのサーバーを探す」の画面。プレハブは作り直さずに足す＝版 4） |
+| 変更 | `Assets/Scripts/Game/Match/Editor/SpaceJunkBuilder.cs`（ビルドに `steam_appid.txt` を入れる） |
 | 部品 | `Packages/manifest.json` に Steamworks.NET（2025.164.1）を追加（`使用素材とライセンス.md`） |
 | 設定 | `StarSweepers/steam_appid.txt`（480） |
 
@@ -113,3 +113,4 @@ Steam のアカウントが2つ（フレンド同士）と、PC が2台あると
 | 2026/10/15 | Claude Code | タイトル画面を前の画面に戻したので、「フレンドのサーバーを探す」も使えるようになった（10/13 の作り直しで外していた） |
 | 2026/10/19 | Claude Code | タイトルの組み替えで、フレンドの部屋はマルチプレイの画面の「参加可能なサーバー」に出る（サーバー検索設定の ■フレンドのサーバー）ようになったことを反映 |
 | 2026/11/5 | Claude Code | フォルダ整理に合わせて、場所の書き込みを新しい場所に直した（対応は `実装計画/フォルダ整理の対応表.md`） |
+| 2026/11/6 | Claude Code | スクリプトのフォルダ分け直し（TitleScene・Lobby・Game・Common）に合わせて、スクリプトの場所の書き込みを新しい場所に直した（対応は `実装計画/スクリプトのシーン別フォルダの対応表.md`） |
