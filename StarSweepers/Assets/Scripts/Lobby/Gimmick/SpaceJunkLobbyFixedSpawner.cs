@@ -3,37 +3,37 @@ using Unity.Netcode;
 using UnityEngine;
 
 /// <summary>
-/// **ƒƒr[‚Ì—ûKêê—p‚ÌA“Á’èˆÊ’uE–³ŒÀ‚¨‚©‚í‚èƒXƒ|ƒi[B**
-/// ”ÍˆÍw’è‚ÍˆêØ‚¹‚¸A‚±‚ÌƒRƒ“ƒ|[ƒlƒ“ƒg‚ª•t‚¢‚Ä‚¢‚é‹óƒIƒuƒWƒFƒNƒg‚ÌˆÊ’uiPosition/Rotationj‚É
-/// İ’è‚µ‚½•b”‚²‚Æ‚ÉAƒRƒ“ƒxƒA‚Ö—¬‚·‚½‚ß‚ÌƒIƒuƒWƒFƒNƒg‚ğ’¼Ú¶¬‚µ‘±‚¯‚Ü‚·B
-/// ê‚É‘¶İ‚·‚éƒIƒuƒWƒFƒNƒg‚ÌÅ‘å”‚ğ§ŒÀ‚·‚é‹@”\•t‚«B
+/// **ãƒ­ãƒ“ãƒ¼ã®ç·´ç¿’å ´å°‚ç”¨ã®ã€ç‰¹å®šä½ç½®ãƒ»ç„¡é™ãŠã‹ã‚ã‚Šã‚¹ãƒãƒŠãƒ¼ã€‚**
+/// ç¯„å›²æŒ‡å®šã¯ä¸€åˆ‡ã›ãšã€ã“ã®ã‚³ãƒ³ãƒãƒ¼ãƒãƒ³ãƒˆãŒä»˜ã„ã¦ã„ã‚‹ç©ºã‚ªãƒ–ã‚¸ã‚§ã‚¯ãƒˆã®ä½ç½®ï¼ˆPosition/Rotationï¼‰ã«
+/// è¨­å®šã—ãŸç§’æ•°ã”ã¨ã«ã€ã‚³ãƒ³ãƒ™ã‚¢ã¸æµã™ãŸã‚ã®ã‚ªãƒ–ã‚¸ã‚§ã‚¯ãƒˆã‚’ç›´æ¥ç”Ÿæˆã—ç¶šã‘ã¾ã™ã€‚
+/// å ´ã«å­˜åœ¨ã™ã‚‹ã‚ªãƒ–ã‚¸ã‚§ã‚¯ãƒˆã®æœ€å¤§æ•°ã‚’åˆ¶é™ã™ã‚‹æ©Ÿèƒ½ä»˜ãã€‚
 /// </summary>
 public class SpaceJunkLobbyFixedSpawner : MonoBehaviour
 {
-    [Header("o‚·•¨")]
-    [Tooltip("ƒƒr[‚Å–³ŒÀ‚Éo‚µ‚½‚¢ƒvƒŒƒnƒuiSpaceJunkSpecial‚È‚ÇANetworkObject•t‚«‚Ì‚à‚Ìj")]
+    [Header("å‡ºã™ç‰©")]
+    [Tooltip("ãƒ­ãƒ“ãƒ¼ã§ç„¡é™ã«å‡ºã—ãŸã„ãƒ—ãƒ¬ãƒãƒ–ï¼ˆSpaceJunkSpecialãªã©ã€NetworkObjectä»˜ãã®ã‚‚ã®ï¼‰")]
     [SerializeField] private GameObject spawnPrefab;
 
-    [Header("ŠÔŠu‚Æ§ŒÀ")]
-    [Tooltip("‰½•b‚²‚Æ‚É1‚Â—‚Æ‚·‚©i•bj")]
+    [Header("é–“éš”ã¨åˆ¶é™")]
+    [Tooltip("ä½•ç§’ã”ã¨ã«1ã¤è½ã¨ã™ã‹ï¼ˆç§’ï¼‰")]
     [SerializeField] private float spawnIntervalSeconds = 3f;
 
-    [Tooltip("“¯‚Éê‚É‘¶İ‚Å‚«‚éÅ‘å”i0‚È‚ç–³§ŒÀj")]
+    [Tooltip("åŒæ™‚ã«å ´ã«å­˜åœ¨ã§ãã‚‹æœ€å¤§æ•°ï¼ˆ0ãªã‚‰ç„¡åˆ¶é™ï¼‰")]
     [SerializeField] private int maxCount = 5;
 
-    // ¶¬‚µ‚½ƒIƒuƒWƒFƒNƒg‚ğŠÇ—‚·‚éƒŠƒXƒg
+    // ç”Ÿæˆã—ãŸã‚ªãƒ–ã‚¸ã‚§ã‚¯ãƒˆã‚’ç®¡ç†ã™ã‚‹ãƒªã‚¹ãƒˆ
     private readonly List<GameObject> spawnedInstances = new List<GameObject>();
     private float timer;
 
     private void Update()
     {
-        // ƒzƒXƒgiƒT[ƒo[j‚ÌPCˆÈŠOA‚Ü‚½‚Í–{í‚ªn‚Ü‚Á‚Ä‚µ‚Ü‚Á‚½‚çƒƒr[—p‚È‚Ì‚Å~‚ß‚é
+        // ãƒ›ã‚¹ãƒˆï¼ˆã‚µãƒ¼ãƒãƒ¼ï¼‰ã®PCä»¥å¤–ã€ã¾ãŸã¯æœ¬æˆ¦ãŒå§‹ã¾ã£ã¦ã—ã¾ã£ãŸã‚‰ãƒ­ãƒ“ãƒ¼ç”¨ãªã®ã§æ­¢ã‚ã‚‹
         if (!CanSpawnLobby()) return;
 
-        // ‚·‚Å‚ÉÁ–ÅiDestroyj‚µ‚½ƒIƒuƒWƒFƒNƒg‚ğƒŠƒXƒg‚©‚çœŠO‚·‚é
+        // ã™ã§ã«æ¶ˆæ»…ï¼ˆDestroyï¼‰ã—ãŸã‚ªãƒ–ã‚¸ã‚§ã‚¯ãƒˆã‚’ãƒªã‚¹ãƒˆã‹ã‚‰é™¤å¤–ã™ã‚‹
         spawnedInstances.RemoveAll(item => item == null);
 
-        // Œ»İ‚Ìê‚É‚ ‚é”‚ªÅ‘å”ˆÈã‚È‚çAƒ^ƒCƒ}[‚ği‚ß‚¸‚É‘Ò‹@‚·‚é
+        // ç¾åœ¨ã®å ´ã«ã‚ã‚‹æ•°ãŒæœ€å¤§æ•°ä»¥ä¸Šãªã‚‰ã€ã‚¿ã‚¤ãƒãƒ¼ã‚’é€²ã‚ãšã«å¾…æ©Ÿã™ã‚‹
         if (maxCount > 0 && spawnedInstances.Count >= maxCount)
         {
             return;
@@ -49,11 +49,11 @@ public class SpaceJunkLobbyFixedSpawner : MonoBehaviour
 
     private bool CanSpawnLobby()
     {
-        // ’ÊM’†‚È‚çƒzƒXƒg‚¾‚¯‚ª—N‚©‚¹‚éÓ”C‚ğ‚Â
+        // é€šä¿¡ä¸­ãªã‚‰ãƒ›ã‚¹ãƒˆã ã‘ãŒæ¹§ã‹ã›ã‚‹è²¬ä»»ã‚’æŒã¤
         NetworkManager network = NetworkManager.Singleton;
         if (network != null && network.IsListening && !network.IsServer) return false;
 
-        // –{í‚Ìƒ‰ƒEƒ“ƒhiSpaceJunkRoundj‚ª“®‚¢‚Ä‚¢‚È‚¢uƒƒr[‚Ì‚¾‚¯v“®‚­‚æ‚¤‚É‚·‚é
+        // æœ¬æˆ¦ã®ãƒ©ã‚¦ãƒ³ãƒ‰ï¼ˆSpaceJunkRoundï¼‰ãŒå‹•ã„ã¦ã„ãªã„ã€Œãƒ­ãƒ“ãƒ¼ã®æ™‚ã ã‘ã€å‹•ãã‚ˆã†ã«ã™ã‚‹
         return SpaceJunkRound.Current == null;
     }
 
@@ -61,16 +61,16 @@ public class SpaceJunkLobbyFixedSpawner : MonoBehaviour
     {
         if (spawnPrefab == null) return;
 
-        // ‚±‚ÌƒIƒuƒWƒFƒNƒg‚Ì‚Ü‚³‚É‚»‚ÌˆÊ’uA‚»‚ÌŒü‚«‚Å¶¬‚·‚é
+        // ã“ã®ã‚ªãƒ–ã‚¸ã‚§ã‚¯ãƒˆã®ã¾ã•ã«ãã®ä½ç½®ã€ãã®å‘ãã§ç”Ÿæˆã™ã‚‹
         Vector3 spawnPosition = transform.position;
         Quaternion spawnRotation = transform.rotation;
 
         GameObject spawned = Instantiate(spawnPrefab, spawnPosition, spawnRotation);
 
-        // ¶¬‚µ‚½ƒIƒuƒWƒFƒNƒg‚ğƒŠƒXƒg‚É“o˜^‚µ‚Ä”‚ğ”‚¦‚ç‚ê‚é‚æ‚¤‚É‚·‚é
+        // ç”Ÿæˆã—ãŸã‚ªãƒ–ã‚¸ã‚§ã‚¯ãƒˆã‚’ãƒªã‚¹ãƒˆã«ç™»éŒ²ã—ã¦æ•°ã‚’æ•°ãˆã‚‰ã‚Œã‚‹ã‚ˆã†ã«ã™ã‚‹
         spawnedInstances.Add(spawned);
 
-        // ƒIƒ“ƒ‰ƒCƒ““¯ŠúF‘Sˆõ‚Ì‰æ–Ê‚ÉoŒ»‚³‚¹‚é
+        // ã‚ªãƒ³ãƒ©ã‚¤ãƒ³åŒæœŸï¼šå…¨å“¡ã®ç”»é¢ã«å‡ºç¾ã•ã›ã‚‹
         NetworkManager network = NetworkManager.Singleton;
         if (network != null && network.IsListening)
         {
@@ -84,7 +84,7 @@ public class SpaceJunkLobbyFixedSpawner : MonoBehaviour
 
     private void OnDrawGizmos()
     {
-        // ‚Ç‚±‚É—N‚­‚©ƒGƒfƒBƒ^‚Ì‰æ–Ê‚É…F‚Ì‹…‚Åo‚·
+        // ã©ã“ã«æ¹§ãã‹ã‚¨ãƒ‡ã‚£ã‚¿ã®ç”»é¢ã«æ°´è‰²ã®çƒã§å‡ºã™
         Gizmos.color = Color.cyan;
         Gizmos.DrawWireSphere(transform.position, 0.4f);
     }

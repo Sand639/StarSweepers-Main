@@ -330,8 +330,7 @@
 > 作業を途中で終えたとき、続きを引き継ぐための置き手紙。
 > 終わった話は消してよい。
 
-- **2026/11/2　長島さんのステージのシーン名 `STAGE_06^^` を付け直してもらう（長島さんの作業待ち）。** PR #22 で入った「ベルトコンベアー2」のシーン（`Assets/Scenes/Prototype/SpaceJunk/Stage/STAGE_06^^.unity`）の名前に `^^` が入っていて、`Assets/` の中は半角の英数字だけという決まりに合わない。**OS のファイル操作では付け直さない**（ステージの一覧 `SpaceJunkMapList.asset` とビルドの設定がパスで持っている）。Unity の Project ウィンドウで名前を変え（例：`STAGE_08`）、ステージの一覧の `sceneName`・`scenePath` が新しい名前になっているかを確かめてもらう。済んだらこの伝言を消す
-- **2026/11/4　Panicbird さんのステージのシーン名 `STAGE_07(New)` を付け直してもらう（Panicbird さんの作業待ち）。** PR #24 で入った「新ガラスの床」のシーン（`Assets/Scenes/Prototype/SpaceJunk/Stage/STAGE_07(New).unity`）の名前に `(` `)` が入っていて、`Assets/` の中は半角の英数字だけという決まりに合わない。直し方は上の `STAGE_06^^` と同じ（Unity の Project ウィンドウで名前を変え、ステージの一覧 `SpaceJunkMapList.asset` の `sceneName`・`scenePath` を確かめる）。済んだらこの伝言を消す
+- **2026/11/7　シーン名 `STAGE_06^^`・`STAGE_07(New)` の付け直しは済んだ。** `STAGE_08`＝ベルトコンベアー2（長島さん）、`STAGE_09`＝新ガラスの床（Panicbird さん）。大槻さんの了承を得て、Claude Code が画面なしの Unity で `AssetDatabase.RenameAsset` を呼んで付け直した（GUID はそのまま。`git diff -M` で R100）。**マップの一覧の控え（`sceneName`・`scenePath`）は、名前を変えただけでは直らない**ので、同じ道具の中で `Entry.Refresh()` を呼び、ビルドの一覧も GUID から今の場所に直した。長島さん・Panicbird さんが古い名前のシーンを手元で編集していたら、取り込むときに新しい名前のシーンへ変更が入ったかを確かめること。同じ日に、Shift-JIS だった `MovingPlate.cs`・`SpaceJunkLobbyFixedSpawner.cs` を UTF-8 に直した（これで `Assets/Scripts/` は全部 UTF-8）
 
 - **2026/10/7　ドキュメント点検（第3回）をした（ブランチ `auto/doc-audit-1007`）。** タイトル・ロビー・パスワード・Steam・始まりの演出などで変わった中身に、ドキュメントを合わせた。
   点検で見つけた**人の判断が要ること**：①画像4枚（レーダー3枚・`ScopeLens.png`）の入手元とライセンス（`質問リスト.md`）②Steam のフレンドの機能は2アカウントでの確認がまだ ③`SpaceJunkMap03`・`04` は作りかけのまま。
@@ -458,3 +457,4 @@
 | 2026/11/5 | Claude Code | 「`Assets/` のフォルダを整理した」の節に、大槻さんの整理と集約したいきさつ（worktree のブランチは Unity Hub から開けない）を追加 |
 | 2026/11/6 | Claude Code | 「`Assets/` のフォルダを整理した」の節に、`Scripts/` をシーン別（TitleScene／Lobby／Game／Common）に分け直したときの注意を足した |
 | 2026/11/6 | Claude Code | 「長いスクリプトを機能ごとのファイルに分けた」の注意（係のクラスと partial の使い分け、別のクラスが同じファイルにあるとき、ビルドを混ぜない）を足した |
+| 2026/11/7 | Claude Code | 「次のAIへの伝言」のシーン名の付け直し待ち2件を、済んだ記録に差し替えた（`STAGE_08`・`STAGE_09`。やり方と、文字コードを UTF-8 にそろえたことも書いた） |

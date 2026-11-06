@@ -22,10 +22,10 @@ public class MoveBox : MonoBehaviour
 
 	void Start()
 	{
-		// Cubeの開始位置
+		// Cube縺ｮ髢句ｧ倶ｽ咲ｽｮ
 		start = transform.position;
 
-		// ゲーム開始時の「Tokenの実際のワールド座標」を記憶
+		// 繧ｲ繝ｼ繝髢句ｧ区凾縺ｮ縲卦oken縺ｮ螳滄圀縺ｮ繝ｯ繝ｼ繝ｫ繝牙ｺｧ讓吶阪ｒ險俶�ｶ
 		target = token.transform.position;
 
 		token.SetActive(false);
