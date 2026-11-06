@@ -76,3 +76,24 @@ MonoBehaviour:
     sceneName: STAGE_Glass2
     scenePath: Assets/Scenes/Stage/STAGE_Glass2.unity
     goalMask: 10
+  - scene: {fileID: 102900000, guid: 446992d2ca7b4464d9a5e57d9cfeda52, type: 3}
+    showInLobby: 1
+    displayName: "\u30AC\u30E9\u30B9\u30DE\u30C3\u30D71\uFF08\u4EEE\uFF09"
+    thumbnail: {fileID: 0}
+    sceneName: STAGE_GlassLattice
+    scenePath: Assets/Scenes/Stage/STAGE_GlassLattice.unity
+    goalMask: 10
+  - scene: {fileID: 102900000, guid: 4f1c410a7216fd944a3f192f9432bfd9, type: 3}
+    showInLobby: 1
+    displayName: "\u30AC\u30E9\u30B9\u30DE\u30C3\u30D72\uFF08\u4EEE\uFF09"
+    thumbnail: {fileID: 0}
+    sceneName: STAGE_GlassFull
+    scenePath: Assets/Scenes/Stage/STAGE_GlassFull.unity
+    goalMask: 10
+  - scene: {fileID: 102900000, guid: a06d8819d5003f748b7a7d81262059e2, type: 3}
+    showInLobby: 1
+    displayName: "\u30AC\u30E9\u30B9\u30DE\u30C3\u30D73\uFF08\u4EEE\uFF09"
+    thumbnail: {fileID: 0}
+    sceneName: STAGE_GlassChecker
+    scenePath: Assets/Scenes/Stage/STAGE_GlassChecker.unity
+    goalMask: 10
