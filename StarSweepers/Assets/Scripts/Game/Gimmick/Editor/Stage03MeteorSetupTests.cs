@@ -6,7 +6,7 @@ using UnityEngine;
 using UnityEngine.SceneManagement;
 
 /// <summary>
-/// STAGE_03 に置いた隕石攻撃の設定が、`隕石攻撃.md` の「STAGE_03への設置」のとおりになっているかを確かめるテスト。
+/// STAGE_Meteor に置いた隕石攻撃の設定が、`隕石攻撃.md` の「STAGE_Meteorへの設置」のとおりになっているかを確かめるテスト。
 ///
 /// ドーナツ形の床（内周の半径 9m・外周の半径 15m）の上に落下範囲が8か所あり、
 /// 管理役が1つだけで、間隔や個数などの数値が決めた値のままかを見る。
@@ -15,10 +15,10 @@ using UnityEngine.SceneManagement;
 public class Stage03MeteorSetupTests
 {
     private const string ScenePath =
-        "Assets/Scenes/Stage/STAGE_03.unity";
+        "Assets/Scenes/Stage/STAGE_Meteor.unity";
 
     /// <summary>
-    /// STAGE_03 を開いたら → 管理役（MeteorManager）が1つ、落下範囲（MeteorArea）が8つあり、
+    /// STAGE_Meteor を開いたら → 管理役（MeteorManager）が1つ、落下範囲（MeteorArea）が8つあり、
     /// 爆風の半径 5m・4秒ごと・予告4秒・1回に3個・範囲の中央に落とす、の設定で、
     /// どの範囲もドーナツ床の上からはみ出していないはず。
     /// </summary>

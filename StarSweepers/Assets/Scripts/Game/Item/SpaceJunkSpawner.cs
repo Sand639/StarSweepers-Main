@@ -12,11 +12,11 @@ using UnityEngine;
 /// ・マップにある素材が **Max Objects 以上なら出さない**
 /// ・出す場所に他の物やプレイヤーがいたら、別の場所を探す
 /// ・**ラウンドの結果が出たら、もう出さない**
-/// ・**Spawn Zones に範囲（四角）を入れたら、その範囲の中にだけ出す**（STAGE_02 の緑の範囲など）
-/// ・**Spawn List に爆弾（ExplosiveObject 付き）を入れたら、素材と一緒に爆弾も出す**（マップの爆弾は Max Bombs 個まで。STAGE_06）
+/// ・**Spawn Zones に範囲（四角）を入れたら、その範囲の中にだけ出す**（STAGE_Train の緑の範囲など）
+/// ・**Spawn List に爆弾（ExplosiveObject 付き）を入れたら、素材と一緒に爆弾も出す**（マップの爆弾は Max Bombs 個まで。STAGE_Conveyor1）
 /// ・**Cycle Zones を ON にすると、Spawn Zones に1回ずつ出すのを1巡として回す**（1巡ごとに順番をシャッフル。STAGE_06_A）
-/// ・**Kind Zones に種類と範囲を入れたら、その種類だけその範囲に出す**（STAGE_05 の「敵陣まで取りに行く」）
-/// ・**Spawn Circle Radius を入れたら円の中に出す。Require Ground Below を ON にすると、真下に床がある所にだけ出す**（STAGE_03 のドーナツ）
+/// ・**Kind Zones に種類と範囲を入れたら、その種類だけその範囲に出す**（STAGE_Island の「敵陣まで取りに行く」）
+/// ・**Spawn Circle Radius を入れたら円の中に出す。Require Ground Below を ON にすると、真下に床がある所にだけ出す**（STAGE_Meteor のドーナツ）
 ///
 /// ## オンラインのとき
 ///
@@ -28,7 +28,7 @@ using UnityEngine;
 ///
 /// 釣り（<c>FishingObjectSpawner</c>）は「物資」と「爆発物」の2種類を、爆発物6：物資1で出していた。
 /// こちらは**素材3種類を均等に出す**のと、**爆発物を出さない**のが違う
-/// （爆発物は入れない、が 2026/9/17 の決まりだったが、2026/10/6 から Bomb Prefab で出せるようにした。STAGE_06）。
+/// （爆発物は入れない、が 2026/9/17 の決まりだったが、2026/10/6 から Bomb Prefab で出せるようにした。STAGE_Conveyor1）。
 ///
 /// ファイルの分け方と変数の置き場所は Documents/スクリプトの説明/Game/Item/SpaceJunkSpawner.md。
 /// </summary>
@@ -117,13 +117,13 @@ public partial class SpaceJunkSpawner : MonoBehaviour
     [SerializeField] private bool cycleZones = false;
 
     [Tooltip("0より大きくすると、このオブジェクトの位置を中心に、この半径の円の中に出す（Spawn Zones が空のとき）。" +
-             "STAGE_03 のドーナツなど。0なら Area Half Size の四角")]
+             "STAGE_Meteor のドーナツなど。0なら Area Half Size の四角")]
     [SerializeField] private float spawnCircleRadius = 0f;
 
     [Tooltip("ON にすると、**真下に床があるときだけ**出す（穴の上には出さない）")]
     [SerializeField] private bool requireGroundBelow = false;
 
-    [Tooltip("ON にすると、**土台など一段高い床の上にも**出す（真下の床から Drop Height の高さに出す。STAGE_01 の土台）。" +
+    [Tooltip("ON にすると、**土台など一段高い床の上にも**出す（真下の床から Drop Height の高さに出す。STAGE_Simple の土台）。" +
              "高い床は、Drop Height より低くしておくこと。" +
              "OFF なら、このオブジェクトと同じ高さの床だけに出す（高い床の上は「何かある」とみなして出さない）")]
     [SerializeField] private bool spawnOnRaisedFloor = false;
@@ -139,7 +139,7 @@ public partial class SpaceJunkSpawner : MonoBehaviour
         public Transform[] zones = new Transform[0];
     }
 
-    [Header("種類ごとの出す範囲（STAGE_05）")]
+    [Header("種類ごとの出す範囲（STAGE_Island）")]
     [Tooltip("ここに入れた種類は、その範囲にだけ出す（入れていない種類は Spawn Zones などのふつうの範囲）。" +
              "「敵陣まで取りに行く」ように、種類ごとに出る場所を分けたいとき")]
     [SerializeField] private KindZone[] kindZones = new KindZone[0];

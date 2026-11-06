@@ -333,7 +333,7 @@ public class MeteorManager : MonoBehaviour
 	/// Area内から落下位置を取得する。
 	///
 	/// 半径は 0 で渡している。つまり **Area は「爆心を決める範囲」で、爆風の円全体を Area の中に収める制限は
-	/// かけていない**（STAGE_03 の設置でそう決めた。`隕石攻撃.md` 参照）。円ごと収めたくなったら impactRadius を渡す。
+	/// かけていない**（STAGE_Meteor の設置でそう決めた。`隕石攻撃.md` 参照）。円ごと収めたくなったら impactRadius を渡す。
 	/// </summary>
 	private bool TryGetUniquePoint(
 		MeteorArea area,

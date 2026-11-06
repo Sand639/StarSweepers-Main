@@ -3,7 +3,7 @@ using UnityEngine;
 /// <summary>
 /// **得点の高い特殊デブリの目印。** ゴールに入れると、ふつうの1点に Bonus Points が足される。
 ///
-/// STAGE_02 の**真ん中に置く特殊デブリ**で使う（2026/10/6・大槻さん）。
+/// STAGE_Train の**真ん中に置く特殊デブリ**で使う（2026/10/6・大槻さん）。
 /// 真ん中に出し、消えたらまた真ん中に出すのは <see cref="SpaceJunkBombPoints"/>（Respawn When Moved を OFF）。
 ///
 /// 見た目は、始まったときに <see cref="SpaceJunkHighValueMark"/> を付けて**金色に光らせる**（レーダーでも大きな点で出る）。

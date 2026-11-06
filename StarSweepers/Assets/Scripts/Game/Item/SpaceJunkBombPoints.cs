@@ -11,8 +11,8 @@ using UnityEngine.Serialization;
 ///
 /// ・動かされた物はそのまま残る（投げたり、爆発させたりできる）
 /// ・**Respawn When Moved を OFF にすると、消えたときだけ出し直す**（真ん中の特殊デブリ用。動かすたびに増えないように）
-/// ・**One Random Point を ON にすると、子の場所のうち毎回ランダムな1か所にだけ出す**（STAGE_03 の特殊デブリ）
-/// ・**Make Heavy を ON にすると、出した物を重いデブリ（イベントの特殊デブリと同じ）にする**（STAGE_01 の真ん中。
+/// ・**One Random Point を ON にすると、子の場所のうち毎回ランダムな1か所にだけ出す**（STAGE_Meteor の特殊デブリ）
+/// ・**Make Heavy を ON にすると、出した物を重いデブリ（イベントの特殊デブリと同じ）にする**（STAGE_Simple の真ん中。
 ///   Spawn Prefab が空なら、スポナーの素材からランダムに選ぶ）
 /// ・**ラウンドの結果が出たら、もう出さない**
 ///
@@ -39,7 +39,7 @@ public class SpaceJunkBombPoints : MonoBehaviour
     [Tooltip("置いた場所から横にこれ以上離れたら「動かされた」とみなす（m）")]
     [SerializeField] private float moveThreshold = 1f;
 
-    [Tooltip("ON：子の場所のうち、毎回ランダムな1か所にだけ出す（同時に1つだけ。STAGE_03 の特殊デブリの上・中・下）。" +
+    [Tooltip("ON：子の場所のうち、毎回ランダムな1か所にだけ出す（同時に1つだけ。STAGE_Meteor の特殊デブリの上・中・下）。" +
              "OFF：子の場所すべてに1つずつ出す")]
     [SerializeField] private bool oneRandomPoint = false;
 
@@ -49,7 +49,7 @@ public class SpaceJunkBombPoints : MonoBehaviour
     [Header("重いデブリにする")]
     [Tooltip("ON：出した物を**重いデブリ**にする（イベントの特殊デブリと同じ。投げられず引きずるだけ・高得点・水色。" +
              "重さ・得点・大きさはロビーのイベントの設定を使う）。Spawn Prefab が空なら、スポナーの素材からランダムに選ぶ。" +
-             "オンラインのときだけ効く（STAGE_01 の真ん中。2026/10/8）")]
+             "オンラインのときだけ効く（STAGE_Simple の真ん中。2026/10/8）")]
     [SerializeField] private bool makeHeavy = false;
 
     /// <summary>1か所分の状態。</summary>

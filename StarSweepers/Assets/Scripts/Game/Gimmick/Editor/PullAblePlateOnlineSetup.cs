@@ -15,7 +15,7 @@ using UnityEngine.SceneManagement;
 /// Unityのメニュー「Tools > SpaceJunk > Apply PullAblePlate Online Setup」から実行できる。
 /// 次の2つをまとめて行う。
 /// ・プレハブ `PullAblePlate.prefab` に、通信用の NetworkObject と、位置を配る NetworkTransform（ホスト権限）を付ける
-/// ・STAGE_05 に置いてある床の、通信用の番号（GlobalObjectIdHash など）を作り直して保存する
+/// ・STAGE_Island に置いてある床の、通信用の番号（GlobalObjectIdHash など）を作り直して保存する
 ///
 /// コマンドラインから Unity を動かす（バッチモード）ことも想定していて、
 /// そのときは「保存していないシーンがあれば止める」「終わったら開いていたシーンに戻す」を飛ばす。
@@ -25,11 +25,11 @@ public static class PullAblePlateOnlineSetup
     private const string PlatePrefabPath =
         "Assets/Prefabs/Gimmick/PullAblePlate.prefab";
     private const string Stage05ScenePath =
-        "Assets/Scenes/Stage/STAGE_05.unity";
+        "Assets/Scenes/Stage/STAGE_Island.unity";
 
     /// <summary>
-    /// プレハブの設定 → STAGE_05 の保存、の順に行う。
-    /// STAGE_05 を Single で開き直すので、作業中のシーンに保存していない変更があれば、消さないよう最初に止める。
+    /// プレハブの設定 → STAGE_Island の保存、の順に行う。
+    /// STAGE_Island を Single で開き直すので、作業中のシーンに保存していない変更があれば、消さないよう最初に止める。
     /// </summary>
     [MenuItem("Tools/SpaceJunk/Apply PullAblePlate Online Setup")]
     public static void ApplyOnlineSetup()
@@ -111,7 +111,7 @@ public static class PullAblePlateOnlineSetup
     }
 
     /// <summary>
-    /// STAGE_05 を開き、置いてある床（1つだけのはず）の通信用の番号を作らせてから保存する。
+    /// STAGE_Island を開き、置いてある床（1つだけのはず）の通信用の番号を作らせてから保存する。
     /// 床が1つでない・番号が 0 のまま・ほかの物と番号が重なる、のどれかなら例外を出して知らせる。
     /// </summary>
     private static void ConfigureStage05()
@@ -123,7 +123,7 @@ public static class PullAblePlateOnlineSetup
         if (plates.Length != 1)
         {
             throw new InvalidOperationException(
-                $"Expected one PullAblePlate in STAGE_05, but found {plates.Length}.");
+                $"Expected one PullAblePlate in STAGE_Island, but found {plates.Length}.");
         }
 
         NetworkObject plateNetworkObject = plates[0].GetComponent<NetworkObject>();

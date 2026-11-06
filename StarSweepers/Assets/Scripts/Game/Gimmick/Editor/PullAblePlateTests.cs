@@ -18,7 +18,7 @@ using UnityEngine.SceneManagement;
 /// ・オンラインの作り … 通信用の部品・ServerRpc の設定・同期する値があるか（型を調べるだけ）
 /// ・計算 … 誰を動かすか・どれだけ動いたか・柱の向き（static の関数を直接呼ぶ）
 /// ・動き … 仮の床とプレイヤーを作り、引っ張る → 床と乗客が動く／壁の手前で止まる、など
-/// ・素材 … 床とアンカーのプレハブ、STAGE_05 に置いた床の作りが決めたとおりか
+/// ・素材 … 床とアンカーのプレハブ、STAGE_Island に置いた床の作りが決めたとおりか
 ///
 /// ## EditMode ならではの前提
 ///
@@ -35,7 +35,7 @@ public class PullAblePlateTests
 {
     private const string PlatePrefabPath = "Assets/Prefabs/Gimmick/PullAblePlate.prefab";
     private const string AnchorPrefabPath = "Assets/Prefabs/Gimmick/PullAblePlateAnchor.prefab";
-    private const string Stage05ScenePath = "Assets/Scenes/Stage/STAGE_05.unity";
+    private const string Stage05ScenePath = "Assets/Scenes/Stage/STAGE_Island.unity";
 
     /// <summary>床は通信に対応した部品（NetworkBehaviour）であるはず。オンラインで床の位置をホストが決めるため。</summary>
     [Test]
@@ -818,7 +818,7 @@ public class PullAblePlateTests
     }
 
     /// <summary>
-    /// STAGE_05 に置いた床（1つだけ）は、通信用の番号（GlobalObjectIdHash など）が 0 でなく、
+    /// STAGE_Island に置いた床（1つだけ）は、通信用の番号（GlobalObjectIdHash など）が 0 でなく、
     /// シーンの中のほかの通信オブジェクトと重なっていないはず。0 や重なりがあると、参加者のPCで床が取り違えられる。
     /// ※ 番号は外から見えないので、インスペクターと同じ読み方で名前を指定して読んでいる
     /// </summary>
@@ -830,7 +830,7 @@ public class PullAblePlateTests
         {
             // 開いた直後に「変更あり」になっていたら、番号が保存されておらず開いた拍子に作り直されたということ
             Assert.That(scene.isDirty, Is.False,
-                "NetworkObject と配置 ID は STAGE_05 に保存済みである必要がある");
+                "NetworkObject と配置 ID は STAGE_Island に保存済みである必要がある");
             PullAblePlate[] plates = scene.GetRootGameObjects()
                 .SelectMany(root => root.GetComponentsInChildren<PullAblePlate>(true))
                 .ToArray();

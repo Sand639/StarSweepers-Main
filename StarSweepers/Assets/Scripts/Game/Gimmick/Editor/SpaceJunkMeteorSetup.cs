@@ -12,15 +12,15 @@ using UnityEngine.SceneManagement;
 /// | --- | --- |
 /// | `Create Prefabs` | `Assets/Prefabs/Gimmick/Meteor/` に、隕石攻撃の6つのプレハブと3つのマテリアルを作る。**すでにある物は上書きしない** |
 /// | `Add To Current Scene` | いま開いているシーンに管理役（MeteorManager）を置き、**選んでいる床**それぞれに落下範囲（MeteorArea）を子として足す |
-/// | `Install Into STAGE_03` | STAGE_03 を開き、ドーナツ床の上に8方向の落下範囲を置いて、管理役の数値を決めた値にして保存する |
+/// | `Install Into STAGE_Meteor` | STAGE_Meteor を開き、ドーナツ床の上に8方向の落下範囲を置いて、管理役の数値を決めた値にして保存する |
 ///
-/// STAGE_03 の数値（4秒ごと・1回3個・予告4秒・半径5m・範囲の中央に落とす）は `隕石攻撃.md` に書いてあり、
+/// STAGE_Meteor の数値（4秒ごと・1回3個・予告4秒・半径5m・範囲の中央に落とす）は `隕石攻撃.md` に書いてあり、
 /// `Stage03MeteorSetupTests` がその値になっているかを確かめている。ここを変えたらテストも合わせること。
 /// </summary>
 public static class SpaceJunkMeteorSetup
 {
     public const string Stage03ScenePath =
-        "Assets/Scenes/Stage/STAGE_03.unity";
+        "Assets/Scenes/Stage/STAGE_Meteor.unity";
     public const string PrefabFolder = "Assets/Prefabs/Gimmick/Meteor";
     public const string ManagerPrefabPath = PrefabFolder + "/MeteorManager.prefab";
     public const string AreaPrefabPath = PrefabFolder + "/MeteorArea.prefab";
@@ -107,12 +107,12 @@ public static class SpaceJunkMeteorSetup
     }
 
     /// <summary>
-    /// STAGE_03 に隕石攻撃を設置して保存する。何度実行しても、同じ名前の物は作り直さずに位置と数値だけ合わせ直す。
+    /// STAGE_Meteor に隕石攻撃を設置して保存する。何度実行しても、同じ名前の物は作り直さずに位置と数値だけ合わせ直す。
     /// </summary>
-    [MenuItem("Tools/StarSweepers/Space Junk/Meteor/Install Into STAGE_03")]
+    [MenuItem("Tools/StarSweepers/Space Junk/Meteor/Install Into STAGE_Meteor")]
     public static void InstallIntoStage03()
     {
-        // STAGE_03 を Single で開き直すので、作業中のシーンに保存していない変更があれば先に聞く
+        // STAGE_Meteor を Single で開き直すので、作業中のシーンに保存していない変更があれば先に聞く
         // （コマンドラインからの実行では聞けないので飛ばす）
         if (!Application.isBatchMode &&
             !EditorSceneManager.SaveCurrentModifiedScenesIfUserWantsTo())
@@ -126,7 +126,7 @@ public static class SpaceJunkMeteorSetup
         GameObject ground = FindSceneObject(scene, "Ground");
         if (ground == null)
         {
-            throw new System.InvalidOperationException("[METEOR] STAGE_03にGroundが見つかりません。");
+            throw new System.InvalidOperationException("[METEOR] STAGE_MeteorにGroundが見つかりません。");
         }
 
         GameObject managerPrefab = AssetDatabase.LoadAssetAtPath<GameObject>(ManagerPrefabPath);
@@ -186,7 +186,7 @@ public static class SpaceJunkMeteorSetup
             EditorUtility.SetDirty(areaObject);
         }
 
-        // 数値は `隕石攻撃.md`「STAGE_03への設置」で決めたもの。private の項目なので名前を指定して書き込む。
+        // 数値は `隕石攻撃.md`「STAGE_Meteorへの設置」で決めたもの。private の項目なので名前を指定して書き込む。
         // ※ MeteorManager の項目名を変えると、ここが null で落ちる（Stage03MeteorSetupTests も同じ名前を使っている）
         SerializedObject managerSerialized = new SerializedObject(manager);
         managerSerialized.FindProperty("intervalSeconds").floatValue = 4f;
@@ -202,10 +202,10 @@ public static class SpaceJunkMeteorSetup
         EditorSceneManager.MarkSceneDirty(scene);
         if (!EditorSceneManager.SaveScene(scene, Stage03ScenePath))
         {
-            throw new System.InvalidOperationException("[METEOR] STAGE_03を保存できませんでした。");
+            throw new System.InvalidOperationException("[METEOR] STAGE_Meteorを保存できませんでした。");
         }
 
-        Debug.Log("[METEOR] STAGE_03へ半径5m・1ラウンド3個の隕石Areaを8か所設置しました。");
+        Debug.Log("[METEOR] STAGE_Meteorへ半径5m・1ラウンド3個の隕石Areaを8か所設置しました。");
     }
 
     /// <summary>

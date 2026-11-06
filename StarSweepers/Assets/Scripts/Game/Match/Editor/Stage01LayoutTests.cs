@@ -6,7 +6,7 @@ using UnityEngine;
 using UnityEngine.SceneManagement;
 
 /// <summary>
-/// STAGE_01（土台と上下する床。2026/10/8・大槻さんの設計図）の、**数値を調整しても崩れてはいけない関係**を確かめる。
+/// STAGE_Simple（土台と上下する床。2026/10/8・大槻さんの設計図）の、**数値を調整しても崩れてはいけない関係**を確かめる。
 /// 大きさや高さそのものは調整で変わるので見ない。
 ///
 /// Unity の Test Runner（EditMode）から動かす。シーンが開いていなければ、テストの間だけ裏で開いて、終わったら閉じる。
@@ -19,7 +19,7 @@ using UnityEngine.SceneManagement;
 public class Stage01LayoutTests
 {
     private const string ScenePath =
-        "Assets/Scenes/Stage/STAGE_01.unity";
+        "Assets/Scenes/Stage/STAGE_Simple.unity";
 
     [Test]
     public void Stage01_LiftFloorsConnectTheGroundAndTheTopOfTheBase()
@@ -111,7 +111,7 @@ public class Stage01LayoutTests
     }
 
     /// <summary>
-    /// STAGE_01 のシーンを返す。もう開いていればそれを使い、開いていなければ裏で（今のシーンに足して）開く。
+    /// STAGE_Simple のシーンを返す。もう開いていればそれを使い、開いていなければ裏で（今のシーンに足して）開く。
     /// openedByTest は「このテストが開いたか」。true なら、終わったら <see cref="CloseIfOpenedByTest"/> で閉じる。
     /// </summary>
     private static Scene OpenStageScene(out bool openedByTest)

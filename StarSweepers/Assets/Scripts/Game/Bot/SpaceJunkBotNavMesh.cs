@@ -7,7 +7,7 @@ using UnityEngine.SceneManagement;
 /// **ボット（<see cref="SpaceJunkBot"/>）が「どこを歩けるか」を知るための、歩ける床の地図（NavMesh）を作る係。** （2026/10/21）
 ///
 /// ボットが壁に向かって押し続けたり、上の段にある素材へ下から近づこうとしたりしないよう、
-/// **壁を回り込む道**と**同じ高さの床か**を、この地図で調べる（大槻さんの報告：STAGE_07）。
+/// **壁を回り込む道**と**同じ高さの床か**を、この地図で調べる（大槻さんの報告：STAGE_Glass1）。
 ///
 /// ## シーンには何も置かない
 ///
@@ -190,7 +190,7 @@ public static class SpaceJunkBotNavMesh
     ///
     /// そのまま入れると、Unity が「RuntimeNavMeshBuilder: Source mesh … does not allow read access」の**エラー**を出す。
     /// 地図はラウンドごとに作り直すので、エラーもラウンドごとに出て、Console の Error Pause が ON だと**ゲームが一時停止**した
-    /// （STAGE_03 のドーナツ `Assets/Art/Models/Donut.obj`。大槻さんの報告）。しかもビルドではその形は地図に入らない。
+    /// （STAGE_Meteor のドーナツ `Assets/Art/Models/Donut.obj`。大槻さんの報告）。しかもビルドではその形は地図に入らない。
     /// 直すときは、そのモデルを選んで、インスペクターの Model タブの **Read/Write** を ON にして Apply する。
     /// </summary>
     private static bool IsUnreadableMesh(NavMeshBuildSource source)
