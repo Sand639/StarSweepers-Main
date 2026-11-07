@@ -227,7 +227,7 @@ public static class TempGlassMapBuilder
             floors++;
         }
 
-        // ---- 縁と角の柱（床の、何も無い側）
+        // ---- 縁と角の柱（床とガラスの、何も無い側）
         PlaceEdges(tiles, svgW, svgH, edgeParent, edge, halfEdge, corner, out int edges, out int corners);
 
         // ---- ゴール（西＝左、東＝右）
@@ -266,10 +266,10 @@ public static class TempGlassMapBuilder
     }
 
     /// <summary>
-    /// 床のマスの、となりに何も無い側（落ちる側）に縁（SM_Edge／SM_Half_Edge）を、
+    /// 床とガラスのマスの、となりに何も無い側（落ちる側）に縁（SM_Edge／SM_Half_Edge）を、
     /// 両どなりとも何も無い角に柱（SM_Corner）を置く。Hans さんの HansStage01_Ver01 の置き方に合わせた：
     /// 縁は境界線の上に置いて厚みを外へ向け、柱は角から外へ 0.125m・床より 0.35m 下。当たり判定は付けない（飾り）。
-    /// ガラスとゴールのとなりには置かない（歩いて行き来する側なので）。
+    /// ゴールのとなりと、床とガラスの間には置かない（歩いて行き来する側なので）。ガラスの外側にも置く（2026/11/7・大槻さんの依頼）。
     /// </summary>
     static void PlaceEdges(List<Tile> tiles, float svgW, float svgH, Transform parent,
                            GameObject edge, GameObject halfEdge, GameObject corner, out int edgeCount, out int cornerCount)
@@ -290,7 +290,7 @@ public static class TempGlassMapBuilder
 
         foreach (Tile t in tiles)
         {
-            if (t.kind != Kind.Floor) continue;
+            if (t.kind == Kind.Goal) continue; // 床とガラスの両方に置く（ゴールのまわりには置かない）
 
             int x0 = t.x / CellPx, x1 = (t.x + t.w) / CellPx; // マスの範囲（x1・y1 は外側）
             int y0 = t.y / CellPx, y1 = (t.y + t.h) / CellPx;
