@@ -1,0 +1,525 @@
+// 【道具の控え】大槻さんの設計図（SVG）から、ガラスのステージ（ガラスマップ1〜4）を作る。2026/11/7・Claude Code
+//
+// 使い方（くわしくは Documents/AIの申し送り.md の「うまくいったやり方」2026/11/7）：
+//   1. このファイルを Assets/Scripts/Game/Match/Editor/TempGlassMapBuilder.cs として一時的に置く（Unity は閉じておく）
+//   2. 下の SvgDir（SVG の置き場所）と OutDir（画像と結果の書き出し先）を、自分のPCの場所に直す
+//   3. Unity.exe -batchmode -quit -projectPath … -executeMethod TempGlassMapBuilder.Run      … シーンを作り直し、上からの画像を書き出す（-nographics は付けない）
+//   4. Unity.exe -batchmode -quit -projectPath … -executeMethod TempGlassMapBuilder.Register … マップの一覧・ビルドの一覧に入れて点検する
+//   5. 終わったら Assets に置いた .cs と .meta を消す（Assets の中にはコミットしない）
+//
+// Run は、シーンがまだ無ければ STAGE_Glass1 を複製して作り、すでにあれば**そのシーンを開いて中身だけ作り直す**
+// （シーンの GUID は変わらないので、マップの一覧・ビルドの一覧はそのまま使える。2026/11/7 の2回目から）。
+// 手でシーンに足した物のうち、Stage の下の Ground・Glass・Edges・Goal_West・Goal_East の中身は作り直しで消える。
+using System;
+using System.Collections.Generic;
+using System.Globalization;
+using System.IO;
+using System.Text;
+using System.Text.RegularExpressions;
+using Unity.Netcode;
+using UnityEditor;
+using UnityEditor.SceneManagement;
+using UnityEngine;
+
+public static class TempGlassMapBuilder
+{
+    const string SvgDir = @"C:\Users\yziku\Desktop\StarSweepers\ステージ設計\SVG\";
+    const string OutDir = @"C:\Users\yziku\AppData\Local\Temp\claude\6918af49c9fc72ff\ab2e8652-2619-4f13-a97f-3984ce1a3e22\scratchpad\";
+    const string SourceScene = "Assets/Scenes/Stage/STAGE_Glass1.unity";
+    const string StageFolder = "Assets/Scenes/Stage/";
+
+    // SVG の 100px が、Hans さんの床 1 枚（SM_Platform＝3m×3m）
+    const float MetersPerPx = 0.03f;
+
+    // SVG のマス目の最小単位（px）。半分の床（50px）があるので 50
+    const int CellPx = 50;
+
+    // 床の部品の原点の高さ（床の上面が 0 になる位置）。縁と角は Hans さんのシーンと同じ相対位置に置く
+    const float FloorY = -0.25f;
+    const float EdgeY = FloorY;          // 縁：床と同じ高さ
+    const float CornerY = FloorY - 0.35f; // 角の柱：床より 0.35 下
+    const float CornerOffset = 0.125f;    // 角の柱：角から外へ 0.125m
+
+    // { SVG のファイル名, シーンの名前, ロビーに出す名前 }
+    static readonly string[,] Maps =
+    {
+        { "ガラスマップ1.svg", "STAGE_GlassLattice", "ガラスマップ1（仮）" },
+        { "ガラスマップ2.svg", "STAGE_GlassFull", "ガラスマップ2（仮）" },
+        { "ガラスマップ3.svg", "STAGE_GlassChecker", "ガラスマップ3（仮）" },
+        { "ガラスマップ4.svg", "STAGE_GlassChecker2", "ガラスマップ4（仮）" },
+    };
+
+    enum Kind { Floor, Glass, Goal }
+
+    struct Tile
+    {
+        public Kind kind;
+        public int x, y, w, h; // SVG の px（左上と大きさ）
+    }
+
+    static StringBuilder report = new StringBuilder();
+
+    /// <summary>ステージを作り直して保存し、上からの画像を書き出す（何度実行してもよい）。</summary>
+    public static void Run()
+    {
+        try
+        {
+            for (int i = 0; i < Maps.GetLength(0); i++)
+            {
+                Build(Maps[i, 0], Maps[i, 1]);
+            }
+        }
+        catch (Exception e)
+        {
+            report.AppendLine("ERROR " + e);
+            Debug.LogError(e);
+        }
+
+        File.WriteAllText(OutDir + "build_report.txt", report.ToString(), new UTF8Encoding(false));
+    }
+
+    /// <summary>マップの一覧とビルドの一覧に入れて、点検する（すでに入っている物はそのまま）。</summary>
+    public static void Register()
+    {
+        try
+        {
+            SpaceJunkMapList list = SpaceJunkMapListSetup.EnsureList();
+            for (int i = 0; i < Maps.GetLength(0); i++)
+            {
+                string path = StageFolder + Maps[i, 1] + ".unity";
+                SpaceJunkMapListSetup.AddMap(path, true);
+
+                SerializedObject so = new SerializedObject(list);
+                SerializedProperty maps = so.FindProperty("maps");
+                for (int m = 0; m < maps.arraySize; m++)
+                {
+                    SerializedProperty entry = maps.GetArrayElementAtIndex(m);
+                    if (entry.FindPropertyRelative("scenePath").stringValue == path)
+                    {
+                        entry.FindPropertyRelative("displayName").stringValue = Maps[i, 2];
+                    }
+                }
+                so.ApplyModifiedPropertiesWithoutUndo();
+            }
+
+            EditorUtility.SetDirty(list);
+            AssetDatabase.SaveAssets();
+            SpaceJunkSetup.RegisterScenesInBuildSettings(SpaceJunkMapListSetup.ScenePaths());
+
+            for (int i = 0; i < Maps.GetLength(0); i++)
+            {
+                string path = StageFolder + Maps[i, 1] + ".unity";
+                EditorSceneManager.OpenScene(path, OpenSceneMode.Single);
+                SpaceJunkSetup.VerifyMap(path);
+            }
+
+            SpaceJunkMapListSetup.RefreshGoalInfo();
+            AssetDatabase.SaveAssets();
+            report.AppendLine("REGISTER OK");
+        }
+        catch (Exception e)
+        {
+            report.AppendLine("ERROR " + e);
+            Debug.LogError(e);
+        }
+
+        File.WriteAllText(OutDir + "register_report.txt", report.ToString(), new UTF8Encoding(false));
+    }
+
+    static void Build(string svgName, string sceneName)
+    {
+        List<Tile> tiles = ReadSvg(SvgDir + svgName, out float svgW, out float svgH);
+        string dst = StageFolder + sceneName + ".unity";
+
+        if (AssetDatabase.LoadAssetAtPath<SceneAsset>(dst) == null)
+        {
+            if (!AssetDatabase.CopyAsset(SourceScene, dst))
+            {
+                throw new Exception("複製に失敗: " + dst);
+            }
+        }
+
+        var scene = EditorSceneManager.OpenScene(dst, OpenSceneMode.Single);
+
+        // ---- 前の地形を取り除く（STAGE_Glass1 の物と、前回この道具が置いた物）
+        foreach (GameObject root in scene.GetRootGameObjects())
+        {
+            if (root.name.StartsWith("Glass_") || root.name.StartsWith("MovingWall"))
+            {
+                UnityEngine.Object.DestroyImmediate(root);
+            }
+        }
+
+        Transform stage = FindRoot(scene, "Stage").transform;
+        Transform ground = stage.Find("Ground");
+        for (int i = ground.childCount - 1; i >= 0; i--)
+        {
+            UnityEngine.Object.DestroyImmediate(ground.GetChild(i).gameObject);
+        }
+
+        Transform glassParent = RecreateChild(stage, "Glass");
+        Transform edgeParent = RecreateChild(stage, "Edges");
+
+        // ---- 部品
+        GameObject platform = Load("Assets/Art/Models/SM_Platform.fbx");
+        GameObject halfPlatform = Load("Assets/Art/Models/SM_Half_Platform.fbx");
+        GameObject transporter = Load("Assets/Art/Models/SM_Transporter.fbx");
+        GameObject edge = Load("Assets/Art/Models/SM_Edge.fbx");
+        GameObject halfEdge = Load("Assets/Art/Models/SM_Half_Edge.fbx");
+        GameObject corner = Load("Assets/Art/Models/SM_Corner.fbx");
+        GameObject glassPrefab = Load("Assets/Prefabs/Gimmick/GravityGlassFloor.prefab");
+
+        int floors = 0, glasses = 0;
+        List<Tile> goals = new List<Tile>();
+        float minZ = float.MaxValue, maxZ = float.MinValue;
+
+        foreach (Tile t in tiles)
+        {
+            Vector3 center = ToWorld(t, svgW, svgH);
+            float sx = t.w * MetersPerPx, sz = t.h * MetersPerPx;
+
+            if (t.kind == Kind.Goal)
+            {
+                goals.Add(t);
+                continue;
+            }
+
+            minZ = Mathf.Min(minZ, center.z - sz * 0.5f);
+            maxZ = Mathf.Max(maxZ, center.z + sz * 0.5f);
+
+            if (t.kind == Kind.Glass)
+            {
+                GameObject glass = (GameObject)PrefabUtility.InstantiatePrefab(glassPrefab, glassParent);
+                glass.name = $"Glass_{t.x}_{t.y}";
+                glass.transform.position = new Vector3(center.x, -0.15f, center.z);
+                glass.transform.localScale = new Vector3(sx, 0.3f, sz);
+
+                // STAGE_Glass1 と同じ設定（踏むと1秒で割れ、3秒で戻る）
+                SerializedObject so = new SerializedObject(glass.GetComponent<GravityGlassFloor>());
+                so.FindProperty("breakGravity").floatValue = 0f;
+                so.FindProperty("secondsUntilBreak").floatValue = 1f;
+                so.FindProperty("respawnSeconds").floatValue = 3f;
+                so.ApplyModifiedPropertiesWithoutUndo();
+                glasses++;
+                continue;
+            }
+
+            // 床：大きさで部品を選ぶ（100×100＝床、100×50／50×100＝半分の床、50×50＝床を半分に縮めたもの）
+            GameObject model;
+            float rotY = 0f;
+            Vector3 scale = Vector3.one;
+
+            if (t.w == 100 && t.h == 100) { model = platform; }
+            else if (t.w == 50 && t.h == 100) { model = halfPlatform; }
+            else if (t.w == 100 && t.h == 50) { model = halfPlatform; rotY = 90f; }
+            else if (t.w == 50 && t.h == 50) { model = platform; scale = new Vector3(0.5f, 1f, 0.5f); }
+            else { throw new Exception($"{svgName}: 床の大きさ {t.w}×{t.h} に合う部品がありません"); }
+
+            GameObject floor = (GameObject)PrefabUtility.InstantiatePrefab(model, ground);
+            floor.name = $"Floor_{t.x}_{t.y}";
+            Bounds mesh = floor.GetComponent<MeshFilter>().sharedMesh.bounds;
+            floor.transform.SetPositionAndRotation(new Vector3(center.x, -mesh.max.y, center.z), Quaternion.Euler(0f, rotY, 0f));
+            floor.transform.localScale = scale;
+
+            BoxCollider box = floor.AddComponent<BoxCollider>();
+            box.center = mesh.center;
+            box.size = mesh.size;
+            floors++;
+        }
+
+        // ---- 縁と角の柱（床とガラスの、何も無い側）
+        PlaceEdges(tiles, svgW, svgH, edgeParent, edge, halfEdge, corner, out int edges, out int corners);
+
+        // ---- ゴール（西＝左、東＝右）
+        if (goals.Count != 2)
+        {
+            throw new Exception($"{svgName}: ゴールが {goals.Count} 個です（2個のはず）");
+        }
+
+        goals.Sort((a, b) => a.x.CompareTo(b.x));
+        SetupGoal(stage, "West", goals[0], svgW, svgH, transporter, 90f);
+        SetupGoal(stage, "East", goals[1], svgW, svgH, transporter, 270f);
+
+        // ---- 素材の出る範囲：2つのゴールの間（ゴールの上には出さない）
+        float zoneMinX = ToWorld(goals[0], svgW, svgH).x + goals[0].w * MetersPerPx * 0.5f;
+        float zoneMaxX = ToWorld(goals[1], svgW, svgH).x - goals[1].w * MetersPerPx * 0.5f;
+        Transform zone = FindRoot(scene, "SpawnZone_Center").transform;
+        zone.position = new Vector3((zoneMinX + zoneMaxX) * 0.5f, 0f, (minZ + maxZ) * 0.5f);
+        zone.localScale = new Vector3(zoneMaxX - zoneMinX, 1f, maxZ - minZ);
+
+        SpaceJunkSpawner spawner = UnityEngine.Object.FindFirstObjectByType<SpaceJunkSpawner>();
+        SerializedObject spawnerSo = new SerializedObject(spawner);
+        spawnerSo.FindProperty("areaHalfSize").vector2Value = new Vector2((zoneMaxX - zoneMinX) * 0.5f, (maxZ - minZ) * 0.5f);
+        spawnerSo.ApplyModifiedPropertiesWithoutUndo();
+
+        EditorSceneManager.MarkSceneDirty(scene);
+        EditorSceneManager.SaveScene(scene);
+
+        report.AppendLine($"{sceneName}: 床 {floors} 枚・ガラス {glasses} 枚・縁 {edges} 本・角 {corners} 本・大きさ {svgW * MetersPerPx}m×{svgH * MetersPerPx}m・素材の範囲 {zone.localScale.x}m×{zone.localScale.z}m");
+        foreach (NetworkObject no in UnityEngine.Object.FindObjectsByType<NetworkObject>(FindObjectsInactive.Include, FindObjectsSortMode.None))
+        {
+            SerializedObject so = new SerializedObject(no);
+            report.AppendLine($"  NetworkObject {no.name} hash={(uint)so.FindProperty("GlobalObjectIdHash").longValue}");
+        }
+
+        Snapshot(sceneName, svgW * MetersPerPx, svgH * MetersPerPx);
+    }
+
+    /// <summary>
+    /// 床とガラスのマスの、となりに何も無い側（落ちる側）に縁（SM_Edge／SM_Half_Edge）を、
+    /// 両どなりとも何も無い角に柱（SM_Corner）を置く。Hans さんの HansStage01_Ver01 の置き方に合わせた：
+    /// 縁は境界線の上に置いて厚みを外へ向け、柱は角から外へ 0.125m・床より 0.35m 下。当たり判定は付けない（飾り）。
+    /// ゴールのとなりと、床とガラスの間には置かない（歩いて行き来する側なので）。ガラスの外側にも置く（2026/11/7・大槻さんの依頼）。
+    /// </summary>
+    static void PlaceEdges(List<Tile> tiles, float svgW, float svgH, Transform parent,
+                           GameObject edge, GameObject halfEdge, GameObject corner, out int edgeCount, out int cornerCount)
+    {
+        HashSet<(int, int)> filled = new HashSet<(int, int)>();
+        foreach (Tile t in tiles)
+        {
+            for (int cx = t.x / CellPx; cx < (t.x + t.w) / CellPx; cx++)
+                for (int cy = t.y / CellPx; cy < (t.y + t.h) / CellPx; cy++)
+                    filled.Add((cx, cy));
+        }
+
+        bool Empty(int cx, int cy) => !filled.Contains((cx, cy));
+
+        edgeCount = 0;
+        int corners = 0;
+        HashSet<(int, int)> placedCorners = new HashSet<(int, int)>();
+
+        foreach (Tile t in tiles)
+        {
+            if (t.kind == Kind.Goal) continue; // 床とガラスの両方に置く（ゴールのまわりには置かない）
+
+            int x0 = t.x / CellPx, x1 = (t.x + t.w) / CellPx; // マスの範囲（x1・y1 は外側）
+            int y0 = t.y / CellPx, y1 = (t.y + t.h) / CellPx;
+
+            // 4つの辺。辺の上の、何も無いマスが続く区間ごとに縁を並べる
+            edgeCount += EdgeRun(x0, y0, y1, c => Empty(x0 - 1, c), c => (t.x, c * CellPx), true, 0f);              // 西（外は -x）
+            edgeCount += EdgeRun(x1, y0, y1, c => Empty(x1, c), c => (t.x + t.w, c * CellPx), true, 180f);          // 東（外は +x）
+            edgeCount += EdgeRun(y0, x0, x1, c => Empty(c, y0 - 1), c => (c * CellPx, t.y), false, 90f);            // 北（SVG の上。外は +z）
+            edgeCount += EdgeRun(y1, x0, x1, c => Empty(c, y1), c => (c * CellPx, t.y + t.h), false, 270f);         // 南（外は -z）
+
+            // 4つの角。両どなりとも何も無ければ柱
+            TryCorner(x0, y0, Empty(x0 - 1, y0) && Empty(x0, y0 - 1), -1, -1);
+            TryCorner(x1, y0, Empty(x1, y0) && Empty(x1 - 1, y0 - 1), +1, -1);
+            TryCorner(x0, y1, Empty(x0 - 1, y1 - 1) && Empty(x0, y1), -1, +1);
+            TryCorner(x1, y1, Empty(x1, y1 - 1) && Empty(x1 - 1, y1), +1, +1);
+        }
+
+        // 辺の上を1マス（50px）ずつ見て、何も無いマスが続く区間に 3m の縁（2マス）と 1.5m の縁（1マス）を並べる
+        int EdgeRun(int line, int from, int to, Func<int, bool> emptyAt, Func<int, (int, int)> pxAt, bool alongY, float rotY)
+        {
+            int placed = 0;
+            int c = from;
+            while (c < to)
+            {
+                if (!emptyAt(c)) { c++; continue; }
+                int runStart = c;
+                while (c < to && emptyAt(c)) c++;
+                int run = c - runStart;
+
+                int pos = runStart;
+                while (run > 0)
+                {
+                    int cells = run >= 2 ? 2 : 1;
+                    (int px, int py) = pxAt(pos);
+                    // 区間の真ん中（px）
+                    float mx = alongY ? px : px + cells * CellPx * 0.5f;
+                    float my = alongY ? py + cells * CellPx * 0.5f : py;
+                    GameObject piece = (GameObject)PrefabUtility.InstantiatePrefab(cells == 2 ? edge : halfEdge, parent);
+                    piece.name = $"{(cells == 2 ? "Edge" : "HalfEdge")}_{(int)mx}_{(int)my}";
+                    piece.transform.SetPositionAndRotation(PxToWorld(mx, my, EdgeY, svgW, svgH), Quaternion.Euler(0f, rotY, 0f));
+                    placed++;
+                    pos += cells;
+                    run -= cells;
+                }
+            }
+            return placed;
+        }
+
+        void TryCorner(int cx, int cy, bool convex, int outX, int outY)
+        {
+            if (!convex || !placedCorners.Add((cx, cy))) return;
+            Vector3 p = PxToWorld(cx * CellPx, cy * CellPx, CornerY, svgW, svgH);
+            // SVG の y は下向きなので、外向き（outY）は世界の z では逆になる
+            p += new Vector3(outX * CornerOffset, 0f, -outY * CornerOffset);
+            GameObject post = (GameObject)PrefabUtility.InstantiatePrefab(corner, parent);
+            post.name = $"Corner_{cx * CellPx}_{cy * CellPx}";
+            post.transform.position = p;
+            corners++;
+        }
+
+        cornerCount = corners;
+    }
+
+    static void SetupGoal(Transform stage, string side, Tile t, float svgW, float svgH, GameObject transporter, float rotY)
+    {
+        // 初回は STAGE_Glass1 の Wall_〜、2回目からは前回付けた Goal_〜
+        Transform group = stage.Find("Wall_" + side) ?? stage.Find("Goal_" + side);
+        if (group == null) throw new Exception("ゴールのまとまり（Wall_/Goal_" + side + "）がありません");
+        Transform goalArea = group.Find("GoalArea_" + side);
+        Vector3 center = ToWorld(t, svgW, svgH);
+
+        // 色を塗る床と囲いの壁（前回の輸送機も）は取り除く。代わりに輸送機を置く
+        for (int i = group.childCount - 1; i >= 0; i--)
+        {
+            if (group.GetChild(i) != goalArea)
+            {
+                UnityEngine.Object.DestroyImmediate(group.GetChild(i).gameObject);
+            }
+        }
+
+        group.name = "Goal_" + side;
+        goalArea.SetParent(null, true);
+        group.SetPositionAndRotation(new Vector3(center.x, 0f, center.z), Quaternion.identity);
+        goalArea.SetParent(group, true);
+        goalArea.SetPositionAndRotation(new Vector3(center.x, 2.5f, center.z), Quaternion.identity);
+
+        BoxCollider trigger = goalArea.GetComponent<BoxCollider>();
+        trigger.center = Vector3.zero;
+        trigger.size = new Vector3(t.w * MetersPerPx, 5f, t.h * MetersPerPx);
+
+        GameObject visual = (GameObject)PrefabUtility.InstantiatePrefab(transporter, group);
+        visual.name = "SM_Transporter";
+        // 床の部品と同じ高さに置く（Hans さんのシーンと同じ）
+        visual.transform.SetPositionAndRotation(new Vector3(center.x, FloorY, center.z), Quaternion.Euler(0f, rotY, 0f));
+
+        MeshCollider collider = visual.AddComponent<MeshCollider>();
+        collider.sharedMesh = visual.GetComponent<MeshFilter>().sharedMesh;
+
+        // 輸送機のモデルは Read/Write が切ってあり、ボットの「歩ける床の地図」に入らない（ボットが輸送機から動けなくなる）。
+        // モデルの設定は変えず、乗る面のすぐ下に箱の当たり判定を足して、地図に入るようにする
+        BoxCollider deck = visual.AddComponent<BoxCollider>();
+        deck.center = new Vector3(0f, 0.145f, 0f);
+        deck.size = new Vector3(3f, 0.29f, 3f);
+
+        SerializedObject so = new SerializedObject(goalArea.GetComponent<SpaceJunkGoal>());
+        so.FindProperty("padRenderer").objectReferenceValue = visual.GetComponent<MeshRenderer>();
+        so.FindProperty("introVisual").objectReferenceValue = visual.transform;
+        so.ApplyModifiedPropertiesWithoutUndo();
+    }
+
+    static Transform RecreateChild(Transform parent, string name)
+    {
+        Transform old = parent.Find(name);
+        if (old != null) UnityEngine.Object.DestroyImmediate(old.gameObject);
+        Transform made = new GameObject(name).transform;
+        made.SetParent(parent, false);
+        return made;
+    }
+
+    static Vector3 ToWorld(Tile t, float svgW, float svgH)
+    {
+        return PxToWorld(t.x + t.w * 0.5f, t.y + t.h * 0.5f, 0f, svgW, svgH);
+    }
+
+    /// <summary>SVG の点（px。中心が原点、上が北）を世界の位置にする。</summary>
+    static Vector3 PxToWorld(float px, float py, float y, float svgW, float svgH)
+    {
+        return new Vector3((px - svgW * 0.5f) * MetersPerPx, y, (svgH * 0.5f - py) * MetersPerPx);
+    }
+
+    static List<Tile> ReadSvg(string path, out float svgW, out float svgH)
+    {
+        string text = File.ReadAllText(path, Encoding.UTF8);
+
+        Match viewBox = Regex.Match(text, "viewBox=\"0 0 ([\\d.]+) ([\\d.]+)\"");
+        svgW = float.Parse(viewBox.Groups[1].Value, CultureInfo.InvariantCulture);
+        svgH = float.Parse(viewBox.Groups[2].Value, CultureInfo.InvariantCulture);
+
+        // .cls-N { fill: 色; } から、クラスごとの種類を決める
+        Dictionary<string, Kind> kinds = new Dictionary<string, Kind>();
+        foreach (Match m in Regex.Matches(text, "\\.(cls-\\d+)\\s*\\{\\s*fill:\\s*([^;]+);"))
+        {
+            string fill = m.Groups[2].Value.Trim();
+            if (fill == "aqua") kinds[m.Groups[1].Value] = Kind.Glass;
+            else if (fill == "blue") kinds[m.Groups[1].Value] = Kind.Floor;
+            else if (fill == "#009245") kinds[m.Groups[1].Value] = Kind.Goal;
+            else throw new Exception($"{path}: 知らない色 {fill}");
+        }
+
+        List<Tile> tiles = new List<Tile>();
+        foreach (Match m in Regex.Matches(text, "<rect class=\"(cls-\\d+)\" x=\"([\\d.]+)\" y=\"([\\d.]+)\" width=\"([\\d.]+)\" height=\"([\\d.]+)\""))
+        {
+            // 四角は線の太さぶん 0.5px 内側に描いてある（x=300.5・幅99 → 300〜400 のマス）
+            tiles.Add(new Tile
+            {
+                kind = kinds[m.Groups[1].Value],
+                x = Mathf.RoundToInt(float.Parse(m.Groups[2].Value, CultureInfo.InvariantCulture) - 0.5f),
+                y = Mathf.RoundToInt(float.Parse(m.Groups[3].Value, CultureInfo.InvariantCulture) - 0.5f),
+                w = Mathf.RoundToInt(float.Parse(m.Groups[4].Value, CultureInfo.InvariantCulture) + 1f),
+                h = Mathf.RoundToInt(float.Parse(m.Groups[5].Value, CultureInfo.InvariantCulture) + 1f),
+            });
+        }
+
+        return tiles;
+    }
+
+    static GameObject FindRoot(UnityEngine.SceneManagement.Scene scene, string name)
+    {
+        foreach (GameObject root in scene.GetRootGameObjects())
+        {
+            if (root.name == name) return root;
+        }
+        throw new Exception("シーンに " + name + " がありません");
+    }
+
+    static GameObject Load(string path)
+    {
+        GameObject asset = AssetDatabase.LoadAssetAtPath<GameObject>(path);
+        if (asset == null) throw new Exception("読み込めません: " + path);
+        return asset;
+    }
+
+    /// <summary>真上からと、南の斜め上からと、ゴールの近くの画像を書き出す（シーンには残さない）。</summary>
+    static void Snapshot(string sceneName, float width, float depth)
+    {
+        GameObject camObject = new GameObject("TempSnapshotCamera") { hideFlags = HideFlags.HideAndDontSave };
+        Camera cam = camObject.AddComponent<Camera>();
+        cam.clearFlags = CameraClearFlags.SolidColor;
+        cam.backgroundColor = new Color(0.08f, 0.08f, 0.12f);
+        cam.farClipPlane = 300f;
+
+        const int W = 1280, H = 720;
+        RenderTexture rt = new RenderTexture(W, H, 24);
+        cam.targetTexture = rt;
+
+        // 真上（SVG と同じ向き：上が北）
+        cam.orthographic = true;
+        cam.orthographicSize = Mathf.Max(depth * 0.5f, width * 0.5f * H / W) + 1.5f;
+        cam.transform.SetPositionAndRotation(new Vector3(0f, 60f, 0f), Quaternion.Euler(90f, 0f, 0f));
+        Shoot(cam, rt, OutDir + sceneName + "_top.png");
+
+        // 南の斜め上
+        cam.orthographic = false;
+        cam.fieldOfView = 50f;
+        float back = Mathf.Max(width, depth) * 0.75f;
+        cam.transform.position = new Vector3(0f, back * 0.9f, -back);
+        cam.transform.LookAt(Vector3.zero);
+        Shoot(cam, rt, OutDir + sceneName + "_angle.png");
+
+        // ゴールの近く
+        cam.fieldOfView = 40f;
+        cam.transform.position = new Vector3(-width * 0.5f + 7f, 4f, -6f);
+        cam.transform.LookAt(new Vector3(-width * 0.5f + 1.5f, 0f, 0f));
+        Shoot(cam, rt, OutDir + sceneName + "_goal.png");
+
+        cam.targetTexture = null;
+        UnityEngine.Object.DestroyImmediate(rt);
+        UnityEngine.Object.DestroyImmediate(camObject);
+    }
+
+    static void Shoot(Camera cam, RenderTexture rt, string path)
+    {
+        cam.Render();
+        RenderTexture.active = rt;
+        Texture2D tex = new Texture2D(rt.width, rt.height, TextureFormat.RGB24, false);
+        tex.ReadPixels(new Rect(0, 0, rt.width, rt.height), 0, 0);
+        tex.Apply();
+        RenderTexture.active = null;
+        File.WriteAllBytes(path, tex.EncodeToPNG());
+        UnityEngine.Object.DestroyImmediate(tex);
+    }
+}
