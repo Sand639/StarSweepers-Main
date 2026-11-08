@@ -10,7 +10,7 @@
 | --- | --- |
 | 担当者 | 鈴木 翔太郎（実装補助：Codex） |
 | 作成日 | 2026年10月8日 |
-| 最終更新日 | 2026年10月8日 |
+| 最終更新日 | 2026年11月8日（日） |
 | 状態 | 実装済み・未確認 |
 
 ---
@@ -49,7 +49,7 @@
 
 ## 仕組み（分かる人向け）
 
-`SetRemainingTime` が残り時間と割合を更新し、段階が変わった瞬間に `Action<int>` と `UnityEvent<int>` の両方を呼ぶ。`UpdateVisuals(float progress)` はゲージ、文字、シェーダー用の `_Progress` と `_TimerColor` をまとめて更新する。ゲージは白いリング画像 `UI_Timer_Radial.png` を使い、Radial 360、Top 起点、時計回り、`fillAmount = progress` とする。残り部分が12時から時計回りに描かれるため、時間が減ると空きが時計回りに広がる。完成見本画像 `UI_Timer_IMG.png` は描画に使わず、TextMeshPro の文字とリング素材を重ねる。
+`SetRemainingTime` が残り時間と割合を更新し、段階が変わった瞬間に `Action<int>` と `UnityEvent<int>` の両方を呼ぶ。`UpdateVisuals(float progress)` はゲージ、文字、シェーダー用の `_Progress` と `_TimerColor` をまとめて更新する。ゲージは白いリング画像 `UI_Timer_Radial.png` を使い、Radial 360、Top 起点、時計回り、`fillAmount = progress` とする。残り部分が12時から時計回りに描かれるため、時間が減ると空きが時計回りに広がる。完成見本画像 `UI_Timer_IMG.png`（このリポジトリには持ってきていない）は描画に使わず、TextMeshPro の文字とリング素材を重ねる。
 
 ## できていないこと・既知の問題
 
@@ -68,3 +68,4 @@
 | 2026/11/5 | Claude Code | フォルダ整理に合わせて、場所の書き込みを新しい場所に直した（対応は `実装計画/フォルダ整理の対応表.md`） |
 | 2026/11/6 | Claude Code | スクリプトのフォルダ分け直し（TitleScene・Lobby・Game・Common）に合わせて、スクリプトの場所の書き込みを新しい場所に直した（対応は `実装計画/スクリプトのシーン別フォルダの対応表.md`） |
 | 2026/11/7 | Claude Code | 先頭に、このリポジトリに無い場所（旧リポジトリに置いてきた検証シーン・道具・試作）の注意書きを足した。本文は書き換えていない |
+| 2026/11/8 | Claude Code | ドキュメント点検（第4回）：このリポジトリに無い画像であることを書いた |
