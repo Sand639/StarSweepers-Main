@@ -8,6 +8,11 @@ using UnityEngine;
 ///
 /// 「動けない」の判定を持つだけで、移動を止めるのは <see cref="FishingPlayerController"/>、
 /// フックを止めるのは <see cref="HookController"/> の側で <see cref="IsStunned"/> を見て行う。
+///
+/// **点滅させる色の項目は、マテリアルにある物を選ぶ**（`_BaseColor` → `_SuitColor` → `_Color` の順。2026/11/10）。
+/// キャラクターの体（`M_Character.mat`・Shader Graph）は `_SuitColor` しか無く、`material.color` で触ると
+/// 「doesn't have a color property '_Color'」のエラーが毎フレーム出て Unity が固まったように見えたため。
+/// どれも無いマテリアルは点滅させない（エラーも出さない）。
 /// </summary>
 public class PlayerStun : MonoBehaviour
 {
@@ -41,6 +46,12 @@ public class PlayerStun : MonoBehaviour
     // プレハブの元の色（青）に戻ってしまうため
     private Color[] originalColors = new Color[0];
 
+    /// <summary>点滅に使う色の項目の候補。前にある物ほど優先（URP の Lit は `_BaseColor`、キャラクターの体は `_SuitColor`）。</summary>
+    private static readonly string[] ColorPropertyNames = { "_BaseColor", "_SuitColor", "_Color" };
+
+    /// <summary>体ごとの、点滅に使う色の項目の ID。**-1 なら使える項目が無い**（その体は点滅させない）。</summary>
+    private int[] colorIds = new int[0];
+
     private void Awake()
     {
         // 入れ忘れでも、点滅の for 文が落ちないよう空の配列にしておく
@@ -59,12 +70,34 @@ public class PlayerStun : MonoBehaviour
     private void CaptureColors()
     {
         originalColors = new Color[bodyRenderers.Length];
+        colorIds = new int[bodyRenderers.Length];
         for (int i = 0; i < bodyRenderers.Length; i++)
         {
-            originalColors[i] = bodyRenderers[i] != null
-                ? bodyRenderers[i].material.color
+            colorIds[i] = FindColorProperty(bodyRenderers[i]);
+            originalColors[i] = colorIds[i] >= 0
+                ? bodyRenderers[i].material.GetColor(colorIds[i])
                 : Color.white;
         }
+    }
+
+    /// <summary>その体のマテリアルにある色の項目を、<see cref="ColorPropertyNames"/> の順に探す。無ければ -1。</summary>
+    private static int FindColorProperty(Renderer renderer)
+    {
+        Material material = renderer != null ? renderer.sharedMaterial : null;
+        if (material == null)
+        {
+            return -1;
+        }
+
+        foreach (string name in ColorPropertyNames)
+        {
+            if (material.HasProperty(name))
+            {
+                return Shader.PropertyToID(name);
+            }
+        }
+
+        return -1;
     }
 
     /// <summary>
@@ -126,11 +159,11 @@ public class PlayerStun : MonoBehaviour
 
         for (int i = 0; i < bodyRenderers.Length; i++)
         {
-            if (bodyRenderers[i] == null)
+            if (bodyRenderers[i] == null || colorIds[i] < 0)
             {
                 continue;
             }
-            bodyRenderers[i].material.color = on ? stunColor : originalColors[i];
+            bodyRenderers[i].material.SetColor(colorIds[i], on ? stunColor : originalColors[i]);
         }
     }
 
@@ -138,11 +171,11 @@ public class PlayerStun : MonoBehaviour
     {
         for (int i = 0; i < bodyRenderers.Length; i++)
         {
-            if (bodyRenderers[i] == null)
+            if (bodyRenderers[i] == null || colorIds[i] < 0)
             {
                 continue;
             }
-            bodyRenderers[i].material.color = originalColors[i];
+            bodyRenderers[i].material.SetColor(colorIds[i], originalColors[i]);
         }
     }
 }
