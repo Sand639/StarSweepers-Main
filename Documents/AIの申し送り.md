@@ -174,6 +174,18 @@
 
 > こういう手順でやったら失敗した、という記録。次に来たAIへの警告。
 
+### メンバーが Unity を再生中に `Assets/` へスクリプトを置いて、試合を壊した（2026/11/10）
+
+- **何が起きたか**：隕石ステージの不具合を調べる途中、確認用の一時スクリプトを `Assets/Scripts/Game/Gimmick/Editor/` に置いて、画面なしの Unity で動かそうとした。
+  ところが大槻さんの Unity が**同じプロジェクトを開いて再生中**だったため、その Unity が再コンパイル（ドメインリロード）を始め、
+  再生中の試合で `SpaceJunkBombPoints.Update` の `NullReferenceException` と、Netcode の `OnNetworkBehaviourDestroyed` の `NullReferenceException` が 30 件以上出た。
+  画面なしの Unity のほうは「別の Unity がこのプロジェクトを開いている」と言って動かなかった（`Temp/UnityLockfile` が目印）。
+- **なぜ壊れるか**：再生中に再コンパイルが走ると、スクリプトの中の「保存されない値」（`[Serializable]` が付いていない private のクラスの配列など）が消える。
+  `SpaceJunkBombPoints` の `points` がそれで、`started` は bool なので残り、`points` だけ null になって 115 行目で落ちた。コードの不具合ではなく、再生中の再コンパイルの副作用。
+- **気をつけること**：**`Assets/` にファイルを置く前に、Unity が開いていないかを確かめる**（`Temp/UnityLockfile` があるか、`Get-Process Unity`）。
+  開いているときは、Unity を使う確認はメンバーに頼む（メニューやテストを案内する）。再生中なら、ファイルを置くこと自体をやめる。
+- メンバー側の予防策：Unity の `Edit > Preferences > General > Script Changes While Playing` を **Recompile After Finished Playing** にしておくと、再生中の再コンパイルが再生終了まで待つようになる。
+
 ### ソウホイチョンさんの釣り爆弾作業：自動コミット・プッシュ禁止（2026/9/17）
 
 本人から「不要自動幫我commit github」と明示された。今後この担当者の作業は、改めて本人から依頼されない限り、自動で Git の add・commit・push をしない。README の自動保存ルールより本人の個別指示を優先する。
@@ -488,6 +500,7 @@
 | 2026/11/7 | Claude Code | 「うまくいったやり方」に、SVG からマス目のステージを作る道具の使い方と、はまった所（Read/Write が OFF のモデルはボットの地図に入らない）を追加 |
 | 2026/11/7 | Claude Code | 「うまくいったやり方」に、SVG から作るステージの作り直し（GUID を変えない）と、Hans さんの縁と角の部品の置き方を追加 |
 | 2026/11/7 | Claude Code | 縁の置き方の行を、ガラスの外側にも置く形に直した |
+| 2026/11/10 | Claude Code | 「失敗したこと」に、メンバーが再生中の Unity があるのに `Assets/` へ一時スクリプトを置いて試合を壊した件と、置く前の確かめ方を足した |
 
 ## 2026/10/22 プレイヤーの名前を3段の番号にした（ソウホイチョン／Codex）
 
