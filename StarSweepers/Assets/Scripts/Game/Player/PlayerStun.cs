@@ -41,6 +41,20 @@ public class PlayerStun : MonoBehaviour
     // プレハブの元の色（青）に戻ってしまうため
     private Color[] originalColors = new Color[0];
 
+    // 体ごとに「どの名前の色を塗るか」。-1 は色を持たないので塗らない。
+    // material.color は "_Color"（か [MainColor] の付いた色）しか見ないため、
+    // キャラ用シェーダー（SG_CharacterColor）のように色の名前が "_SuitColor" だと
+    // 「_Color がありません」というエラーが出てしまう。そのためマテリアルごとに探す
+    private int[] colorPropertyIds = new int[0];
+
+    // 探す順番。左ほど優先
+    private static readonly int[] FallbackColorIds =
+    {
+        Shader.PropertyToID("_BaseColor"),
+        Shader.PropertyToID("_Color"),
+        Shader.PropertyToID("_SuitColor"),
+    };
+
     private void Awake()
     {
         // 入れ忘れでも、点滅の for 文が落ちないよう空の配列にしておく
@@ -59,12 +73,67 @@ public class PlayerStun : MonoBehaviour
     private void CaptureColors()
     {
         originalColors = new Color[bodyRenderers.Length];
+        colorPropertyIds = new int[bodyRenderers.Length];
         for (int i = 0; i < bodyRenderers.Length; i++)
         {
-            originalColors[i] = bodyRenderers[i] != null
-                ? bodyRenderers[i].material.color
-                : Color.white;
+            colorPropertyIds[i] = -1;
+            originalColors[i] = Color.white;
+
+            if (bodyRenderers[i] == null)
+            {
+                continue;
+            }
+
+            Material material = bodyRenderers[i].material;
+            int id = FindColorProperty(material);
+            colorPropertyIds[i] = id;
+            if (id != -1)
+            {
+                originalColors[i] = material.GetColor(id);
+            }
         }
+    }
+
+    /// <summary>
+    /// このマテリアルで「体の色」に当たる色の名前（ID）を探す。見つからなければ -1。
+    /// シェーダーで「メインの色」に指定された色があればそれを、無ければ <see cref="FallbackColorIds"/> の順に探す。
+    /// </summary>
+    private static int FindColorProperty(Material material)
+    {
+        if (material == null || material.shader == null)
+        {
+            return -1;
+        }
+
+        Shader shader = material.shader;
+        int count = shader.GetPropertyCount();
+        for (int p = 0; p < count; p++)
+        {
+            if (shader.GetPropertyType(p) == UnityEngine.Rendering.ShaderPropertyType.Color &&
+                (shader.GetPropertyFlags(p) & UnityEngine.Rendering.ShaderPropertyFlags.MainColor) != 0)
+            {
+                return shader.GetPropertyNameId(p);
+            }
+        }
+
+        foreach (int id in FallbackColorIds)
+        {
+            if (material.HasColor(id))
+            {
+                return id;
+            }
+        }
+        return -1;
+    }
+
+    /// <summary>i 番目の体を、この色で塗る。色を持たないマテリアルなら何もしない。</summary>
+    private void Paint(int i, Color color)
+    {
+        if (bodyRenderers[i] == null || i >= colorPropertyIds.Length || colorPropertyIds[i] == -1)
+        {
+            return;
+        }
+        bodyRenderers[i].material.SetColor(colorPropertyIds[i], color);
     }
 
     /// <summary>
@@ -124,25 +193,17 @@ public class PlayerStun : MonoBehaviour
         // 1回の点滅（1 ÷ blinkPerSecond 秒）のうち、前半を赤、後半を元の色にする
         bool on = Mathf.Repeat(Time.time * blinkPerSecond, 1f) < 0.5f;
 
-        for (int i = 0; i < bodyRenderers.Length; i++)
+        for (int i = 0; i < originalColors.Length; i++)
         {
-            if (bodyRenderers[i] == null)
-            {
-                continue;
-            }
-            bodyRenderers[i].material.color = on ? stunColor : originalColors[i];
+            Paint(i, on ? stunColor : originalColors[i]);
         }
     }
 
     private void RestoreColors()
     {
-        for (int i = 0; i < bodyRenderers.Length; i++)
+        for (int i = 0; i < originalColors.Length; i++)
         {
-            if (bodyRenderers[i] == null)
-            {
-                continue;
-            }
-            bodyRenderers[i].material.color = originalColors[i];
+            Paint(i, originalColors[i]);
         }
     }
 }
