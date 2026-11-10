@@ -22,6 +22,8 @@ using UnityEngine;
 /// **回り込んでいる途中で押すと、回っている勢いを残して斜め後ろへ飛ぶ**（2026/11/4）。
 /// 飛ぶ向きは「体の真後ろ」と「物資がいま動いている向き（接線）」を Throw Follow Motion の割合で混ぜる。
 /// 0 で今までどおり真後ろ、1 で動いている向きそのまま。まっすぐ引いているときはどちらでも真後ろになる。
+/// **混ぜる割合は、引き寄せの進み具合で切り替わる**（2026/11/10・小野田さんの案）。道のりの Throw Follow Switch（初期値 8 割）までは
+/// Throw Follow Motion（接線に近い向き）、そこを超えたら Throw Follow Near（体の真後ろに、ほんの少しだけ接線を足す。初期値 0.15）。
 /// クリティカルの合図は物資のまわりにだけ出す（ゲージなどの画面の表示は出さない）。
 /// 1回押したら、それで決まる（連打で当てられないように）。
 ///
@@ -121,9 +123,17 @@ public class SweeperReel : MonoBehaviour
     [Min(0.5f)]
     [SerializeField] private float backArcHeight = 3.2f;
 
-    [Tooltip("投げる向きを、物資がいま動いている向き（回り込みの勢い）にどれだけ寄せるか。0 でいつも体の真後ろ、1 で動いている向きそのまま（ハンマー投げのように横へも飛ぶ）。まっすぐ引いているときはどちらでも真後ろ")]
+    [Tooltip("【引き寄せの前半（Throw Follow Switch まで）】投げる向きを、物資がいま動いている向き（回り込みの勢い＝接線）にどれだけ寄せるか。0 でいつも体の真後ろ、1 で動いている向きそのまま（ハンマー投げのように横へも飛ぶ）。まっすぐ引いているときはどちらでも真後ろ")]
     [Range(0f, 1f)]
     [SerializeField] private float throwFollowMotion = 0.5f;
+
+    [Tooltip("【引き寄せの後半（Throw Follow Switch を超えてから）】接線にどれだけ寄せるか。体の真後ろを基本に、ほんの少しだけ勢いを残す。0 で真後ろ")]
+    [Range(0f, 1f)]
+    [SerializeField] private float throwFollowNear = 0.15f;
+
+    [Tooltip("前半と後半を切り替える、引き寄せの進み具合。0.8 なら、当たった位置から止める位置（Stop Distance）までの道のりを 8 割引いたところで後半に切り替わる")]
+    [Range(0f, 1f)]
+    [SerializeField] private float throwFollowSwitch = 0.8f;
 
     [Header("前へ投げる（最後まで押さなかったとき）")]
     [Tooltip("前へ飛ばす速さ（m/秒）")]
@@ -233,6 +243,9 @@ public class SweeperReel : MonoBehaviour
 
     /// <summary>これより遅いときは「動いている向き」が当てにならないので、体の真後ろへ投げる（m/秒）。</summary>
     private const float MinFollowSpeed = 0.5f;
+
+    /// <summary>引き始めたときの、プレイヤーの中心から物資までの距離（真上から見た距離）。引き寄せの進み具合を出すのに使う。</summary>
+    private float reelStartDistance;
 
     /// <summary>いま引いている物が重い物か（<see cref="Begin"/> で決める）。</summary>
     private bool heavy;
@@ -388,6 +401,7 @@ public class SweeperReel : MonoBehaviour
         waitingForClaim = false;
         supply = null;
         reelVelocity = Vector3.zero;
+        reelStartDistance = FlatDistanceToPlayer();
         strain = 0f;
         hasLastStep = false;
         pierceTime = 0f;
@@ -501,6 +515,7 @@ public class SweeperReel : MonoBehaviour
             {
                 waitingForClaim = false;
                 startTime = Time.time;
+                reelStartDistance = FlatDistanceToPlayer();
                 body.WakeUp();
                 return true;
             }
@@ -911,24 +926,56 @@ public class SweeperReel : MonoBehaviour
     }
 
     /// <summary>
-    /// 後ろへ投げる向き（真上から見た向き）。体の真後ろから、物資が動いている向きのほうへ、
-    /// その間の角度の <see cref="throwFollowMotion"/> 倍だけ回す。
-    /// まっすぐ引いているときは動いている向き＝プレイヤーへ向かう向き＝真後ろなので、今までと同じになる。
+    /// 後ろへ投げる向き（真上から見た向き）。体の真後ろから、物資が動いている向き（接線）のほうへ、
+    /// その間の角度の「寄せる割合」倍だけ回す。
+    /// 寄せる割合は引き寄せの進み具合で切り替える（2026/11/10）。<see cref="throwFollowSwitch"/>（初期値 8 割）までは
+    /// <see cref="throwFollowMotion"/>（接線に近い向きへ飛ぶ）、そこを超えたら <see cref="throwFollowNear"/>（真後ろに、ほんの少しだけ接線を足す）。
+    /// まっすぐ引いているときは動いている向き＝プレイヤーへ向かう向き＝真後ろなので、どちらでも真後ろになる。
     /// </summary>
     private Vector3 ThrowBackDirection()
     {
         Vector3 back = -Flat(transform.forward);
 
+        float follow = ReelProgress() < throwFollowSwitch ? throwFollowMotion : throwFollowNear;
+
         Vector3 motion = reelVelocity;
         motion.y = 0f;
-        if (throwFollowMotion <= 0f || motion.sqrMagnitude < MinFollowSpeed * MinFollowSpeed)
+        if (follow <= 0f || motion.sqrMagnitude < MinFollowSpeed * MinFollowSpeed)
         {
             return back;
         }
 
         // 角度で混ぜる（真逆どうしでも向きが決まるように、真上から見た回転の角度で考える）
-        float angle = Vector3.SignedAngle(back, motion, Vector3.up) * throwFollowMotion;
+        float angle = Vector3.SignedAngle(back, motion, Vector3.up) * follow;
         return Quaternion.AngleAxis(angle, Vector3.up) * back;
+    }
+
+    /// <summary>
+    /// 引き寄せの進み具合（0〜1）。当たった位置で 0、止める位置（Stop Distance）に着いたら 1。
+    /// 初めから止める位置のそばにいたときは 1（後半あつかい）。
+    /// </summary>
+    private float ReelProgress()
+    {
+        float span = reelStartDistance - stopDistance;
+        if (span <= 0.01f)
+        {
+            return 1f;
+        }
+
+        return Mathf.Clamp01((reelStartDistance - FlatDistanceToPlayer()) / span);
+    }
+
+    /// <summary>プレイヤーの中心から物資までの、真上から見た距離。</summary>
+    private float FlatDistanceToPlayer()
+    {
+        if (body == null)
+        {
+            return 0f;
+        }
+
+        Vector3 offset = body.position - transform.position;
+        offset.y = 0f;
+        return offset.magnitude;
     }
 
     /// <summary>
