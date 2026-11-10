@@ -7,7 +7,8 @@ using UnityEngine.InputSystem;
 /// ・左スティック／WASD で動く。**画面の上下左右に合わせる**（カメラが水平に回っていたら、そのぶん入力も回す）
 /// ・体は**移動している方向へ向き直す**
 /// ・狙っている間（<see cref="FaceAim"/> が ON）は、**狙う方向**を向く
-/// ・光線を撃ってから投げ終わるまでは、<see cref="SweeperShooter"/> が <see cref="MoveLocked"/> を ON にして止める
+/// ・光線を撃ってから物資に当たるまで（伸びている・戻っている間）は、<see cref="SweeperShooter"/> が <see cref="MoveLocked"/> を ON にして止める
+/// ・物資を巻き取っている間は止めずに、<see cref="MoveSpeedScale"/> で**ゆっくり歩ける**ようにする（2026/11/10）
 ///
 /// 釣り・宇宙ごみのプレイヤー（<see cref="FishingPlayerController"/>）とは別の部品。あちらは変えていない。
 ///
@@ -52,6 +53,18 @@ public class SweeperMover : MonoBehaviour
 
     /// <summary>ON の間は横に動かない（向きを変えることと、落ちることはできる）。</summary>
     public bool MoveLocked { get; set; }
+
+    /// <summary>
+    /// 歩く速さに掛ける倍率（0〜1。ふだんは 1）。巻き取り中に <see cref="SweeperShooter"/> が小さくして、
+    /// 「引っ張りながら少しだけ動ける」ようにする（2026/11/10）。
+    /// </summary>
+    public float MoveSpeedScale
+    {
+        get => moveSpeedScale;
+        set => moveSpeedScale = Mathf.Clamp01(value);
+    }
+
+    private float moveSpeedScale = 1f;
 
     /// <summary>ON の間は、移動方向ではなく狙う方向（<see cref="SweeperAim.Direction"/>）を向く。</summary>
     public bool FaceAim { get; set; }
@@ -166,11 +179,12 @@ public class SweeperMover : MonoBehaviour
             verticalVelocity += gravity * Time.deltaTime;
         }
 
-        Vector3 velocity = direction * moveSpeed;
+        float speed = moveSpeed * moveSpeedScale;
+        Vector3 velocity = direction * speed;
         velocity.y = verticalVelocity;
         characterController.Move(velocity * Time.deltaTime);
 
-        CurrentSpeed = direction.magnitude * moveSpeed;
+        CurrentSpeed = direction.magnitude * speed;
 
         Turn(direction);
     }
