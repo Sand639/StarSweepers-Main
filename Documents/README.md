@@ -4,7 +4,7 @@
 | --- | --- |
 | 製作者 | 大槻 海斗 |
 | 作成日 | 2026年8月28日（金） |
-| 最終更新日 | 2026年11月8日（日）　変更者：Claude Code |
+| 最終更新日 | 2026年11月10日（火）　変更者：Claude Code |
 | リポジトリ | https://github.com/Sand639/StarSweepers-Main （本制作用）　旧：https://github.com/Sand639/StarSweepers （保管用） |
 
 > ⚠️ **2026/11/4 に、本制作（宇宙ごみ集め）に必要な物だけを集めた、このリポジトリに移りました。**
@@ -250,14 +250,14 @@ StarSweepers-Main/                     ← リポジトリのルート
     │   │   ├── Lobby/            ロビーだけで使う物（UI＝ロビーの画面・リアクション、Gimmick＝ロビーの端末・チームの場所など）
     │   │   ├── Game/             ゲームの中身（ロビーでも動く）：Player＝体、Hook＝フック、Item＝物資・爆弾、Gimmick＝仕掛け、
     │   │   │                     Match＝試合の進行、Camera、Bot、Effect＝演出、UI＝試合中の表示
-    │   │   ├── Common/           どのシーンでも使う土台：Input＝入力、Network＝通信、Settings＝設定・ポーズ画面、UI＝ポインター・フォント
+    │   │   ├── Common/           どのシーンでも使う土台：Input＝入力、Network＝通信、Settings＝設定・ポーズ画面、UI＝ポインター・フォント・シーンを切り替えるときの演出
     │   │   └── SG_Character/・SG_Stage/  Hansさんのスクリプト（動かす前に本人の了承が要る）
     │   ├── Resources/            名前で読み込むもの（タイトル・ロビーの画面のプレハブ、ボタンのテーマ、名前タグ）
     │   └── Scenes/               シーン（直下の SpaceJunkMapList.asset は、使うマップの一覧）
     │       ├── MainLoop/             タイトルとロビー（TitleScene・SpaceJunkLobby）
     │       ├── Stage/            ステージ（`STAGE_Simple`・`STAGE_Train` など。名前の付け方と一覧は `宇宙ごみのマップの作り方.md`）
     │       ├── HansStages/       Hansさんのステージ
-    │       └── Test/             機能ごとの検証用シーン（ビルドには含めない）。**いまは1つも無いので、フォルダも無い**（作るときにできる）
+    │       └── Test/             機能ごとの検証用シーン（ビルドには含めない）。いまは `SceneTransitionTest` だけ（ほかはメニューで作る）
     ├── Packages/
     ├── steam_appid.txt           Steam のテスト用の App ID（480）。Steam の外で起動するときに使う
     └── ProjectSettings/
@@ -750,3 +750,4 @@ Unityは `.meta` ファイルで各アセットの参照を管理しているた
 | 11/7（土） | Claude Code | リポジトリ構成の図のステージを `STAGE_01〜09` にした（`STAGE_06^^` → `STAGE_08`、`STAGE_07(New)` → `STAGE_09` に名前を付け直したため。大槻さんの了承）。ルールの部分は変えていない |
 | 11/7（土） | Claude Code | リポジトリ構成の図のステージの書き方を直した（ステージの名前を `STAGE_01`〜`09` から `STAGE_Simple` などの分かりやすい名前に付け直したため。大槻さんの方針。対応表は `宇宙ごみのマップの作り方.md`）。ルールの部分は変えていない |
 | 11/8（日） | Claude Code | **ドキュメント点検（第4回）。** 依頼文の例に残っていた、このリポジトリに無いシーン名（`SampleScene`）を `STAGE_Simple` に直した。ルールの部分は変えていない |
+| 11/10（火） | Claude Code | リポジトリ構成の図を今の状態に合わせた（`Scripts/Common/UI/` にシーンを切り替えるときの演出が入った、`Scenes/Test/` に検証シーン `SceneTransitionTest` ができた）。ルールの部分は変えていない |

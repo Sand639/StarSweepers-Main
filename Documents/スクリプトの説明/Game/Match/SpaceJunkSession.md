@@ -46,6 +46,7 @@
 - 変数がどのファイルにあるかは、上の「変数の置き場所」を見る。**新しい変数は、使う機能のファイルに置き、上の表にも足す。**
 - クラスの説明（`///` のコメント）は、入口のファイルの先頭にある。
 - **ボットの頭は、新しい体用の `SweeperBot` だけ**（`SpaceJunkSession.Bots.cs`）。古い体用のボットは 2026/11/7 に消したので、新しい体のプレハブが見つからず古い体で出たボットは、頭が付かず動かない（警告が出る）。
+- **試合を始める（`ServerStartMatch`）と、すぐにはマップへ移らない。** 状態を「試合中」にしてから `SceneTransition.PlayForEveryone(LoadNextMap)` で全員の画面を覆い、覆いきったら（約0.5秒後）`LoadNextMap` が呼ばれる（`SpaceJunkSession.Match.cs`）。演出の仕組みは `スクリプトの説明/Common/UI/SceneTransition.md`。
 
 ## 変更ログ
 
@@ -54,3 +55,4 @@
 | 2026/11/6 | Claude Code | 新規作成（大槻さんの依頼）。長いスクリプトを機能ごとのファイルに分けたので、分け方を書いた |
 | 2026/11/7 | Claude Code | 「変数の置き場所」を足し、ずれやすい行数の列を表から消した（大槻さんの依頼。AIが読んで気づいた弱点の修正） |
 | 2026/11/7 | Claude Code | `SpaceJunkSession.Bots.cs`：古い体用のボット（`SpaceJunkBot`）を消したので、ボットの頭を付ける所を `SweeperBot` だけにした。気をつけることに書き足した |
+| 2026/11/10 | Claude Code | `SpaceJunkSession.Match.cs`：試合を始めるとき、トランジション（`SceneTransition`）で全員の画面を覆ってからマップへ移るようにした。気をつけることに書き足した |
