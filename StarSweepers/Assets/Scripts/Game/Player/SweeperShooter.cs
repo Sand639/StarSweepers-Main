@@ -8,8 +8,8 @@ using UnityEngine.InputSystem;
 /// | --- | --- |
 /// | RT／左クリックを押す | 狙い始める。リングの縁から、届く長さの矢印の帯（<see cref="SweeperAimArea"/>）が出る |
 /// | 押している間 | 帯が最短から最長まで伸びていく（Charge Seconds で最長）。**歩ける**。体は狙う方向を向く |
-/// | 離す | 光線がその長さまで伸びる（<see cref="extendSpeed"/>）。**ここから投げ終わるまで歩けない** |
-/// | 光線が物資に当たる | 自動で巻き取りへ（<see cref="SweeperReel"/>）。巻き取り中に押すと後ろへ投げる（重い物は投げずに引きずるだけ） |
+/// | 離す | 光線がその長さまで伸びる（<see cref="extendSpeed"/>）。**伸びている・戻っている間は歩けない** |
+/// | 光線が物資に当たる | 自動で巻き取りへ（<see cref="SweeperReel"/>）。巻き取り中に押すと後ろへ投げる（重い物は投げずに引きずるだけ）。**巻き取り中はゆっくり歩ける**（<see cref="reelMoveScale"/>。2026/11/10） |
 /// | 何にも当たらない・壁に当たる | 光線が戻ってくる。戻りきったら歩ける |
 ///
 /// 光線の見た目は液体のビーム（<see cref="LiquidBeam"/>）。何もつかんでいない間は薄いチームの色、つかんだら濃くなる。
@@ -92,6 +92,15 @@ public class SweeperShooter : MonoBehaviour
     [Range(0f, 1f)]
     [SerializeField] private float idleWhiten = 0.45f;
 
+    [Header("巻き取り中の歩き（2026/11/10）")]
+    [Tooltip("巻き取り中に歩ける速さ（ふだんの速さに掛ける割合）。0 で今までどおり動けない、1 でふだんと同じ")]
+    [Range(0f, 1f)]
+    [SerializeField] private float reelMoveScale = 0.25f;
+
+    [Tooltip("重い物を引きずっている間に歩ける速さ（ふだんの速さに掛ける割合）。重い物に踏ん張っている感じを出すため、ふつうより遅くする")]
+    [Range(0f, 1f)]
+    [SerializeField] private float heavyReelMoveScale = 0.1f;
+
     [Header("巻き取り中のしなり（向きを変えたとき。2026/11/4）")]
     [Tooltip("光線の曲がる強さ（0 でしならない＝いつもまっすぐ、1 で手元から出る向きがちょうど『しなりの向き』になる）")]
     [Range(0f, 1.5f)]
@@ -137,7 +146,7 @@ public class SweeperShooter : MonoBehaviour
     /// <summary>押して狙っている最中か。</summary>
     public bool IsCharging => phase == ShotPhase.Charging;
 
-    /// <summary>光線が出ている（伸びている・戻っている・巻き取っている）か。この間は歩けない。</summary>
+    /// <summary>光線が出ている（伸びている・戻っている・巻き取っている）か。伸びている・戻っている間は歩けず、巻き取り中はゆっくり歩ける。</summary>
     public bool IsBeamOut => phase == ShotPhase.Extending || phase == ShotPhase.Retracting || phase == ShotPhase.Reeling;
 
     /// <summary>いま離したら、光線がどこまで伸びるか（プレイヤーの中心から m）。</summary>
@@ -301,9 +310,28 @@ public class SweeperShooter : MonoBehaviour
                 if (!reel.IsActive)
                 {
                     EndShot();
+                    break;
                 }
+                AllowSlowWalk();
                 break;
         }
+    }
+
+    /// <summary>
+    /// 巻き取り中は止めずに、ゆっくり歩けるようにする（2026/11/10）。
+    /// 物資はいつも「いまのプレイヤーの位置」へ引き寄せられるので（<see cref="SweeperReel"/>）、歩いても着く時間とクリティカルのタイミングは変わらない。
+    /// 体の向きは狙いのまま（<see cref="SweeperMover.FaceAim"/>）なので、歩いても光線はしならない。
+    /// </summary>
+    private void AllowSlowWalk()
+    {
+        if (mover == null)
+        {
+            return;
+        }
+
+        float scale = reel.IsHeavyDrag ? heavyReelMoveScale : reelMoveScale;
+        mover.MoveLocked = scale <= 0f;
+        mover.MoveSpeedScale = scale;
     }
 
     private void LateUpdate()
@@ -633,6 +661,7 @@ public class SweeperShooter : MonoBehaviour
         if (mover != null)
         {
             mover.MoveLocked = false;
+            mover.MoveSpeedScale = 1f;
             mover.FaceAim = false;
         }
 
