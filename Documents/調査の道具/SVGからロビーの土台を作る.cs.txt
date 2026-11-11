@@ -1,0 +1,169 @@
+// SVG（土台.svg）から、ロビーの床を置く道具（2026/11/11・Claude Code。大槻さんの依頼）
+//
+// 使い方（Unity を閉じた状態で）：
+//   1. このファイルを Assets/Scripts/Common/UI/Editor/TempLobbyFloorBuilder.cs として一時的に置く
+//   2. 下の SvgPath（SVG の置き場所）と OutDir（画像の書き出し先）を、自分のPCの場所に直す
+//   3. Unity.com -batchmode -projectPath <StarSweepers> -executeMethod TempLobbyFloorBuilder.Run -quit -logFile <ログ>
+//      （画像も撮るので -nographics は付けない）
+//   4. 終わったら .cs と .meta を消す
+//
+// 決まり（SVGからガラスのステージを作る.cs.txt と同じ）：
+//   ・SVG の 100px が、Hans さんの床 1 枚（SM_Platform＝3m×3m）
+//   ・SVG の真ん中がシーンの原点。SVG の右が +X、SVG の上が北（+Z）
+//   ・床の上面が高さ 0。床には箱の当たり判定を付ける
+//   ・青（blue）＝床。赤（#ed1c24）＝設定端末の場所（置かずに、位置をログに出すだけ）
+//   ・何回実行してもよい（シーンの一番上の「Ground」を作り直す。ほかの物には触らない）
+
+using System;
+using System.Collections.Generic;
+using System.Globalization;
+using System.IO;
+using System.Text;
+using System.Text.RegularExpressions;
+using UnityEditor;
+using UnityEditor.SceneManagement;
+using UnityEngine;
+
+public static class TempLobbyFloorBuilder
+{
+    const string SvgPath = @"C:\Users\yziku\Desktop\StarSweepers\ステージ設計\SVG\土台.svg";
+    const string OutDir = @"C:\Users\yziku\AppData\Local\Temp\claude\6918af49c9fc72ff\4bd22549-2f9d-4578-84f7-1a96b5725824\scratchpad\";
+    const string ScenePath = "Assets/Scenes/MainLoop/Lobby.unity";
+    const string PlatformPath = "Assets/Art/Models/SM_Platform.fbx";
+    const float MetersPerPx = 0.03f;
+
+    struct Rect2 { public string fill; public float x, y, w, h; }
+
+    public static void Run()
+    {
+        List<Rect2> rects = ReadSvg(SvgPath, out float svgW, out float svgH);
+
+        var scene = EditorSceneManager.OpenScene(ScenePath, OpenSceneMode.Single);
+        foreach (GameObject root in scene.GetRootGameObjects())
+        {
+            if (root.name == "Ground") UnityEngine.Object.DestroyImmediate(root);
+        }
+
+        GameObject platform = AssetDatabase.LoadAssetAtPath<GameObject>(PlatformPath);
+        if (platform == null) throw new Exception("読み込めません: " + PlatformPath);
+
+        Transform ground = new GameObject("Ground").transform;
+        int floors = 0;
+        StringBuilder report = new StringBuilder();
+
+        foreach (Rect2 r in rects)
+        {
+            if (r.fill == "blue")
+            {
+                // 四角は線の太さぶん 0.5px 内側に描いてある（x=300.5・幅99 → 300〜400 のマス）
+                int x = Mathf.RoundToInt(r.x - 0.5f), y = Mathf.RoundToInt(r.y - 0.5f);
+                int w = Mathf.RoundToInt(r.w + 1f), h = Mathf.RoundToInt(r.h + 1f);
+                if (w != 100 || h != 100) throw new Exception($"床の大きさ {w}×{h} に合う部品がありません（{x},{y}）");
+
+                GameObject floor = (GameObject)PrefabUtility.InstantiatePrefab(platform, ground);
+                floor.name = $"Floor_{x}_{y}";
+                Bounds mesh = floor.GetComponent<MeshFilter>().sharedMesh.bounds;
+                Vector3 center = PxToWorld(x + w * 0.5f, y + h * 0.5f, svgW, svgH);
+                floor.transform.SetPositionAndRotation(new Vector3(center.x, -mesh.max.y, center.z), Quaternion.identity);
+
+                BoxCollider box = floor.AddComponent<BoxCollider>();
+                box.center = mesh.center;
+                box.size = mesh.size;
+                floors++;
+            }
+            else if (r.fill == "#ed1c24")
+            {
+                Vector3 p = PxToWorld(r.x + r.w * 0.5f, r.y + r.h * 0.5f, svgW, svgH);
+                report.AppendLine($"[LOBBY] 設定端末の場所（置いていない）：中心 X={p.x:F2} Z={p.z:F2}、大きさ {r.w * MetersPerPx:F2}m×{r.h * MetersPerPx:F2}m");
+            }
+            else
+            {
+                report.AppendLine($"[LOBBY] 知らない色 {r.fill} の四角は飛ばした（{r.x},{r.y}）");
+            }
+        }
+
+        EditorSceneManager.MarkSceneDirty(scene);
+        EditorSceneManager.SaveScene(scene);
+
+        Debug.Log($"[LOBBY] 床 {floors} 枚を置いた。大きさ {svgW * MetersPerPx}m×{svgH * MetersPerPx}m\n{report}");
+        Snapshot(svgW * MetersPerPx, svgH * MetersPerPx);
+    }
+
+    static Vector3 PxToWorld(float px, float py, float svgW, float svgH)
+    {
+        return new Vector3((px - svgW * 0.5f) * MetersPerPx, 0f, (svgH * 0.5f - py) * MetersPerPx);
+    }
+
+    static List<Rect2> ReadSvg(string path, out float svgW, out float svgH)
+    {
+        string text = File.ReadAllText(path, Encoding.UTF8);
+
+        Match viewBox = Regex.Match(text, "viewBox=\"0 0 ([\\d.]+) ([\\d.]+)\"");
+        svgW = float.Parse(viewBox.Groups[1].Value, CultureInfo.InvariantCulture);
+        svgH = float.Parse(viewBox.Groups[2].Value, CultureInfo.InvariantCulture);
+
+        // .cls-N { fill: 色; } から、クラスごとの色を読む
+        Dictionary<string, string> fills = new Dictionary<string, string>();
+        foreach (Match m in Regex.Matches(text, "\\.(cls-\\d+)\\s*\\{\\s*fill:\\s*([^;]+);"))
+        {
+            fills[m.Groups[1].Value] = m.Groups[2].Value.Trim();
+        }
+
+        List<Rect2> rects = new List<Rect2>();
+        foreach (Match m in Regex.Matches(text, "<rect class=\"(cls-\\d+)\" x=\"([\\d.]+)\" y=\"([\\d.]+)\" width=\"([\\d.]+)\" height=\"([\\d.]+)\""))
+        {
+            rects.Add(new Rect2
+            {
+                fill = fills.TryGetValue(m.Groups[1].Value, out string fill) ? fill : "?",
+                x = float.Parse(m.Groups[2].Value, CultureInfo.InvariantCulture),
+                y = float.Parse(m.Groups[3].Value, CultureInfo.InvariantCulture),
+                w = float.Parse(m.Groups[4].Value, CultureInfo.InvariantCulture),
+                h = float.Parse(m.Groups[5].Value, CultureInfo.InvariantCulture),
+            });
+        }
+
+        return rects;
+    }
+
+    /// <summary>真上からと、南の斜め上からの画像を書き出す（シーンには残さない）。</summary>
+    static void Snapshot(float width, float depth)
+    {
+        GameObject camObject = new GameObject("TempSnapshotCamera") { hideFlags = HideFlags.HideAndDontSave };
+        Camera cam = camObject.AddComponent<Camera>();
+        cam.clearFlags = CameraClearFlags.SolidColor;
+        cam.backgroundColor = new Color(0.08f, 0.08f, 0.12f);
+        cam.farClipPlane = 300f;
+
+        const int W = 1280, H = 720;
+        RenderTexture rt = new RenderTexture(W, H, 24);
+        cam.targetTexture = rt;
+
+        cam.orthographic = true;
+        cam.orthographicSize = Mathf.Max(depth * 0.5f, width * 0.5f * H / W) + 1.5f;
+        cam.transform.SetPositionAndRotation(new Vector3(0f, 60f, 0f), Quaternion.Euler(90f, 0f, 0f));
+        Shoot(cam, rt, OutDir + "Lobby_top.png");
+
+        cam.orthographic = false;
+        cam.fieldOfView = 50f;
+        float back = Mathf.Max(width, depth) * 0.75f;
+        cam.transform.position = new Vector3(0f, back * 0.9f, -back);
+        cam.transform.LookAt(Vector3.zero);
+        Shoot(cam, rt, OutDir + "Lobby_angle.png");
+
+        cam.targetTexture = null;
+        UnityEngine.Object.DestroyImmediate(rt);
+        UnityEngine.Object.DestroyImmediate(camObject);
+    }
+
+    static void Shoot(Camera cam, RenderTexture rt, string path)
+    {
+        cam.Render();
+        RenderTexture.active = rt;
+        Texture2D tex = new Texture2D(rt.width, rt.height, TextureFormat.RGB24, false);
+        tex.ReadPixels(new Rect(0, 0, rt.width, rt.height), 0, 0);
+        tex.Apply();
+        RenderTexture.active = null;
+        File.WriteAllBytes(path, tex.EncodeToPNG());
+        UnityEngine.Object.DestroyImmediate(tex);
+    }
+}
