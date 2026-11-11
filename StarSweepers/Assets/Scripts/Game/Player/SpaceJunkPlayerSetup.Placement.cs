@@ -141,7 +141,7 @@ public partial class SpaceJunkPlayerSetup
     /// <summary>いまのシーンがロビーか。</summary>
     private static bool IsInLobbyScene()
     {
-        string lobby = SpaceJunkSession.Current != null ? SpaceJunkSession.Current.LobbySceneName : "SpaceJunkLobby";
+        string lobby = SpaceJunkSession.Current != null ? SpaceJunkSession.Current.LobbySceneName : TitleScreen.LobbySceneName;
         return UnityEngine.SceneManagement.SceneManager.GetActiveScene().name == lobby;
     }
 

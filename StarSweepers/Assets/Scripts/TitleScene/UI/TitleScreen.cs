@@ -14,7 +14,7 @@ using UnityEngine.UI;
 public class TitleScreen : MonoBehaviour
 {
     public const string TitleSceneName = "TitleScene";
-    public const string LobbySceneName = "SpaceJunkLobby";
+    public const string LobbySceneName = "Lobby";
 
     /// <summary>Resources の中の画面のプレハブの名前。</summary>
     public const string PrefabResourcePath = "TitleScreen";

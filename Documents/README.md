@@ -4,7 +4,7 @@
 | --- | --- |
 | 製作者 | 大槻 海斗 |
 | 作成日 | 2026年8月28日（金） |
-| 最終更新日 | 2026年11月10日（火）　変更者：Claude Code |
+| 最終更新日 | 2026年11月11日（水）　変更者：Claude Code |
 | リポジトリ | https://github.com/Sand639/StarSweepers-Main （本制作用）　旧：https://github.com/Sand639/StarSweepers （保管用） |
 
 > ⚠️ **2026/11/4 に、本制作（宇宙ごみ集め）に必要な物だけを集めた、このリポジトリに移りました。**
@@ -254,7 +254,7 @@ StarSweepers-Main/                     ← リポジトリのルート
     │   │   └── SG_Character/・SG_Stage/  Hansさんのスクリプト（動かす前に本人の了承が要る）
     │   ├── Resources/            名前で読み込むもの（タイトル・ロビーの画面のプレハブ、ボタンのテーマ、名前タグ）
     │   └── Scenes/               シーン（直下の SpaceJunkMapList.asset は、使うマップの一覧）
-    │       ├── MainLoop/             タイトルとロビー（TitleScene・SpaceJunkLobby）
+    │       ├── MainLoop/             タイトルとロビー（TitleScene・Lobby。2026/11/11 から Lobby。前のロビー SpaceJunkLobby は使っていない）
     │       ├── Stage/            ステージ（`STAGE_Simple`・`STAGE_Train` など。名前の付け方と一覧は `宇宙ごみのマップの作り方.md`）
     │       ├── HansStages/       Hansさんのステージ
     │       └── Test/             機能ごとの検証用シーン（ビルドには含めない）。いまは `SceneTransitionTest` だけ（ほかはメニューで作る）
@@ -751,3 +751,4 @@ Unityは `.meta` ファイルで各アセットの参照を管理しているた
 | 11/7（土） | Claude Code | リポジトリ構成の図のステージの書き方を直した（ステージの名前を `STAGE_01`〜`09` から `STAGE_Simple` などの分かりやすい名前に付け直したため。大槻さんの方針。対応表は `宇宙ごみのマップの作り方.md`）。ルールの部分は変えていない |
 | 11/8（日） | Claude Code | **ドキュメント点検（第4回）。** 依頼文の例に残っていた、このリポジトリに無いシーン名（`SampleScene`）を `STAGE_Simple` に直した。ルールの部分は変えていない |
 | 11/10（火） | Claude Code | リポジトリ構成の図を今の状態に合わせた（`Scripts/Common/UI/` にシーンを切り替えるときの演出が入った、`Scenes/Test/` に検証シーン `SceneTransitionTest` ができた）。ルールの部分は変えていない |
+| 11/11（水） | Claude Code | リポジトリ構成の図の `MainLoop/` を、新しいロビー `Lobby` に合わせた（大槻さんの依頼でロビーを切り替えたため）。ルールの部分は変えていない |

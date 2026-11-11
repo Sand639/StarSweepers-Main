@@ -59,6 +59,9 @@ public class SpaceJunkConveyor : MonoBehaviour
     [Tooltip("ベルトの土台の見た目（子の Base）")]
     [SerializeField] private Transform baseVisual;
 
+    [Tooltip("OFF にすると、仮の見た目（土台と流れる帯）を出さない。コンベアのモデルを別に置くとき用（運ぶ働きはそのまま）")]
+    [SerializeField] private bool showBuiltInVisual = true;
+
     [Tooltip("帯（横の筋）の間隔（m）")]
     [SerializeField] private float slatSpacing = 1.5f;
 
@@ -95,7 +98,15 @@ public class SpaceJunkConveyor : MonoBehaviour
     {
         box = GetComponent<BoxCollider>();
         ApplySize();
-        BuildSlats();
+
+        if (showBuiltInVisual)
+        {
+            BuildSlats();
+        }
+        else if (baseVisual != null && baseVisual.TryGetComponent(out Renderer baseRenderer))
+        {
+            baseRenderer.enabled = false;
+        }
 
         // プレハブやシーンを書き換えずに済むよう、再生したときに付ける
         surfaceBody = GetComponent<Rigidbody>();
