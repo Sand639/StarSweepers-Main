@@ -1,0 +1,363 @@
+// SVG（ロビー.svg）から、新しいロビー（Assets/Scenes/MainLoop/Lobby.unity）を作る道具（2026/11/11・Claude Code。大槻さんの依頼）
+//
+// 使い方（Unity を閉じた状態で）：
+//   1. このファイルを Assets/Scripts/Common/UI/Editor/TempLobbyBuilder.cs として一時的に置く
+//   2. 下の SvgPath（SVG の置き場所）と OutDir（画像の書き出し先）を、自分のPCの場所に直す
+//   3. Unity.com -batchmode -projectPath <StarSweepers> -executeMethod TempLobbyBuilder.Run -quit -logFile <ログ>
+//      （画像も撮るので -nographics は付けない）
+//   4. 終わったら .cs と .meta を消す
+//
+// ⚠ 実行するたびに、今のロビー（SpaceJunkLobby.unity）の中身を Lobby.unity に写してから並べ直す。
+//    **Lobby.unity に手で足した物・動かした物は消える。** 手で直し始めたら、この道具は使わないこと。
+//
+// 決まり（SVGからガラスのステージを作る.cs.txt と同じ）：
+//   ・SVG の 100px が、Hans さんの床 1 枚（SM_Platform＝3m×3m）。SVG の真ん中がシーンの原点。SVG の右が +X、上が北（+Z）
+//   ・床の上面が高さ 0。縁（SM_Edge）は外周に置く飾り（当たり判定なし）。角の柱（SM_Corner）は外へ 0.125m・床より 0.35m 下
+//
+// SVG の色と、置く物（オブジェクトデータ_1.svg の凡例）：
+//   青のマス＝床／赤のマス＝Team Area Red／水色のマス＝Team Area Blue（どちらも下に床を敷く）
+//   緑のマス＝輸送機（SM_Transporter）。灰色の細い線が手すりで、線の無い側が入口。練習用のゴール GoalArea_West をここへ移す
+//   灰色のマス＝ベルトコンベア（Hans さんのモデルがまだ無いので、今のロビーの ConveyorBelt 3本を並べ直す）
+//   小さな赤＝SettingsTerminal／小さな黄緑＝RespawnBottonTerminal／小さなオレンジ＝LobbyScreen
+//   （LobbyScreen は画面に重ねて出す UI で場所を持たないので、ここには SVG に無い NameChangeTerminal を仮に置く）
+//
+// 今のロビーから変えないもの：通信の係（NetworkManager）・LobbyScreen・ReactionSystem・出現場所 6 か所・カメラ・光
+
+using System;
+using System.Collections.Generic;
+using System.Globalization;
+using System.IO;
+using System.Text;
+using System.Text.RegularExpressions;
+using UnityEditor;
+using UnityEditor.SceneManagement;
+using UnityEngine;
+
+public static class TempLobbyBuilder
+{
+    const string SvgPath = @"C:\Users\yziku\Desktop\StarSweepers\ステージ設計\SVG\ロビー.svg";
+    const string OutDir = @"C:\Users\yziku\AppData\Local\Temp\claude\6918af49c9fc72ff\4bd22549-2f9d-4578-84f7-1a96b5725824\scratchpad\";
+    const string SourceScene = "Assets/Scenes/MainLoop/SpaceJunkLobby.unity";
+    const string ScenePath = "Assets/Scenes/MainLoop/Lobby.unity";
+
+    const float MetersPerPx = 0.03f;
+    const int CellPx = 100;
+    const float FloorY = -0.25f;          // 床の部品の原点の高さ（床の上面が 0）
+    const float EdgeY = FloorY;
+    const float CornerY = FloorY - 0.35f;
+    const float CornerOffset = 0.125f;
+    const float BeltWidth = 2.8f;         // ConveyorBelt の幅（beltSize.x 4 × 0.7）
+    const float BeltLength = 20f;         // ConveyorBelt の長さ（beltSize.z。拡大率 1 のとき）
+
+    enum Kind { Floor, TeamRed, TeamBlue, Transporter, Conveyor }
+
+    struct Shape { public string fill; public float x, y, w, h; }
+
+    public static void Run()
+    {
+        List<Shape> shapes = ReadSvg(SvgPath, out float svgW, out float svgH);
+        Dictionary<(int, int), Kind> cells = new Dictionary<(int, int), Kind>();
+        List<Shape> rails = new List<Shape>();
+        Shape? settings = null, respawn = null, screen = null;
+
+        foreach (Shape s in shapes)
+        {
+            bool tile = Mathf.RoundToInt(s.w) == 99 && Mathf.RoundToInt(s.h) == 99;
+            bool small = Mathf.Abs(s.w - 43.83f) < 0.5f && Mathf.Abs(s.h - 21.02f) < 0.5f;
+            (int, int) cell = (Mathf.RoundToInt(s.x - 0.5f) / CellPx, Mathf.RoundToInt(s.y - 0.5f) / CellPx);
+
+            if (tile && s.fill == "blue") cells[cell] = Kind.Floor;
+            else if (tile && s.fill == "#ed1c24") cells[cell] = Kind.TeamRed;
+            else if (tile && s.fill == "aqua") cells[cell] = Kind.TeamBlue;
+            else if (tile && s.fill == "#009245") cells[cell] = Kind.Transporter;
+            else if (tile && s.fill == "#666") cells[cell] = Kind.Conveyor;
+            else if (s.fill == "#666") rails.Add(s);
+            else if (small && s.fill == "#ed1c24") settings = s;
+            else if (small && s.fill == "lime") respawn = s;
+            else if (small && s.fill == "#ff931e") screen = s;
+            else Debug.Log($"[LOBBY] 使わなかった四角：{s.fill} {s.x},{s.y} {s.w}×{s.h}");
+        }
+
+        if (settings == null || respawn == null || screen == null) throw new Exception("端末の小さな四角（赤・黄緑・オレンジ）がそろっていません");
+
+        // ---- 今のロビーを写して開く（Lobby.unity の .meta はそのまま＝シーンの番号は変わらない）
+        string root = Path.GetDirectoryName(Application.dataPath);
+        File.Copy(Path.Combine(root, SourceScene), Path.Combine(root, ScenePath), true);
+        AssetDatabase.ImportAsset(ScenePath, ImportAssetOptions.ForceUpdate);
+        var scene = EditorSceneManager.OpenScene(ScenePath, OpenSceneMode.Single);
+
+        GameObject Find(string name)
+        {
+            foreach (GameObject r in scene.GetRootGameObjects()) if (r.name == name) return r;
+            throw new Exception("ロビーに " + name + " がありません");
+        }
+
+        Vector3 Center(Shape s, float y) => PxToWorld(s.x + s.w * 0.5f, s.y + s.h * 0.5f, y, svgW, svgH);
+        Vector3 CellCenter((int x, int y) c, float y) => PxToWorld((c.x + 0.5f) * CellPx, (c.y + 0.5f) * CellPx, y, svgW, svgH);
+
+        StringBuilder report = new StringBuilder();
+
+        // ---- 平らな地面をやめて、床の部品を敷く（チームエリアの下にも敷く）
+        UnityEngine.Object.DestroyImmediate(Find("Ground"));
+        GameObject platform = Load("Assets/Art/Models/SM_Platform.fbx");
+        Transform floors = new GameObject("Floors").transform;
+        int floorCount = 0;
+        foreach (var pair in cells)
+        {
+            if (pair.Value != Kind.Floor && pair.Value != Kind.TeamRed && pair.Value != Kind.TeamBlue) continue;
+            GameObject floor = (GameObject)PrefabUtility.InstantiatePrefab(platform, floors);
+            floor.name = $"Floor_{pair.Key.Item1 * CellPx}_{pair.Key.Item2 * CellPx}";
+            Bounds mesh = floor.GetComponent<MeshFilter>().sharedMesh.bounds;
+            Vector3 c = CellCenter(pair.Key, -mesh.max.y);
+            floor.transform.SetPositionAndRotation(c, Quaternion.identity);
+            BoxCollider box = floor.AddComponent<BoxCollider>();
+            box.center = mesh.center;
+            box.size = mesh.size;
+            floorCount++;
+        }
+
+        // ---- チームエリア（1マスの大きさにする。Plane は 10m 四方なので 0.3 倍）
+        foreach (var pair in cells)
+        {
+            if (pair.Value != Kind.TeamRed && pair.Value != Kind.TeamBlue) continue;
+            Transform area = Find(pair.Value == Kind.TeamRed ? "Team Area Red" : "Team Area Blue").transform;
+            area.position = CellCenter(pair.Key, 0.01f);
+            area.localScale = new Vector3(0.3f, 1f, 0.3f);
+        }
+
+        // ---- 練習用のゴール：囲いの壁と床をやめて、輸送機に置き換える（ガラスマップと同じ作り）
+        (int, int) goalCell = default;
+        int goals = 0;
+        foreach (var pair in cells) if (pair.Value == Kind.Transporter) { goalCell = pair.Key; goals++; }
+        if (goals != 1) throw new Exception($"輸送機のマスが {goals} 個です（1個のはず）");
+
+        Transform group = Find("Wall_West").transform;
+        Transform goalArea = group.Find("GoalArea_West");
+        for (int i = group.childCount - 1; i >= 0; i--)
+        {
+            if (group.GetChild(i) != goalArea) UnityEngine.Object.DestroyImmediate(group.GetChild(i).gameObject);
+        }
+
+        Vector3 goalCenter = CellCenter(goalCell, 0f);
+        group.name = "Goal_West";
+        goalArea.SetParent(null, true);
+        group.SetPositionAndRotation(goalCenter, Quaternion.identity);
+        goalArea.SetParent(group, true);
+        goalArea.SetPositionAndRotation(goalCenter + Vector3.up * 2.5f, Quaternion.identity);
+        BoxCollider trigger = goalArea.GetComponent<BoxCollider>();
+        trigger.center = Vector3.zero;
+        trigger.size = new Vector3(CellPx * MetersPerPx, 5f, CellPx * MetersPerPx);
+
+        // 手すり（灰色の細い線）の無い側が入口。輸送機は向き 0 で入口が北（+Z）を向く（ガラスマップの西のゴールが 90）
+        string open = OpenSide(goalCell, rails);
+        float goalRot = open == "north" ? 0f : open == "east" ? 90f : open == "south" ? 180f : 270f;
+        // ゴールの子にすると SpaceJunkLobbyGoal が色を塗る相手に選んでしまうので、となりに置く
+        GameObject visual = (GameObject)PrefabUtility.InstantiatePrefab(Load("Assets/Art/Models/SM_Transporter.fbx"), group);
+        visual.name = "SM_Transporter";
+        visual.transform.SetPositionAndRotation(new Vector3(goalCenter.x, FloorY, goalCenter.z), Quaternion.Euler(0f, goalRot, 0f));
+        MeshCollider meshCollider = visual.AddComponent<MeshCollider>();
+        meshCollider.sharedMesh = visual.GetComponent<MeshFilter>().sharedMesh;
+        BoxCollider deck = visual.AddComponent<BoxCollider>();
+        deck.center = new Vector3(0f, 0.145f, 0f);
+        deck.size = new Vector3(3f, 0.29f, 3f);
+        report.AppendLine($"[LOBBY] 輸送機：{goalCenter}・入口は{open}（向き {goalRot}）");
+
+        // ---- 端末（大きさと中身は今のまま。場所だけ SVG に合わせる）
+        Find("SettingsTerminal").transform.position = Center(settings.Value, 0.75f);
+        Find("RespawnBottonTerminal").transform.position = Center(respawn.Value, 0.75f);
+        Find("NameChangeTerminal").transform.position = Center(screen.Value, 0.75f);
+
+        // ---- 練習用の物資が出る所：ゴールから 8m 東（今のロビーと同じ距離）
+        Find("DebrisPoint").transform.position = goalCenter + new Vector3(8f, 0.5f, 0f);
+
+        // ---- ベルトコンベア（今のロビーの 3 本）：東の端から西へ → 北へ → 東の端へ抜ける U 字
+        var expected = new HashSet<(int, int)> { (6, 3), (5, 3), (5, 2), (5, 1), (6, 1) };
+        var conveyorCells = new HashSet<(int, int)>();
+        foreach (var pair in cells) if (pair.Value == Kind.Conveyor) conveyorCells.Add(pair.Key);
+        if (!conveyorCells.SetEquals(expected)) throw new Exception("ベルトコンベアのマスが、作ったときの SVG と違います。この道具のコンベアの並べ方を直してください");
+
+        float colX = CellCenter((5, 0), 0f).x;            // 縦の列の X
+        float bottomZ = CellCenter((0, 3), 0f).z;         // 下の段の Z
+        float topZ = CellCenter((0, 1), 0f).z;            // 上の段の Z
+        float eastX = svgW * 0.5f * MetersPerPx;          // 東の端
+        float half = BeltWidth * 0.5f;
+
+        PlaceBelt(Find("ConveyorBelt").transform, new Vector3(colX, 0.01f, ((bottomZ - half) + (topZ - half)) * 0.5f), 0f, (topZ - half) - (bottomZ - half));
+        PlaceBelt(Find("ConveyorBelt (1)").transform, new Vector3(((colX + half) + eastX) * 0.5f, 0.01f, bottomZ), 270f, eastX - (colX + half));
+        PlaceBelt(Find("ConveyorBelt (2)").transform, new Vector3(((colX - half) + eastX) * 0.5f, 0.01f, topZ), 90f, eastX - (colX - half));
+        Find("GameObject").transform.position = new Vector3(eastX - 1f, 1f, bottomZ); // 物資をコンベアに出す係
+
+        // ---- 縁と角の柱（外周。上の段のコンベアが東の端から物資を落とす所だけは空ける）
+        Transform edges = new GameObject("Edges").transform;
+        GameObject edge = Load("Assets/Art/Models/SM_Edge.fbx");
+        GameObject corner = Load("Assets/Art/Models/SM_Corner.fbx");
+        int edgeCount = 0, cornerCount = 0;
+        HashSet<(int, int)> placedCorners = new HashSet<(int, int)>();
+        bool Empty(int cx, int cy) => !cells.ContainsKey((cx, cy));
+
+        foreach (var cell in cells.Keys)
+        {
+            int cx = cell.Item1, cy = cell.Item2;
+            if (Empty(cx - 1, cy)) { AddEdge(cx * CellPx, (cy + 0.5f) * CellPx, 0f); }
+            if (Empty(cx + 1, cy) && cell != (6, 1)) { AddEdge((cx + 1) * CellPx, (cy + 0.5f) * CellPx, 180f); }
+            if (Empty(cx, cy - 1)) { AddEdge((cx + 0.5f) * CellPx, cy * CellPx, 90f); }
+            if (Empty(cx, cy + 1)) { AddEdge((cx + 0.5f) * CellPx, (cy + 1) * CellPx, 270f); }
+
+            TryCorner(cx, cy, Empty(cx - 1, cy) && Empty(cx, cy - 1), -1, -1);
+            TryCorner(cx + 1, cy, Empty(cx + 1, cy) && Empty(cx, cy - 1), +1, -1);
+            TryCorner(cx, cy + 1, Empty(cx - 1, cy) && Empty(cx, cy + 1), -1, +1);
+            TryCorner(cx + 1, cy + 1, Empty(cx + 1, cy) && Empty(cx, cy + 1), +1, +1);
+        }
+
+        void AddEdge(float px, float py, float rotY)
+        {
+            GameObject piece = (GameObject)PrefabUtility.InstantiatePrefab(edge, edges);
+            piece.name = $"Edge_{(int)px}_{(int)py}";
+            piece.transform.SetPositionAndRotation(PxToWorld(px, py, EdgeY, svgW, svgH), Quaternion.Euler(0f, rotY, 0f));
+            edgeCount++;
+        }
+
+        void TryCorner(int gx, int gy, bool convex, int outX, int outY)
+        {
+            if (!convex || !placedCorners.Add((gx, gy))) return;
+            Vector3 p = PxToWorld(gx * CellPx, gy * CellPx, CornerY, svgW, svgH) + new Vector3(outX * CornerOffset, 0f, -outY * CornerOffset);
+            GameObject post = (GameObject)PrefabUtility.InstantiatePrefab(corner, edges);
+            post.name = $"Corner_{gx * CellPx}_{gy * CellPx}";
+            post.transform.position = p;
+            cornerCount++;
+        }
+
+        EditorSceneManager.MarkSceneDirty(scene);
+        EditorSceneManager.SaveScene(scene);
+
+        report.AppendLine($"[LOBBY] 床 {floorCount} 枚・縁 {edgeCount} 本・角 {cornerCount} 本・大きさ {svgW * MetersPerPx}m×{svgH * MetersPerPx}m");
+        foreach (string name in new[] { "Team Area Red", "Team Area Blue", "SettingsTerminal", "RespawnBottonTerminal", "NameChangeTerminal", "DebrisPoint", "ConveyorBelt", "ConveyorBelt (1)", "ConveyorBelt (2)", "GameObject", "Main Camera" })
+        {
+            Transform t = Find(name).transform;
+            report.AppendLine($"[LOBBY] {name}：位置 {t.position.ToString("F2")}・向き {t.eulerAngles.y:F0}・拡大 {t.localScale.ToString("F3")}");
+        }
+        Debug.Log(report.ToString());
+
+        Snapshot(svgW * MetersPerPx, svgH * MetersPerPx, goalCenter, new Vector3(colX + 1.5f, 0f, 0f));
+    }
+
+    /// <summary>ベルトを置く。長さは拡大率で合わせる（幅はそのまま）。</summary>
+    static void PlaceBelt(Transform belt, Vector3 position, float rotY, float length)
+    {
+        belt.SetPositionAndRotation(position, Quaternion.Euler(0f, rotY, 0f));
+        Vector3 scale = belt.localScale;
+        belt.localScale = new Vector3(scale.x, scale.y, length / BeltLength);
+    }
+
+    /// <summary>輸送機のマスで、手すりの線が無い側（入口）を返す。</summary>
+    static string OpenSide((int x, int y) cell, List<Shape> rails)
+    {
+        float x0 = cell.x * CellPx, y0 = cell.y * CellPx, mid = CellPx * 0.5f;
+        bool north = false, south = false, west = false, east = false;
+        foreach (Shape r in rails)
+        {
+            float cx = r.x + r.w * 0.5f - x0, cy = r.y + r.h * 0.5f - y0;
+            if (cx < 0 || cx > CellPx || cy < 0 || cy > CellPx) continue;
+            if (r.w > r.h) { if (cy < mid) north = true; else south = true; }
+            else { if (cx < mid) west = true; else east = true; }
+        }
+        List<string> open = new List<string>();
+        if (!north) open.Add("north");
+        if (!east) open.Add("east");
+        if (!south) open.Add("south");
+        if (!west) open.Add("west");
+        if (open.Count != 1) throw new Exception("輸送機の手すりから入口が1つに決まりません：" + string.Join(",", open));
+        return open[0];
+    }
+
+    static Vector3 PxToWorld(float px, float py, float y, float svgW, float svgH)
+    {
+        return new Vector3((px - svgW * 0.5f) * MetersPerPx, y, (svgH * 0.5f - py) * MetersPerPx);
+    }
+
+    static GameObject Load(string path)
+    {
+        GameObject asset = AssetDatabase.LoadAssetAtPath<GameObject>(path);
+        if (asset == null) throw new Exception("読み込めません: " + path);
+        return asset;
+    }
+
+    static List<Shape> ReadSvg(string path, out float svgW, out float svgH)
+    {
+        string text = File.ReadAllText(path, Encoding.UTF8);
+        Match viewBox = Regex.Match(text, "viewBox=\"0 0 ([\\d.]+) ([\\d.]+)\"");
+        svgW = float.Parse(viewBox.Groups[1].Value, CultureInfo.InvariantCulture);
+        svgH = float.Parse(viewBox.Groups[2].Value, CultureInfo.InvariantCulture);
+
+        Dictionary<string, string> fills = new Dictionary<string, string>();
+        foreach (Match m in Regex.Matches(text, "\\.(cls-\\d+)\\s*\\{\\s*fill:\\s*([^;]+);"))
+        {
+            fills[m.Groups[1].Value] = m.Groups[2].Value.Trim();
+        }
+
+        List<Shape> shapes = new List<Shape>();
+        foreach (Match m in Regex.Matches(text, "<rect class=\"(cls-\\d+)\" x=\"([\\d.]+)\" y=\"([\\d.]+)\" width=\"([\\d.]+)\" height=\"([\\d.]+)\""))
+        {
+            shapes.Add(new Shape
+            {
+                fill = fills.TryGetValue(m.Groups[1].Value, out string fill) ? fill : "?",
+                x = float.Parse(m.Groups[2].Value, CultureInfo.InvariantCulture),
+                y = float.Parse(m.Groups[3].Value, CultureInfo.InvariantCulture),
+                w = float.Parse(m.Groups[4].Value, CultureInfo.InvariantCulture),
+                h = float.Parse(m.Groups[5].Value, CultureInfo.InvariantCulture),
+            });
+        }
+        return shapes;
+    }
+
+    /// <summary>真上・南の斜め上・輸送機・コンベアの画像を書き出す（シーンには残さない）。</summary>
+    static void Snapshot(float width, float depth, Vector3 goal, Vector3 conveyor)
+    {
+        GameObject camObject = new GameObject("TempSnapshotCamera") { hideFlags = HideFlags.HideAndDontSave };
+        Camera cam = camObject.AddComponent<Camera>();
+        cam.clearFlags = CameraClearFlags.SolidColor;
+        cam.backgroundColor = new Color(0.08f, 0.08f, 0.12f);
+        cam.farClipPlane = 300f;
+
+        const int W = 1280, H = 720;
+        RenderTexture rt = new RenderTexture(W, H, 24);
+        cam.targetTexture = rt;
+
+        cam.orthographic = true;
+        cam.orthographicSize = Mathf.Max(depth * 0.5f, width * 0.5f * H / W) + 1.5f;
+        cam.transform.SetPositionAndRotation(new Vector3(0f, 60f, 0f), Quaternion.Euler(90f, 0f, 0f));
+        Shoot(cam, rt, OutDir + "Lobby2_top.png");
+
+        cam.orthographic = false;
+        cam.fieldOfView = 50f;
+        float back = Mathf.Max(width, depth) * 0.75f;
+        cam.transform.position = new Vector3(0f, back * 0.9f, -back);
+        cam.transform.LookAt(Vector3.zero);
+        Shoot(cam, rt, OutDir + "Lobby2_angle.png");
+
+        cam.fieldOfView = 45f;
+        cam.transform.position = goal + new Vector3(5f, 5f, -5f);
+        cam.transform.LookAt(goal);
+        Shoot(cam, rt, OutDir + "Lobby2_goal.png");
+
+        cam.transform.position = conveyor + new Vector3(-7f, 9f, -9f);
+        cam.transform.LookAt(conveyor);
+        Shoot(cam, rt, OutDir + "Lobby2_conveyor.png");
+
+        cam.targetTexture = null;
+        UnityEngine.Object.DestroyImmediate(rt);
+        UnityEngine.Object.DestroyImmediate(camObject);
+    }
+
+    static void Shoot(Camera cam, RenderTexture rt, string path)
+    {
+        cam.Render();
+        RenderTexture.active = rt;
+        Texture2D tex = new Texture2D(rt.width, rt.height, TextureFormat.RGB24, false);
+        tex.ReadPixels(new Rect(0, 0, rt.width, rt.height), 0, 0);
+        tex.Apply();
+        RenderTexture.active = null;
+        File.WriteAllBytes(path, tex.EncodeToPNG());
+        UnityEngine.Object.DestroyImmediate(tex);
+    }
+}
