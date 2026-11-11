@@ -42,7 +42,8 @@ public partial class SpaceJunkSession
         matchWinner.Value = -1;
         state.Value = SpaceJunkMatchState.Playing;
 
-        LoadNextMap();
+        // 全員の画面をトランジションで覆ってから、マップへ移る
+        SceneTransition.PlayForEveryone(LoadNextMap);
     }
 
     /// <summary>
