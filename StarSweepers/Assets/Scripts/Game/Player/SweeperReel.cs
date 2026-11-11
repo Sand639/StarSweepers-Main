@@ -22,6 +22,8 @@ using UnityEngine;
 /// **回り込んでいる途中で押すと、回っている勢いを残して斜め後ろへ飛ぶ**（2026/11/4）。
 /// 飛ぶ向きは「体の真後ろ」と「物資がいま動いている向き（接線）」を Throw Follow Motion の割合で混ぜる。
 /// 0 で今までどおり真後ろ、1 で動いている向きそのまま。まっすぐ引いているときはどちらでも真後ろになる。
+/// **混ぜる割合は、引き寄せの進み具合で切り替わる**（2026/11/10・小野田さんの案）。道のりの Throw Follow Switch（初期値 8 割）までは
+/// Throw Follow Motion（接線に近い向き）、そこを超えたら Throw Follow Near（体の真後ろに、ほんの少しだけ接線を足す。初期値 0.15）。
 /// クリティカルの合図は物資のまわりにだけ出す（ゲージなどの画面の表示は出さない）。
 /// 1回押したら、それで決まる（連打で当てられないように）。
 ///
@@ -41,6 +43,19 @@ using UnityEngine;
 /// | 決まったとき | 星のかけらが飛び散る（案1）・物資が白く光って一瞬止まる（案4）・**推進の衝撃波**（物資の、引っ張られている側と逆の側から輪が噴き出す）・前からの大きな輪 |
 ///
 /// 合図を受付より前から出すのは、受付が0.2秒しかなく、光ったのを見てから押すのでは間に合わないため。
+///
+/// ### 光線がちぎれる（2026/11/10）
+///
+/// 動く物（Is Kinematic の Rigidbody。回る床・上下する床・ベルトコンベア・動く障害物など）に物資を押し付けたまま引くと、
+/// めり込みを押し戻す力で物資がものすごい勢いで飛んだり、回転が増え続けたりしていた。これを防ぐため、次のどちらかで**光線がちぎれ、物資はその場に落ちる**。
+///
+/// | ちぎれる条件 | 中身 |
+/// | --- | --- |
+/// | **たまった力** | 引きたい距離に対して、物資が動けなかった距離をためていく（引っかかりが取れていれば少しずつ減る）。**Snap Strain** m たまったらちぎれる。初期設定では、動く物に触れている間だけためる |
+/// | **貫通** | 光線（手元から物資までの曲線）が動く物を **Kinematic Snap Seconds** 秒つらぬいたらちぎれる。**ふつうの壁（Rigidbody が無い物）では、ちぎれない** |
+///
+/// あわせて、引きずる速さに上限（**Max Drag Speed**）を付けた。前は、引っかかって遅れた分を残りの時間で取り戻そうとして、
+/// 最後の一瞬に秒速数百 m を出すことがあった。
 ///
 /// ## オンライン（宇宙ごみのオンラインの体。2026/10/28）
 ///
@@ -69,6 +84,36 @@ public class SweeperReel : MonoBehaviour
     [Min(0f)]
     [SerializeField] private float maxSwingSpeed = 540f;
 
+    [Tooltip("引きずる速さの上限（m/秒）。0 で上限なし。ふつうに引くときは 7〜9 m/秒ほどなので、それより大きくしておく")]
+    [Min(0f)]
+    [SerializeField] private float maxDragSpeed = 20f;
+
+    [Header("光線がちぎれる（2026/11/10）")]
+    [Tooltip("引きたかったのに動けなかった距離（m）がこれだけたまったら、光線がちぎれて物資をその場に落とす。0 でちぎれない")]
+    [Min(0f)]
+    [SerializeField] private float snapStrain = 2f;
+
+    [Tooltip("引っかかりが取れているとき、たまった距離が減る速さ（m/秒）。床との摩擦などの小さな遅れでちぎれないようにする")]
+    [Min(0f)]
+    [SerializeField] private float strainRecovery = 2f;
+
+    [Tooltip("ON：たまった力を、動く物（Is Kinematic の Rigidbody）に触れている間だけためる。OFF：ふつうの壁に引っかかっていてもためる")]
+    [SerializeField] private bool strainOnlyOnKinematic = true;
+
+    [Tooltip("光線が動く物（Is Kinematic の Rigidbody）をつらぬいたら、ちぎれる。ふつうの壁ではちぎれない")]
+    [SerializeField] private bool snapOnKinematicPierce = true;
+
+    [Tooltip("動く物をこの秒数つらぬき続けたら、ちぎれる。0 ですぐ（一瞬かすっただけでちぎれないよう、少しだけ待つ）")]
+    [Min(0f)]
+    [SerializeField] private float kinematicSnapSeconds = 0.1f;
+
+    [Tooltip("つらぬいたかを見るとき、光線の両端（手元と物資のそば）を何 m 見ないか。物資が乗っている床に、先端がかすってちぎれないようにする")]
+    [Min(0f)]
+    [SerializeField] private float pierceIgnoreEnds = 0.3f;
+
+    [Tooltip("つらぬいたか・触れているかを見る相手のレイヤー")]
+    [SerializeField] private LayerMask snapCheckMask = ~0;
+
     [Header("後ろへ投げる（途中で押したとき）")]
     [Tooltip("プレイヤーの中心から、後ろのどこに落とすか（m）")]
     [Min(0f)]
@@ -78,9 +123,17 @@ public class SweeperReel : MonoBehaviour
     [Min(0.5f)]
     [SerializeField] private float backArcHeight = 3.2f;
 
-    [Tooltip("投げる向きを、物資がいま動いている向き（回り込みの勢い）にどれだけ寄せるか。0 でいつも体の真後ろ、1 で動いている向きそのまま（ハンマー投げのように横へも飛ぶ）。まっすぐ引いているときはどちらでも真後ろ")]
+    [Tooltip("【引き寄せの前半（Throw Follow Switch まで）】投げる向きを、物資がいま動いている向き（回り込みの勢い＝接線）にどれだけ寄せるか。0 でいつも体の真後ろ、1 で動いている向きそのまま（ハンマー投げのように横へも飛ぶ）。まっすぐ引いているときはどちらでも真後ろ")]
     [Range(0f, 1f)]
     [SerializeField] private float throwFollowMotion = 0.5f;
+
+    [Tooltip("【引き寄せの後半（Throw Follow Switch を超えてから）】接線にどれだけ寄せるか。体の真後ろを基本に、ほんの少しだけ勢いを残す。0 で真後ろ")]
+    [Range(0f, 1f)]
+    [SerializeField] private float throwFollowNear = 0.15f;
+
+    [Tooltip("前半と後半を切り替える、引き寄せの進み具合。0.8 なら、当たった位置から止める位置（Stop Distance）までの道のりを 8 割引いたところで後半に切り替わる")]
+    [Range(0f, 1f)]
+    [SerializeField] private float throwFollowSwitch = 0.8f;
 
     [Header("前へ投げる（最後まで押さなかったとき）")]
     [Tooltip("前へ飛ばす速さ（m/秒）")]
@@ -191,6 +244,9 @@ public class SweeperReel : MonoBehaviour
     /// <summary>これより遅いときは「動いている向き」が当てにならないので、体の真後ろへ投げる（m/秒）。</summary>
     private const float MinFollowSpeed = 0.5f;
 
+    /// <summary>引き始めたときの、プレイヤーの中心から物資までの距離（真上から見た距離）。引き寄せの進み具合を出すのに使う。</summary>
+    private float reelStartDistance;
+
     /// <summary>いま引いている物が重い物か（<see cref="Begin"/> で決める）。</summary>
     private bool heavy;
 
@@ -218,11 +274,38 @@ public class SweeperReel : MonoBehaviour
     /// <summary>これだけ待っても返事が来なければ、あきらめて光線を戻す（秒）。</summary>
     private const float ClaimTimeout = 1.5f;
 
+    // ---- 光線がちぎれる（2026/11/10） ----
+
+    /// <summary>ちぎれたときの <see cref="LastResult"/>。</summary>
+    private const string SnapResult = "ちぎれた";
+
+    /// <summary>引きたかったのに動けなかった距離のたまり（m）。<see cref="snapStrain"/> を超えたらちぎれる。</summary>
+    private float strain;
+
+    /// <summary>前のステップで速さを入れたときの物資の位置と、そのステップで動かしたかった横の距離。</summary>
+    private Vector3 lastPosition;
+    private Vector3 lastStep;
+    private bool hasLastStep;
+
+    /// <summary>光線が動く物をつらぬき続けている秒数。</summary>
+    private float pierceTime;
+
+    /// <summary>光線の形（手元→物資）を受け取る入れ物。</summary>
+    private readonly Vector3[] beamPath = new Vector3[9];
+
+    /// <summary>当たり判定を受け取る入れ物（毎回作らないように使い回す）。</summary>
+    private readonly RaycastHit[] pierceHits = new RaycastHit[16];
+    private readonly Collider[] touchBuffer = new Collider[16];
+
+    /// <summary>物資のまわり、どれだけ離れていても「触れている」とみなすか（m）。</summary>
+    private const float TouchMargin = 0.05f;
+
     /// <summary>エフェクトの種類（オンラインでほかの人の画面にも出すときに使う）。</summary>
     public enum Effect
     {
         CriticalCue,
-        CriticalHit
+        CriticalHit,
+        Snap // 光線がちぎれた（2026/11/10）
     }
 
     /// <summary>エフェクトを出した瞬間に呼ばれる（<see cref="SweeperNetSync"/> がほかの人へ知らせる）。</summary>
@@ -293,6 +376,9 @@ public class SweeperReel : MonoBehaviour
     /// <summary>最後の投げの結果（「後ろ」「前」「クリティカル」）。検証用の表示に使う。</summary>
     public string LastResult { get; private set; } = "";
 
+    /// <summary>最後の巻き取りが、光線がちぎれて終わったか。</summary>
+    public bool LastWasSnapped => LastResult == SnapResult;
+
     private void Awake()
     {
         playerCollider = GetComponent<Collider>();
@@ -315,6 +401,10 @@ public class SweeperReel : MonoBehaviour
         waitingForClaim = false;
         supply = null;
         reelVelocity = Vector3.zero;
+        reelStartDistance = FlatDistanceToPlayer();
+        strain = 0f;
+        hasLastStep = false;
+        pierceTime = 0f;
 
         // 重い物は投げずに引きずるだけ。1回で引きずれる距離は重さで割る
         heavy = HeavyHookable.TryGetWeight(target, out heavyWeight);
@@ -425,6 +515,7 @@ public class SweeperReel : MonoBehaviour
             {
                 waitingForClaim = false;
                 startTime = Time.time;
+                reelStartDistance = FlatDistanceToPlayer();
                 body.WakeUp();
                 return true;
             }
@@ -456,6 +547,12 @@ public class SweeperReel : MonoBehaviour
     private void FixedUpdate()
     {
         if (!IsActive || body == null || waitingForClaim)
+        {
+            return;
+        }
+
+        // 動く物に押し付けすぎた・光線が動く物をつらぬいたら、ちぎれて落とす（2026/11/10）
+        if (CheckSnap())
         {
             return;
         }
@@ -492,7 +589,7 @@ public class SweeperReel : MonoBehaviour
 
         Vector3 rest = player + nextDirection * nextDistance - body.position;
         rest.y = 0f;
-        Vector3 velocity = rest / Time.fixedDeltaTime;
+        Vector3 velocity = CapSpeed(rest / Time.fixedDeltaTime);
         reelVelocity = velocity;
 
         if (body.isKinematic)
@@ -504,7 +601,10 @@ public class SweeperReel : MonoBehaviour
         SetDragVelocity(velocity);
     }
 
-    /// <summary>上下は物理（重力）のまま、横だけ決める＝床に置いたまま引きずる。回転は弱める。</summary>
+    /// <summary>
+    /// 上下は物理（重力）のまま、横だけ決める＝床に置いたまま引きずる。回転は弱める。
+    /// 次のステップで「どれだけ動けなかったか」を測るため、いまの位置と動かしたい距離を覚えておく。
+    /// </summary>
     private void SetDragVelocity(Vector3 velocity)
     {
         body.linearVelocity = new Vector3(velocity.x, body.linearVelocity.y, velocity.z);
@@ -512,6 +612,219 @@ public class SweeperReel : MonoBehaviour
         if (spinDamping > 0f)
         {
             body.angularVelocity *= Mathf.Exp(-spinDamping * Time.fixedDeltaTime);
+        }
+
+        lastPosition = body.position;
+        lastStep = new Vector3(velocity.x, 0f, velocity.z) * Time.fixedDeltaTime;
+        hasLastStep = true;
+    }
+
+    /// <summary>横の速さを <see cref="maxDragSpeed"/> までに抑える（0 なら抑えない）。</summary>
+    private Vector3 CapSpeed(Vector3 velocity)
+    {
+        if (maxDragSpeed <= 0f)
+        {
+            return velocity;
+        }
+
+        float speed = velocity.magnitude;
+        return speed > maxDragSpeed ? velocity * (maxDragSpeed / speed) : velocity;
+    }
+
+    // ------------------------------------------------------------
+    // 光線がちぎれる（2026/11/10）
+    // ------------------------------------------------------------
+
+    /// <summary>
+    /// **ちぎれるかを調べ、ちぎれたら物資を落として true。** FixedUpdate の最初に呼ぶ。
+    /// ①前のステップで動かしたかった距離のうち、動けなかった分をためる（<see cref="snapStrain"/> を超えたらちぎれる）
+    /// ②光線が動く物をつらぬき続けたら（<see cref="kinematicSnapSeconds"/>）ちぎれる
+    /// </summary>
+    private bool CheckSnap()
+    {
+        float dt = Time.fixedDeltaTime;
+
+        if (snapStrain > 0f && hasLastStep && !body.isKinematic)
+        {
+            Vector3 moved = body.position - lastPosition;
+            moved.y = 0f;
+
+            // 動かしたかった向きに、実際に進めた距離。押し戻された・止められた分が「動けなかった距離」
+            float wanted = lastStep.magnitude;
+            float shortfall = wanted > 0.0001f ? Mathf.Max(0f, wanted - Vector3.Dot(moved, lastStep / wanted)) : 0f;
+
+            if (shortfall > 0.0001f && (!strainOnlyOnKinematic || TouchingKinematic()))
+            {
+                strain += shortfall;
+            }
+
+            strain = Mathf.Max(0f, strain - strainRecovery * dt);
+            if (strain >= snapStrain)
+            {
+                Snap();
+                return true;
+            }
+        }
+        hasLastStep = false;
+
+        if (snapOnKinematicPierce && BeamPiercesKinematic())
+        {
+            pierceTime += dt;
+            if (pierceTime >= kinematicSnapSeconds)
+            {
+                Snap();
+                return true;
+            }
+        }
+        else
+        {
+            pierceTime = 0f;
+        }
+
+        return false;
+    }
+
+    /// <summary>
+    /// **ちぎれる相手か。** 動く物（Is Kinematic の Rigidbody）だけ。ふつうの壁（Rigidbody が無い）・物資・プレイヤー・
+    /// 自分の体・すり抜ける判定は数えない（オンラインでは、ほかの人の物資も Is Kinematic になっているため物資は除く）。
+    /// </summary>
+    private bool IsSnapObstacle(Collider other)
+    {
+        if (other == null || other.isTrigger)
+        {
+            return false;
+        }
+
+        Rigidbody otherBody = other.attachedRigidbody;
+        if (otherBody == null || !otherBody.isKinematic || otherBody == body)
+        {
+            return false;
+        }
+
+        if (other.transform.IsChildOf(transform))
+        {
+            return false;
+        }
+
+        return other.GetComponentInParent<HookableObject>() == null
+            && other.GetComponentInParent<CharacterController>() == null;
+    }
+
+    /// <summary>引いている物資が、動く物に触れているか（物資の大きさの箱を少しふくらませて調べる）。</summary>
+    private bool TouchingKinematic()
+    {
+        Collider itemCollider = item != null ? item.GetComponent<Collider>() : null;
+        if (itemCollider == null)
+        {
+            return false;
+        }
+
+        Bounds bounds = itemCollider.bounds;
+        int count = Physics.OverlapBoxNonAlloc(bounds.center, bounds.extents + Vector3.one * TouchMargin, touchBuffer,
+            Quaternion.identity, snapCheckMask, QueryTriggerInteraction.Ignore);
+
+        for (int i = 0; i < count; i++)
+        {
+            if (IsSnapObstacle(touchBuffer[i]))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /// <summary>
+    /// 光線（手元から物資まで。しなっていれば曲線）が、動く物をつらぬいているか。
+    /// 両端の <see cref="pierceIgnoreEnds"/> m は見ない（物資が乗っている床に先端がかするだけでちぎれないように）。
+    /// </summary>
+    private bool BeamPiercesKinematic()
+    {
+        if (shooter == null)
+        {
+            return false;
+        }
+
+        int count = shooter.GetBeamPath(beamPath);
+        if (count < 2)
+        {
+            return false;
+        }
+
+        float total = 0f;
+        for (int i = 1; i < count; i++)
+        {
+            total += Vector3.Distance(beamPath[i - 1], beamPath[i]);
+        }
+
+        float from = pierceIgnoreEnds;
+        float to = total - pierceIgnoreEnds;
+        if (to <= from)
+        {
+            return false;
+        }
+
+        float walked = 0f;
+        for (int i = 1; i < count; i++)
+        {
+            Vector3 a = beamPath[i - 1];
+            Vector3 b = beamPath[i];
+            float length = Vector3.Distance(a, b);
+            float segmentStart = walked;
+            walked += length;
+
+            // この区間のうち、両端を除いた部分だけ調べる
+            float s0 = Mathf.Max(segmentStart, from);
+            float s1 = Mathf.Min(walked, to);
+            if (length < 0.0001f || s1 <= s0)
+            {
+                continue;
+            }
+
+            Vector3 direction = (b - a) / length;
+            Vector3 start = a + direction * (s0 - segmentStart);
+            int hits = Physics.RaycastNonAlloc(start, direction, pierceHits, s1 - s0, snapCheckMask, QueryTriggerInteraction.Ignore);
+
+            for (int h = 0; h < hits; h++)
+            {
+                if (IsSnapObstacle(pierceHits[h].collider))
+                {
+                    return true;
+                }
+            }
+        }
+
+        return false;
+    }
+
+    /// <summary>**光線がちぎれる。** ちぎれた見た目を出し（オンラインではほかの人の画面にも）、物資はその場に落とす。</summary>
+    private void Snap()
+    {
+        PlayEffect(Effect.Snap);
+        DropInPlace();
+        Finish(SnapResult, false, false);
+    }
+
+    /// <summary>
+    /// 物資を横に動かさず、その場に置く（落ちるのは止めない）。オンラインでは、離した位置をホストへ渡して置いてもらう
+    /// （ホストに届いている位置は少し遅れているため）。
+    /// </summary>
+    private void DropInPlace()
+    {
+        if (body == null)
+        {
+            return;
+        }
+
+        if (!body.isKinematic)
+        {
+            body.linearVelocity = new Vector3(0f, Mathf.Min(0f, body.linearVelocity.y), 0f);
+            body.angularVelocity = Vector3.zero;
+        }
+
+        if (supply != null && supply.IsSpawned)
+        {
+            supply.RequestThrow(Vector3.zero, 0f, 0f, MyIndex, true, Vector3.zero, Vector3.zero, true, body.position);
         }
     }
 
@@ -543,7 +856,7 @@ public class SweeperReel : MonoBehaviour
 
         Vector3 rest = player + nextDirection * (distance - step) - body.position;
         rest.y = 0f;
-        Vector3 velocity = rest / dt;
+        Vector3 velocity = CapSpeed(rest / dt);
         reelVelocity = velocity;
 
         if (body.isKinematic)
@@ -561,20 +874,7 @@ public class SweeperReel : MonoBehaviour
     /// </summary>
     private void ReleaseHeavy()
     {
-        if (body != null)
-        {
-            if (!body.isKinematic)
-            {
-                body.linearVelocity = new Vector3(0f, Mathf.Min(0f, body.linearVelocity.y), 0f);
-                body.angularVelocity = Vector3.zero;
-            }
-
-            if (supply != null && supply.IsSpawned)
-            {
-                supply.RequestThrow(Vector3.zero, 0f, 0f, MyIndex, true, Vector3.zero, Vector3.zero, true, body.position);
-            }
-        }
-
+        DropInPlace();
         Finish("引きずった", false, false);
     }
 
@@ -626,24 +926,56 @@ public class SweeperReel : MonoBehaviour
     }
 
     /// <summary>
-    /// 後ろへ投げる向き（真上から見た向き）。体の真後ろから、物資が動いている向きのほうへ、
-    /// その間の角度の <see cref="throwFollowMotion"/> 倍だけ回す。
-    /// まっすぐ引いているときは動いている向き＝プレイヤーへ向かう向き＝真後ろなので、今までと同じになる。
+    /// 後ろへ投げる向き（真上から見た向き）。体の真後ろから、物資が動いている向き（接線）のほうへ、
+    /// その間の角度の「寄せる割合」倍だけ回す。
+    /// 寄せる割合は引き寄せの進み具合で切り替える（2026/11/10）。<see cref="throwFollowSwitch"/>（初期値 8 割）までは
+    /// <see cref="throwFollowMotion"/>（接線に近い向きへ飛ぶ）、そこを超えたら <see cref="throwFollowNear"/>（真後ろに、ほんの少しだけ接線を足す）。
+    /// まっすぐ引いているときは動いている向き＝プレイヤーへ向かう向き＝真後ろなので、どちらでも真後ろになる。
     /// </summary>
     private Vector3 ThrowBackDirection()
     {
         Vector3 back = -Flat(transform.forward);
 
+        float follow = ReelProgress() < throwFollowSwitch ? throwFollowMotion : throwFollowNear;
+
         Vector3 motion = reelVelocity;
         motion.y = 0f;
-        if (throwFollowMotion <= 0f || motion.sqrMagnitude < MinFollowSpeed * MinFollowSpeed)
+        if (follow <= 0f || motion.sqrMagnitude < MinFollowSpeed * MinFollowSpeed)
         {
             return back;
         }
 
         // 角度で混ぜる（真逆どうしでも向きが決まるように、真上から見た回転の角度で考える）
-        float angle = Vector3.SignedAngle(back, motion, Vector3.up) * throwFollowMotion;
+        float angle = Vector3.SignedAngle(back, motion, Vector3.up) * follow;
         return Quaternion.AngleAxis(angle, Vector3.up) * back;
+    }
+
+    /// <summary>
+    /// 引き寄せの進み具合（0〜1）。当たった位置で 0、止める位置（Stop Distance）に着いたら 1。
+    /// 初めから止める位置のそばにいたときは 1（後半あつかい）。
+    /// </summary>
+    private float ReelProgress()
+    {
+        float span = reelStartDistance - stopDistance;
+        if (span <= 0.01f)
+        {
+            return 1f;
+        }
+
+        return Mathf.Clamp01((reelStartDistance - FlatDistanceToPlayer()) / span);
+    }
+
+    /// <summary>プレイヤーの中心から物資までの、真上から見た距離。</summary>
+    private float FlatDistanceToPlayer()
+    {
+        if (body == null)
+        {
+            return 0f;
+        }
+
+        Vector3 offset = body.position - transform.position;
+        offset.y = 0f;
+        return offset.magnitude;
     }
 
     /// <summary>
@@ -748,6 +1080,9 @@ public class SweeperReel : MonoBehaviour
         waitingForClaim = false;
         heavy = false;
         heavyRemaining = 0f;
+        hasLastStep = false;
+        strain = 0f;
+        pierceTime = 0f;
     }
 
     /// <summary>巻き取っている物資にエフェクトを出し、出したことを知らせる（オンラインではほかの人の画面にも出る）。</summary>
@@ -769,6 +1104,13 @@ public class SweeperReel : MonoBehaviour
     /// </summary>
     public void ShowEffect(Effect kind, HookableObject target)
     {
+        // ちぎれた：光線の見た目だけ（物資が見つからなくても出す）
+        if (kind == Effect.Snap)
+        {
+            shooter?.PlaySnap();
+            return;
+        }
+
         if (target == null)
         {
             return;

@@ -193,6 +193,63 @@ public class SweeperShooter : MonoBehaviour
     }
 
     /// <summary>
+    /// **巻き取り中の光線の形を、点の並びで返す**（手元 → 物資。しなっていれば、見た目と同じ曲線）。
+    /// <paramref name="points"/> の数だけ点を入れ、入れた数を返す（まっすぐなら 2）。巻き取っていなければ 0。
+    /// <see cref="SweeperReel"/> が「光線が動く物をつらぬいていないか」を調べるのに使う（2026/11/10）。
+    /// </summary>
+    public int GetBeamPath(Vector3[] points)
+    {
+        if (points == null || points.Length < 2 || phase != ShotPhase.Reeling)
+        {
+            return 0;
+        }
+
+        Vector3 hand = HandPosition;
+        Vector3 tip = BeamTip;
+        Vector3 toTip = tip - hand;
+        float length = toTip.magnitude;
+
+        if (!bendActive || bendStrength <= 0f || length < 0.001f)
+        {
+            points[0] = hand;
+            points[1] = tip;
+            return 2;
+        }
+
+        // LiquidBeam.Follow と同じ曲線（2次ベジェ）。真ん中の目印を、手元からしなりの向きへずらす
+        Vector3 direction = toTip / length;
+        float turn = Mathf.DeltaAngle(bendTipYaw, bendYaw);
+        Vector3 startDirection = (Quaternion.AngleAxis(turn, Vector3.up) * toTip).normalized;
+        Vector3 middle = hand + direction * (length * 0.5f) + (startDirection - direction) * (length * 0.5f * bendStrength);
+
+        int count = points.Length;
+        for (int i = 0; i < count; i++)
+        {
+            float t = i / (float)(count - 1);
+            float u = 1f - t;
+            points[i] = u * u * hand + 2f * u * t * middle + t * t * tip;
+        }
+
+        return count;
+    }
+
+    /// <summary>
+    /// **光線がちぎれた見た目を出す**（<see cref="SweeperReel"/> がちぎれたときに呼ぶ。オンラインのほかの人の体では、本人から知らせが来たとき）。
+    /// 光線は手元へ縮みながら消え、物資の縁取りははなす。
+    /// </summary>
+    public void PlaySnap()
+    {
+        beam?.Snap();
+        wrap?.Release();
+
+        // ほかの人の体：まだ「巻き取り中」が届いていても、光線を物資へ描き直さない
+        if (remotePhase == ShotPhase.Reeling)
+        {
+            remoteSnapped = true;
+        }
+    }
+
+    /// <summary>
     /// **撃っている光線をしまい、巻き取りもやめる**（物資は投げずに離す）。
     /// オンラインで、出てくる場所へ戻されたときなどに呼ぶ（<see cref="SweeperNetSync"/>）。
     /// </summary>
@@ -432,6 +489,9 @@ public class SweeperShooter : MonoBehaviour
     /// <summary>ほかの人の体で、最後に見せた段階。段階が変わった瞬間だけ色やアニメーションを切り替えるために持つ。</summary>
     private ShotPhase remotePhase = ShotPhase.Idle;
 
+    /// <summary>ほかの人の体で、巻き取り中に「ちぎれた」が届いたか。段階が変わるまで光線を描き直さない。</summary>
+    private bool remoteSnapped;
+
     /// <summary>
     /// **ほかの人の体に、本人から届いた光線の様子をそのまま見せる。**（<see cref="SweeperNetSync"/> が毎フレーム呼ぶ）
     /// ほかの人の体ではこの部品は止まっている（操作はしない）ので、見た目だけをここで出す。
@@ -444,6 +504,7 @@ public class SweeperShooter : MonoBehaviour
         {
             OnRemotePhaseChanged(remotePhase, newPhase);
             remotePhase = newPhase;
+            remoteSnapped = false;
         }
 
         if (newPhase == ShotPhase.Charging)
@@ -459,7 +520,7 @@ public class SweeperShooter : MonoBehaviour
         Vector3 shownTip = newPhase == ShotPhase.Reeling && item != null ? item.AnchorPoint : tip;
         UpdateBend(newPhase == ShotPhase.Reeling, shownTip, Time.deltaTime);
 
-        if (beam != null && newPhase != ShotPhase.Idle)
+        if (beam != null && newPhase != ShotPhase.Idle && !(remoteSnapped && newPhase == ShotPhase.Reeling))
         {
             FollowBeam(shownTip);
         }
@@ -470,8 +531,7 @@ public class SweeperShooter : MonoBehaviour
         switch (after)
         {
             case ShotPhase.Idle:
-                beam?.Stop();
-                beam?.SetColor(IdleColor);
+                StopBeam();
                 wrap?.Release();
                 aimArea?.Hide();
                 animationPlayer?.PlayIdle();
@@ -665,15 +725,25 @@ public class SweeperShooter : MonoBehaviour
             mover.FaceAim = false;
         }
 
-        if (beam != null)
-        {
-            beam.Stop();
-            beam.SetColor(IdleColor);
-        }
-
+        StopBeam();
         wrap?.Release();
         aimArea?.Hide();
         animationPlayer?.PlayIdle();
+    }
+
+    /// <summary>
+    /// 光線を消し始め、色を薄いチームの色へ戻す。**ちぎれて縮んでいる途中なら、そのまま縮ませる**
+    /// （色もチームの色のまま。次に撃つときに薄い色へ戻る）。
+    /// </summary>
+    private void StopBeam()
+    {
+        if (beam == null || beam.IsSnapping)
+        {
+            return;
+        }
+
+        beam.Stop();
+        beam.SetColor(IdleColor);
     }
 
     private LiquidBeam CreateBeam()

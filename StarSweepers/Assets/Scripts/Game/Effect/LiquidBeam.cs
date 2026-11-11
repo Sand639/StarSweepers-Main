@@ -70,6 +70,15 @@ public class LiquidBeam : MonoBehaviour
     [Tooltip("消えるまでにかかる時間（秒）。根元から切れて、先端へ向かって流れ去る")]
     [SerializeField] private float fadeSeconds = 0.4f;
 
+    [Header("ちぎれる（Snap()。2026/11/10）")]
+    [Tooltip("ちぎれてから、手元へ縮みきって消えるまでの時間（秒）。はじめは速く、だんだんゆっくり縮む")]
+    [Min(0.05f)]
+    [SerializeField] private float snapSeconds = 0.25f;
+
+    [Tooltip("ちぎれた瞬間に、先端から飛び散るしぶきの数")]
+    [Min(0)]
+    [SerializeField] private int snapBurst = 30;
+
     [Header("液体のゆれ")]
     [Tooltip("流れが横にゆれる大きさ（メートル）")]
     [SerializeField] private float wobble = 0.05f;
@@ -183,6 +192,8 @@ public class LiquidBeam : MonoBehaviour
         /// <summary>根元から切れて、先端へ流れ去りながら消えていく途中。</summary>
         Fading,
         Following,  // 外から両端を決めてもらっている（フックの糸の代わり。Follow()）
+        /// <summary>ちぎれて、先端がゴムのように手元へ縮みながら消えていく途中（Snap()）。</summary>
+        Snapping,
     }
 
     /// <summary>流れの芯の点の数。</summary>
@@ -245,6 +256,9 @@ public class LiquidBeam : MonoBehaviour
     /// </summary>
     private Vector3 bendOffset;
 
+    /// <summary>ちぎれた瞬間の長さ（メートル）。ここから 0 へ縮む。</summary>
+    private float snapFrom;
+
     // 見た目の部品。どれも Awake で子オブジェクトとして作る
     private LiquidLine body;        // 流れ本体
     private LiquidLine highlight;   // 流れの真ん中の明るい筋
@@ -264,7 +278,10 @@ public class LiquidBeam : MonoBehaviour
     public bool IsCharging => state == State.Charging;
 
     /// <summary>流れが出ている（発射〜消えるまで）か。この間は次の溜めを始められない。</summary>
-    public bool IsFiring => state == State.Firing || state == State.Holding || state == State.Fading || state == State.Following;
+    public bool IsFiring => state == State.Firing || state == State.Holding || state == State.Fading || state == State.Following || state == State.Snapping;
+
+    /// <summary>ちぎれて縮んでいる途中か（<see cref="Snap"/>）。この間は <see cref="Stop"/> を呼んでも何も起きない。</summary>
+    public bool IsSnapping => state == State.Snapping;
 
     /// <summary>先端が届ききって、出たままになっているか。</summary>
     public bool IsHolding => state == State.Holding;
@@ -335,6 +352,49 @@ public class LiquidBeam : MonoBehaviour
         if (state == State.Firing || state == State.Holding || state == State.Following)
         {
             BeginFade();
+        }
+    }
+
+    /// <summary>
+    /// **ちぎれる。** 先端からしぶきが飛び散り、流れはゴムが切れたように手元へ縮みながら消える（<see cref="snapSeconds"/> 秒）。
+    /// 引っぱっていた物資を、力がかかりすぎて落としたときに呼ぶ（2026/11/10）。
+    /// すでに消えている途中なら、しぶきだけ出す。流れが出ていなければ何もしない。
+    /// </summary>
+    public void Snap()
+    {
+        if (state == State.Firing || state == State.Holding || state == State.Following)
+        {
+            EmitSnapBurst();
+            snapFrom = headDistance;
+            tailDistance = 0f;
+            state = State.Snapping;
+            stateTimer = snapSeconds;
+            return;
+        }
+
+        if (state == State.Fading)
+        {
+            EmitSnapBurst();
+            return;
+        }
+
+        Stop();
+    }
+
+    /// <summary>ちぎれた所（先端）から、しぶきをまわりへ一度にまき散らす。</summary>
+    private void EmitSnapBurst()
+    {
+        if (droplets == null)
+        {
+            return;
+        }
+
+        Vector3 head = Bend(StreamCenter(headDistance));
+        for (int i = 0; i < snapBurst; i++)
+        {
+            Vector3 position = head + Random.insideUnitSphere * streamWidth * 0.6f;
+            Vector3 velocity = Random.onUnitSphere * dropletSpeed * Random.Range(0.6f, 1.4f);
+            EmitDroplet(position, velocity, 1f);
         }
     }
 
@@ -565,6 +625,26 @@ public class LiquidBeam : MonoBehaviour
                 DrawStream(1f, deltaTime);
                 EmitHeadSpray(deltaTime, followGrowing ? headSplashRate : headSplashRate * 0.35f, followGrowing);
                 EmitDrips(deltaTime, dripsPerMeter);
+                break;
+
+            case State.Snapping:
+                stateTimer -= deltaTime;
+
+                if (stateTimer <= 0f)
+                {
+                    HideAll();
+                    state = State.Idle;
+                    break;
+                }
+
+                // 先端が手元へ縮む。残りの割合の2乗にして、ちぎれた直後ほど速く縮む（ゴムが戻るように）
+                float left = stateTimer / snapSeconds;
+                headDistance = snapFrom * left * left;
+                tailDistance = 0f;
+
+                DrawStream(Mathf.Sqrt(left), deltaTime);
+                EmitHeadSpray(deltaTime, headSplashRate * 0.5f, false);
+                EmitDrips(deltaTime, dripsPerMeter * 8f);
                 break;
         }
     }
