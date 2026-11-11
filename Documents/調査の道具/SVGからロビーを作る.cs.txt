@@ -17,7 +17,10 @@
 // SVG の色と、置く物（オブジェクトデータ_1.svg の凡例）：
 //   青のマス＝床／赤のマス＝Team Area Red／水色のマス＝Team Area Blue（どちらも下に床を敷く）
 //   緑のマス＝輸送機（SM_Transporter）。灰色の細い線が手すりで、線の無い側が入口。練習用のゴール GoalArea_West をここへ移す
-//   灰色のマス＝ベルトコンベア（Hans さんのモデルがまだ無いので、今のロビーの ConveyorBelt 3本を並べ直す）
+//   灰色のマス＝ベルトコンベア。見た目は SM_Coveyor_Rail_Start／Mid／End と SM_Conveyor_Turn_R（下に床を敷く）。
+//     運ぶ働きは今のロビーの ConveyorBelt 3 本を並べ直して使う（仮の見た目は切り、上面と幅をモデルに合わせる）
+//     モデルの向き：向き 0 で東から西へ流れる。手すりは流れの左側。Start は上流、End は下流の端にふた。
+//     Turn_R は東から入って北へ出る（右曲がり）、Turn_L は東から入って南へ出る（左曲がり）
 //   小さな赤＝SettingsTerminal／小さな黄緑＝RespawnBottonTerminal／小さなオレンジ＝LobbyScreen
 //   （LobbyScreen は画面に重ねて出す UI で場所を持たないので、ここには SVG に無い NameChangeTerminal を仮に置く）
 //
@@ -46,8 +49,11 @@ public static class TempLobbyBuilder
     const float EdgeY = FloorY;
     const float CornerY = FloorY - 0.35f;
     const float CornerOffset = 0.125f;
-    const float BeltWidth = 2.8f;         // ConveyorBelt の幅（beltSize.x 4 × 0.7）
+    const float BeltWidth = 2.5f;         // コンベアのモデルの幅に合わせる（ConveyorBelt の beltSize.x 4 × 0.625）
     const float BeltLength = 20f;         // ConveyorBelt の長さ（beltSize.z。拡大率 1 のとき）
+    const float BeltTop = 0.19f;          // コンベアのモデルの上面（床の上 0.188m）。ConveyorBelt の当たり判定の上面をここに合わせる
+    const float BeltSizeX = 4f;           // ConveyorBelt の beltSize.x
+    const float TurnShift = 0.125f;       // 曲がる部品（2.75m 四方）を、内側の角へずらす量（外側の線をまっすぐの部品の手すりに合わせる）
 
     enum Kind { Floor, TeamRed, TeamBlue, Transporter, Conveyor }
 
@@ -104,7 +110,7 @@ public static class TempLobbyBuilder
         int floorCount = 0;
         foreach (var pair in cells)
         {
-            if (pair.Value != Kind.Floor && pair.Value != Kind.TeamRed && pair.Value != Kind.TeamBlue) continue;
+            if (pair.Value == Kind.Transporter) continue; // 輸送機の下には敷かない（輸送機が床の代わり）。コンベアの下には敷く
             GameObject floor = (GameObject)PrefabUtility.InstantiatePrefab(platform, floors);
             floor.name = $"Floor_{pair.Key.Item1 * CellPx}_{pair.Key.Item2 * CellPx}";
             Bounds mesh = floor.GetComponent<MeshFilter>().sharedMesh.bounds;
@@ -182,10 +188,18 @@ public static class TempLobbyBuilder
         float eastX = svgW * 0.5f * MetersPerPx;          // 東の端
         float half = BeltWidth * 0.5f;
 
-        PlaceBelt(Find("ConveyorBelt").transform, new Vector3(colX, 0.01f, ((bottomZ - half) + (topZ - half)) * 0.5f), 0f, (topZ - half) - (bottomZ - half));
-        PlaceBelt(Find("ConveyorBelt (1)").transform, new Vector3(((colX + half) + eastX) * 0.5f, 0.01f, bottomZ), 270f, eastX - (colX + half));
-        PlaceBelt(Find("ConveyorBelt (2)").transform, new Vector3(((colX - half) + eastX) * 0.5f, 0.01f, topZ), 90f, eastX - (colX - half));
+        PlaceBelt(Find("ConveyorBelt").transform, new Vector3(colX, BeltTop, ((bottomZ - half) + (topZ - half)) * 0.5f), 0f, (topZ - half) - (bottomZ - half));
+        PlaceBelt(Find("ConveyorBelt (1)").transform, new Vector3(((colX + half) + eastX) * 0.5f, BeltTop, bottomZ), 270f, eastX - (colX + half));
+        PlaceBelt(Find("ConveyorBelt (2)").transform, new Vector3(((colX - half) + eastX) * 0.5f, BeltTop, topZ), 90f, eastX - (colX - half));
         Find("GameObject").transform.position = new Vector3(eastX - 1f, 1f, bottomZ); // 物資をコンベアに出す係
+
+        // 見た目はモデル。マスごとに、流れる向きに合わせて回す（向き 0 で西へ流れる → 北へは 90、東へは 180）
+        Transform models = new GameObject("ConveyorModels").transform;
+        PlaceConveyorModel(models, "SM_Coveyor_Rail_Start", CellCenter((6, 3), 0f), 0f, false);  // 東の端から西へ（上流）
+        PlaceConveyorModel(models, "SM_Conveyor_Turn_R", CellCenter((5, 3), 0f), 0f, true);      // 西へ → 北へ
+        PlaceConveyorModel(models, "SM_Coveyor_Rail_Mid", CellCenter((5, 2), 0f), 90f, false);   // 北へ
+        PlaceConveyorModel(models, "SM_Conveyor_Turn_R", CellCenter((5, 1), 0f), 90f, true);     // 北へ → 東へ
+        PlaceConveyorModel(models, "SM_Coveyor_Rail_End", CellCenter((6, 1), 0f), 180f, false);  // 東の端へ（下流）
 
         // ---- 縁と角の柱（外周。上の段のコンベアが東の端から物資を落とす所だけは空ける）
         Transform edges = new GameObject("Edges").transform;
@@ -241,12 +255,28 @@ public static class TempLobbyBuilder
         Snapshot(svgW * MetersPerPx, svgH * MetersPerPx, goalCenter, new Vector3(colX + 1.5f, 0f, 0f));
     }
 
-    /// <summary>ベルトを置く。長さは拡大率で合わせる（幅はそのまま）。</summary>
+    /// <summary>ベルト（運ぶ働き）を置く。幅と長さは拡大率で合わせる。仮の見た目は切る（モデルを別に置くため）。</summary>
     static void PlaceBelt(Transform belt, Vector3 position, float rotY, float length)
     {
         belt.SetPositionAndRotation(position, Quaternion.Euler(0f, rotY, 0f));
         Vector3 scale = belt.localScale;
-        belt.localScale = new Vector3(scale.x, scale.y, length / BeltLength);
+        belt.localScale = new Vector3(BeltWidth / BeltSizeX, scale.y, length / BeltLength);
+
+        SerializedObject so = new SerializedObject(belt.GetComponent<SpaceJunkConveyor>());
+        so.FindProperty("showBuiltInVisual").boolValue = false;
+        so.ApplyModifiedPropertiesWithoutUndo();
+        Transform baseVisual = belt.Find("Base");
+        if (baseVisual != null) baseVisual.GetComponent<MeshRenderer>().enabled = false; // エディタでもモデルが隠れないように
+    }
+
+    /// <summary>コンベアのモデルを1マスに置く。曲がる部品は内側の角（向き 0 で北東）へ少しずらす。</summary>
+    static void PlaceConveyorModel(Transform parent, string modelName, Vector3 cellCenter, float rotY, bool turn)
+    {
+        GameObject piece = (GameObject)PrefabUtility.InstantiatePrefab(Load($"Assets/Art/Models/{modelName}.fbx"), parent);
+        piece.name = modelName;
+        Quaternion rotation = Quaternion.Euler(0f, rotY, 0f);
+        Vector3 shift = turn ? rotation * new Vector3(TurnShift, 0f, TurnShift) : Vector3.zero;
+        piece.transform.SetPositionAndRotation(cellCenter + shift, rotation);
     }
 
     /// <summary>輸送機のマスで、手すりの線が無い側（入口）を返す。</summary>

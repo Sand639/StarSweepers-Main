@@ -73,7 +73,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::SpaceJunkSession
   ShowTopMostFoldoutHeaderGroup: 1
-  lobbySceneName: SpaceJunkLobby
+  lobbySceneName: Lobby
   roundResultSeconds: 5
   matchResultSeconds: 8
   winRule: 0

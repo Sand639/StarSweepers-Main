@@ -104,7 +104,7 @@ public partial class SpaceJunkSession : NetworkBehaviour
 
     [Header("戻り先")]
     [Tooltip("試合が終わったあとに全員が戻るシーンの名前。**ビルドの一覧に入っていること**")]
-    [SerializeField] private string lobbySceneName = "SpaceJunkLobby";
+    [SerializeField] private string lobbySceneName = "Lobby";
 
     [Header("待ち時間")]
     [Tooltip("ラウンドの結果を見せてから、次のマップへ移るまでの秒数")]
