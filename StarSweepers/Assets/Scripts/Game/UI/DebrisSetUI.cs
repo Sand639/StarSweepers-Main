@@ -354,8 +354,8 @@ public sealed class DebrisSetUI : MonoBehaviour
         {
             float stop = LaneStopTime(n, state.size, spinSeconds, firstStopRatio);
 
-            // 減速の曲線（1 − (1 − t)³）の出だしの速さは「流れる数 × 3 ÷ 止まる時刻」なので、そこから流れる数を決める
-            int count = Mathf.Max(2, Mathf.RoundToInt(spinStartSpeed * stop / 3f));
+            // 減速の曲線（1 − (1 − t)²）の出だしの速さは「流れる数 × 2 ÷ 止まる時刻」なので、そこから流れる数を決める
+            int count = Mathf.Max(2, Mathf.RoundToInt(spinStartSpeed * stop / 2f));
             var reel = new int[count + 1];
             reel[count] = state.kinds[n];
 
@@ -453,8 +453,9 @@ public sealed class DebrisSetUI : MonoBehaviour
             return count;
         }
 
+        // 3乗だと最後の 1〜2 割は止まって見えるので、2乗にして止まる時刻まで動いて見えるようにした
         float rest = 1f - Mathf.Clamp01(elapsed / stopTime);
-        return count * (1f - rest * rest * rest);
+        return count * (1f - rest * rest);
     }
 
     /// <summary>
