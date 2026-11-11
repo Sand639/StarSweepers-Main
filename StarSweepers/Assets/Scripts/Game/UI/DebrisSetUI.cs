@@ -72,8 +72,11 @@ public sealed class DebrisSetUI : MonoBehaviour
     [Tooltip("入れた物資の画像にかける色。白ならそのまま、灰色に近いほど暗く灰色っぽくなる")]
     [SerializeField] private Color collectedTint = new Color(0.55f, 0.55f, 0.55f, 1f);
 
-    [Tooltip("オフなら 左＝青チーム・右＝赤チーム。オンなら左右を入れ替える（3・4チーム目の段も入れ替わる）")]
-    [SerializeField] private bool swapLeftRight;
+    [Tooltip("オンなら、チームのゴールが画面の左右どちらに見えるかで、枠を置く側を決める（カメラを切り替えても合わせる）")]
+    [SerializeField] private bool followGoalSide = true;
+
+    [Tooltip("ゴールで決められないとき（検証シーン、2つのゴールが同じくらいの横位置に見えるとき）の並び。オンなら 左＝赤チーム・右＝青チーム")]
+    [SerializeField] private bool swapLeftRight = true;
 
     [Header("スロットの演出")]
     [Tooltip("いちばん右のマスが止まるまでの秒数。スロットは、ちょうどこの秒数で全部止まる")]
@@ -149,6 +152,13 @@ public sealed class DebrisSetUI : MonoBehaviour
     private readonly int[] kindBuffer = new int[ItemKinds];
     private readonly System.Random random = new System.Random();
     private bool hasState;
+
+    // 段（上＝チーム0と1、下＝チーム2と3）ごとに、左右を入れ替えているか
+    private readonly bool[] rowSwapped = new bool[MaxTeams / 2];
+    private bool sidesDecided;
+
+    // 2つのゴールの横位置がこれ以上（画面の幅に対する割合）離れていないときは、左右を切り替えない（ちらつかないように）
+    private const float SideMargin = 0.1f;
 
     // テスト用のお題
     private readonly int[,] testKinds = new int[MaxTeams, MaxSlots];
@@ -226,6 +236,7 @@ public sealed class DebrisSetUI : MonoBehaviour
 
         SetVisible(true);
         hasState = true;
+        UpdateSides(SpaceJunkRound.Current != null);
 
         for (int panel = 0; panel < panels.Length; panel++)
         {
@@ -532,7 +543,72 @@ public sealed class DebrisSetUI : MonoBehaviour
     /// <summary>左上から何番目の枠に、どのチームを出すか。</summary>
     private int TeamOfPanel(int panel)
     {
-        return swapLeftRight ? panel ^ 1 : panel;
+        int row = panel / 2;
+        bool swapped = row < rowSwapped.Length ? rowSwapped[row] : swapLeftRight;
+        return swapped ? panel ^ 1 : panel;
+    }
+
+    /// <summary>段ごとに、2チームのゴールが画面のどちら側に見えるかで左右を決める。</summary>
+    private void UpdateSides(bool inRound)
+    {
+        for (int row = 0; row < rowSwapped.Length; row++)
+        {
+            int even = row * 2;
+            float evenX = 0f;
+            float oddX = 0f;
+            bool found = inRound && followGoalSide &&
+                         TryGoalScreenX(even, out evenX) && TryGoalScreenX(even + 1, out oddX);
+
+            rowSwapped[row] = found
+                ? DecideSwap(sidesDecided ? rowSwapped[row] : swapLeftRight, evenX, oddX)
+                : swapLeftRight;
+        }
+
+        sidesDecided = true;
+    }
+
+    /// <summary>
+    /// 番号の小さいチーム（青・緑）のゴールが右に見えれば入れ替える。横位置が近いときは current のまま。
+    /// </summary>
+    public static bool DecideSwap(bool current, float evenTeamX, float oddTeamX)
+    {
+        float dx = evenTeamX - oddTeamX;
+        return Mathf.Abs(dx) < SideMargin ? current : dx > 0f;
+    }
+
+    /// <summary>そのチームのゴールが、画面の横のどこに見えるか（0＝左端、1＝右端）。カメラの後ろのゴールは数えない。</summary>
+    private static bool TryGoalScreenX(int team, out float x)
+    {
+        x = 0f;
+        Camera view = Camera.main;
+        if (view == null)
+        {
+            return false;
+        }
+
+        int count = 0;
+        foreach (SpaceJunkGoal goal in SpaceJunkGoal.All)
+        {
+            if (goal == null || goal.OwnerTeam != team)
+            {
+                continue;
+            }
+
+            Vector3 point = view.WorldToViewportPoint(goal.transform.position);
+            if (point.z > 0f)
+            {
+                x += point.x;
+                count++;
+            }
+        }
+
+        if (count == 0)
+        {
+            return false;
+        }
+
+        x /= count;
+        return true;
     }
 
     /// <summary>出していたお題を忘れる（次にイベントが始まったら、またスロットから）。</summary>
@@ -544,6 +620,7 @@ public sealed class DebrisSetUI : MonoBehaviour
         }
 
         hasState = false;
+        sidesDecided = false;
         foreach (TeamState state in states)
         {
             state.Reset();

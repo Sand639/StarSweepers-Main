@@ -76,6 +76,18 @@ public class DebrisSetUITests
     }
 
     [Test]
+    public void Side_FollowsWhereTheGoalsAreSeen()
+    {
+        // 青チーム（0）のゴールが右、赤チーム（1）のゴールが左に見える → 入れ替える（左＝赤）
+        Assert.That(DebrisSetUI.DecideSwap(false, 0.8f, 0.2f), Is.True);
+        // 青チームのゴールが左 → 入れ替えない（左＝青）
+        Assert.That(DebrisSetUI.DecideSwap(true, 0.2f, 0.8f), Is.False);
+        // 2つのゴールが同じくらいの横位置 → 今のまま（ちらつかないように）
+        Assert.That(DebrisSetUI.DecideSwap(true, 0.52f, 0.48f), Is.True);
+        Assert.That(DebrisSetUI.DecideSwap(false, 0.52f, 0.48f), Is.False);
+    }
+
+    [Test]
     public void Prefab_IsInResourcesAndWired()
     {
         GameObject prefab = Resources.Load<GameObject>(DebrisSetUI.PrefabResourcePath);

@@ -21,6 +21,13 @@
    3. `MarkCollected` … マスごとに「入れたか」を決める（下）
    4. `DrawPanel` … 枠ごとに、マスを出し入れし、回っているマスは物資を流し、止まったマスはお題の物資とチェックを出す
 
+## 枠の左右（`UpdateSides`）
+
+- 枠は場所で決まっている（`Panel0`＝左上、`Panel1`＝右上、`Panel2`・`Panel3`＝その下の段）。どの枠にどのチームを出すかを、段ごとの `rowSwapped` で決める（`TeamOfPanel`。入れ替えなら `panel ^ 1`）
+- 毎フレーム、段の2チーム（0と1、2と3）のゴール（`SpaceJunkGoal.All` の `OwnerTeam`）を `Camera.main` の画面の横位置（0〜1）に直し、`DecideSwap` で決める。番号の小さいチームのゴールが右に見えれば入れ替える
+- 2つの横位置の差が `SideMargin`（画面の幅の 0.1）より小さいときは前のまま（チームカメラで2つのゴールが縦に並ぶときに、ちらつかないように）。イベントの始まりで近いときは Swap Left Right の並び
+- ラウンドが無いとき（検証シーン）・Follow Goal Side がオフ・ゴールやカメラが見つからないときは Swap Left Right の並び
+
 ## ほかのスクリプトとのつながり
 
 - `IsShowing`（static）… いまお題を出しているか。仮の画面 `SpaceJunkMatchUI` の `DrawEventProgress` がこれを見て、出ている間は「お題 1/3 → +10 ■□…」の文字の行を出さない（同じお題が2か所に出て、左の枠と重なるため）
@@ -50,13 +57,13 @@
 ```
 DebrisSetUI（Canvas：画面に重ねる・並び順 20、CanvasScaler：1920×1080 基準、DebrisSetUI）
 └ Content（表示ごと隠す）
-   ├ Panel0（左上・青チーム）  … Image（フレーム・9スライス）＋ Horizontal Layout Group ＋ Content Size Fitter
+   ├ Panel0（左上）  … Image（フレーム・9スライス）＋ Horizontal Layout Group ＋ Content Size Fitter
    │  ├ Slot0〜7（58×58）
    │  │  ├ Reel（RectMask2D）
    │  │  │  ├ Item（物資の画像）
    │  │  │  └ NextItem（スロット中だけ）
    │  │  └ Check（右下。切り抜かない）
-   ├ Panel1（右上・赤チーム）
+   ├ Panel1（右上）
    ├ Panel2（左の2段目）
    └ Panel3（右の2段目）
 ```
@@ -78,3 +85,4 @@ DebrisSetUI（Canvas：画面に重ねる・並び順 20、CanvasScaler：1920×
 | --- | --- | --- |
 | 2026/11/11 | Claude Code | 新規作成（大槻さんの依頼） |
 | 2026/11/11 | Claude Code | `IsShowing` と、仮の画面がそれを見てお題の文字の行を出さないことを書いた |
+| 2026/11/11 | Claude Code | 枠の左右をゴールの見え方で決める `UpdateSides`・`DecideSwap` を書いた |
