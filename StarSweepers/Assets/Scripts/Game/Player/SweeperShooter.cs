@@ -8,8 +8,8 @@ using UnityEngine.InputSystem;
 /// | --- | --- |
 /// | RT／左クリックを押す | 狙い始める。リングの縁から、届く長さの矢印の帯（<see cref="SweeperAimArea"/>）が出る |
 /// | 押している間 | 帯が最短から最長まで伸びていく（Charge Seconds で最長）。**歩ける**。体は狙う方向を向く |
-/// | 離す | 光線がその長さまで伸びる（<see cref="extendSpeed"/>）。**ここから投げ終わるまで歩けない** |
-/// | 光線が物資に当たる | 自動で巻き取りへ（<see cref="SweeperReel"/>）。巻き取り中に押すと後ろへ投げる（重い物は投げずに引きずるだけ） |
+/// | 離す | 光線がその長さまで伸びる（<see cref="extendSpeed"/>）。**伸びている・戻っている間は歩けない** |
+/// | 光線が物資に当たる | 自動で巻き取りへ（<see cref="SweeperReel"/>）。巻き取り中に押すと後ろへ投げる（重い物は投げずに引きずるだけ）。**巻き取り中はゆっくり歩ける**（<see cref="reelMoveScale"/>。2026/11/10） |
 /// | 何にも当たらない・壁に当たる | 光線が戻ってくる。戻りきったら歩ける |
 ///
 /// 光線の見た目は液体のビーム（<see cref="LiquidBeam"/>）。何もつかんでいない間は薄いチームの色、つかんだら濃くなる。
@@ -92,6 +92,15 @@ public class SweeperShooter : MonoBehaviour
     [Range(0f, 1f)]
     [SerializeField] private float idleWhiten = 0.45f;
 
+    [Header("巻き取り中の歩き（2026/11/10）")]
+    [Tooltip("巻き取り中に歩ける速さ（ふだんの速さに掛ける割合）。0 で今までどおり動けない、1 でふだんと同じ")]
+    [Range(0f, 1f)]
+    [SerializeField] private float reelMoveScale = 0.25f;
+
+    [Tooltip("重い物を引きずっている間に歩ける速さ（ふだんの速さに掛ける割合）。重い物に踏ん張っている感じを出すため、ふつうより遅くする")]
+    [Range(0f, 1f)]
+    [SerializeField] private float heavyReelMoveScale = 0.1f;
+
     [Header("巻き取り中のしなり（向きを変えたとき。2026/11/4）")]
     [Tooltip("光線の曲がる強さ（0 でしならない＝いつもまっすぐ、1 で手元から出る向きがちょうど『しなりの向き』になる）")]
     [Range(0f, 1.5f)]
@@ -137,7 +146,7 @@ public class SweeperShooter : MonoBehaviour
     /// <summary>押して狙っている最中か。</summary>
     public bool IsCharging => phase == ShotPhase.Charging;
 
-    /// <summary>光線が出ている（伸びている・戻っている・巻き取っている）か。この間は歩けない。</summary>
+    /// <summary>光線が出ている（伸びている・戻っている・巻き取っている）か。伸びている・戻っている間は歩けず、巻き取り中はゆっくり歩ける。</summary>
     public bool IsBeamOut => phase == ShotPhase.Extending || phase == ShotPhase.Retracting || phase == ShotPhase.Reeling;
 
     /// <summary>いま離したら、光線がどこまで伸びるか（プレイヤーの中心から m）。</summary>
@@ -181,6 +190,63 @@ public class SweeperShooter : MonoBehaviour
     {
         direction = YawToDirection(bendYaw);
         return bendActive;
+    }
+
+    /// <summary>
+    /// **巻き取り中の光線の形を、点の並びで返す**（手元 → 物資。しなっていれば、見た目と同じ曲線）。
+    /// <paramref name="points"/> の数だけ点を入れ、入れた数を返す（まっすぐなら 2）。巻き取っていなければ 0。
+    /// <see cref="SweeperReel"/> が「光線が動く物をつらぬいていないか」を調べるのに使う（2026/11/10）。
+    /// </summary>
+    public int GetBeamPath(Vector3[] points)
+    {
+        if (points == null || points.Length < 2 || phase != ShotPhase.Reeling)
+        {
+            return 0;
+        }
+
+        Vector3 hand = HandPosition;
+        Vector3 tip = BeamTip;
+        Vector3 toTip = tip - hand;
+        float length = toTip.magnitude;
+
+        if (!bendActive || bendStrength <= 0f || length < 0.001f)
+        {
+            points[0] = hand;
+            points[1] = tip;
+            return 2;
+        }
+
+        // LiquidBeam.Follow と同じ曲線（2次ベジェ）。真ん中の目印を、手元からしなりの向きへずらす
+        Vector3 direction = toTip / length;
+        float turn = Mathf.DeltaAngle(bendTipYaw, bendYaw);
+        Vector3 startDirection = (Quaternion.AngleAxis(turn, Vector3.up) * toTip).normalized;
+        Vector3 middle = hand + direction * (length * 0.5f) + (startDirection - direction) * (length * 0.5f * bendStrength);
+
+        int count = points.Length;
+        for (int i = 0; i < count; i++)
+        {
+            float t = i / (float)(count - 1);
+            float u = 1f - t;
+            points[i] = u * u * hand + 2f * u * t * middle + t * t * tip;
+        }
+
+        return count;
+    }
+
+    /// <summary>
+    /// **光線がちぎれた見た目を出す**（<see cref="SweeperReel"/> がちぎれたときに呼ぶ。オンラインのほかの人の体では、本人から知らせが来たとき）。
+    /// 光線は手元へ縮みながら消え、物資の縁取りははなす。
+    /// </summary>
+    public void PlaySnap()
+    {
+        beam?.Snap();
+        wrap?.Release();
+
+        // ほかの人の体：まだ「巻き取り中」が届いていても、光線を物資へ描き直さない
+        if (remotePhase == ShotPhase.Reeling)
+        {
+            remoteSnapped = true;
+        }
     }
 
     /// <summary>
@@ -301,9 +367,28 @@ public class SweeperShooter : MonoBehaviour
                 if (!reel.IsActive)
                 {
                     EndShot();
+                    break;
                 }
+                AllowSlowWalk();
                 break;
         }
+    }
+
+    /// <summary>
+    /// 巻き取り中は止めずに、ゆっくり歩けるようにする（2026/11/10）。
+    /// 物資はいつも「いまのプレイヤーの位置」へ引き寄せられるので（<see cref="SweeperReel"/>）、歩いても着く時間とクリティカルのタイミングは変わらない。
+    /// 体の向きは狙いのまま（<see cref="SweeperMover.FaceAim"/>）なので、歩いても光線はしならない。
+    /// </summary>
+    private void AllowSlowWalk()
+    {
+        if (mover == null)
+        {
+            return;
+        }
+
+        float scale = reel.IsHeavyDrag ? heavyReelMoveScale : reelMoveScale;
+        mover.MoveLocked = scale <= 0f;
+        mover.MoveSpeedScale = scale;
     }
 
     private void LateUpdate()
@@ -404,6 +489,9 @@ public class SweeperShooter : MonoBehaviour
     /// <summary>ほかの人の体で、最後に見せた段階。段階が変わった瞬間だけ色やアニメーションを切り替えるために持つ。</summary>
     private ShotPhase remotePhase = ShotPhase.Idle;
 
+    /// <summary>ほかの人の体で、巻き取り中に「ちぎれた」が届いたか。段階が変わるまで光線を描き直さない。</summary>
+    private bool remoteSnapped;
+
     /// <summary>
     /// **ほかの人の体に、本人から届いた光線の様子をそのまま見せる。**（<see cref="SweeperNetSync"/> が毎フレーム呼ぶ）
     /// ほかの人の体ではこの部品は止まっている（操作はしない）ので、見た目だけをここで出す。
@@ -416,6 +504,7 @@ public class SweeperShooter : MonoBehaviour
         {
             OnRemotePhaseChanged(remotePhase, newPhase);
             remotePhase = newPhase;
+            remoteSnapped = false;
         }
 
         if (newPhase == ShotPhase.Charging)
@@ -431,7 +520,7 @@ public class SweeperShooter : MonoBehaviour
         Vector3 shownTip = newPhase == ShotPhase.Reeling && item != null ? item.AnchorPoint : tip;
         UpdateBend(newPhase == ShotPhase.Reeling, shownTip, Time.deltaTime);
 
-        if (beam != null && newPhase != ShotPhase.Idle)
+        if (beam != null && newPhase != ShotPhase.Idle && !(remoteSnapped && newPhase == ShotPhase.Reeling))
         {
             FollowBeam(shownTip);
         }
@@ -442,8 +531,7 @@ public class SweeperShooter : MonoBehaviour
         switch (after)
         {
             case ShotPhase.Idle:
-                beam?.Stop();
-                beam?.SetColor(IdleColor);
+                StopBeam();
                 wrap?.Release();
                 aimArea?.Hide();
                 animationPlayer?.PlayIdle();
@@ -633,18 +721,29 @@ public class SweeperShooter : MonoBehaviour
         if (mover != null)
         {
             mover.MoveLocked = false;
+            mover.MoveSpeedScale = 1f;
             mover.FaceAim = false;
         }
 
-        if (beam != null)
-        {
-            beam.Stop();
-            beam.SetColor(IdleColor);
-        }
-
+        StopBeam();
         wrap?.Release();
         aimArea?.Hide();
         animationPlayer?.PlayIdle();
+    }
+
+    /// <summary>
+    /// 光線を消し始め、色を薄いチームの色へ戻す。**ちぎれて縮んでいる途中なら、そのまま縮ませる**
+    /// （色もチームの色のまま。次に撃つときに薄い色へ戻る）。
+    /// </summary>
+    private void StopBeam()
+    {
+        if (beam == null || beam.IsSnapping)
+        {
+            return;
+        }
+
+        beam.Stop();
+        beam.SetColor(IdleColor);
     }
 
     private LiquidBeam CreateBeam()

@@ -17,7 +17,7 @@ public static class ReactionWheelTestSetup
 {
     private const string PrefabPath = "Assets/Prefabs/UI/ReactionSystem.prefab";
     private const string ScenePath = "Assets/Scenes/Test/ReactionWheelTest.unity";
-    private const string LobbySceneName = "SpaceJunkLobby";
+    private const string LobbySceneName = "Lobby";
 
     /// <summary>プレハブを作る。**すでにあれば作り直さない**（手で調整した値や画像が消えないように）。</summary>
     [MenuItem("Tools/StarSweepers/リアクション/プレハブを作る（無ければ）")]

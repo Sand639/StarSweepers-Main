@@ -15,7 +15,7 @@ using UnityEngine.SceneManagement;
 ///
 /// ## できるもの
 ///
-///   ・`SpaceJunkLobby.unity`（2026/11/5 から `Assets/Scenes/MainLoop/`。ツールは名前で探す） … つないで待ち合わせる部屋。
+///   ・`Lobby.unity`（`Assets/Scenes/MainLoop/`。2026/11/11 までは `SpaceJunkLobby.unity`。ツールは名前で探す） … つないで待ち合わせる部屋。
 ///     **設定端末**が置いてあり、ホストだけが近づいて `E` で詳細設定を開ける
 ///   ・`SpaceJunkMap01〜03.unity`（**2026/11/5 に消した。** 今のマップは `Assets/Scenes/Stage/` の STAGE_〜）…
 ///     **釣りのマップをコピーして、中の部品を宇宙ごみ用に差し替えたもの**
@@ -43,7 +43,7 @@ using UnityEngine.SceneManagement;
 /// </summary>
 public static class SpaceJunkSetup
 {
-    public const string LobbySceneName = "SpaceJunkLobby";
+    public const string LobbySceneName = "Lobby";
     /// <summary>
     /// シーン全体の置き場所（2026/11/5 のフォルダ整理で `Assets/Scenes/Prototype/SpaceJunk` から変えた）。
     /// この中の `MainLoop`（タイトルとロビー）・`Stage`（STAGE_〜）・`HansStages` に分かれている。
