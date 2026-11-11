@@ -353,7 +353,7 @@
 - タイトルから入るロビーは、**`Assets/Scenes/MainLoop/Lobby.unity`**（Hans さんの3Dモデルで組んだ新しいロビー）。ビルドの一覧も入れ替えた
 - 名前は `TitleScreen.LobbySceneName`・`SpaceJunkSession` の Lobby Scene Name（プレハブ）・エディタの道具の `SpaceJunkSetup.LobbySceneName` で決めている。3つとも `Lobby`
 - **古い資料に出てくる `SpaceJunkLobby` は、今は使っていない前のロビー**（ファイルは残してある）。ロビーに物を足す・直すときは `Lobby.unity` のほう
-- `Documents/調査の道具/SVGからロビーを作る.cs.txt` は、**動かすたびに `SpaceJunkLobby` を写し直して並べ直す**。`Lobby.unity` を手で直し始めたら使わないこと
+- `Documents/調査の道具/SVGからロビーを作る.cs.txt` は、**もう使わない**（動かすたびに `SpaceJunkLobby` を写し直すので、大槻さんが手で調整したカメラ・ゴール・端末と、あとから足したコンベアの角が消える）。`Lobby.unity` を直すときは、**シーンを開いて、直す物だけを動かす**一時スクリプトを書くこと（2026/11/11 のコンベアの角はそうした。差分で、手の調整の行が消えていないかも確かめた）
 
 ### 📌 Kyo さんの隣で作業しているAIへ（2026/11/7・大槻さんからの伝言）
 
@@ -549,3 +549,4 @@
 | 2026/11/10 | Claude Code | 「失敗したこと・気をつけること」に、キャラの見た目に `material.color` を使わないこと（`_SuitColor`）を書いた |
 | 2026/11/10 | Claude Code | 「うまくいったやり方」に、画面全体を覆う演出（トランジション）を Unity を閉じたまま確かめる方法（フレームごとのログと、Overlay の画面を撮るときの切り替え）を書いた |
 | 2026/11/11 | Claude Code | 「次のAIへの伝言」に、ロビーのシーンが `Lobby` に変わったことを書いた |
+| 2026/11/11 | Claude Code | 「ロビーのシーンが Lobby に変わった」に、ロビーを作る道具はもう使わないこと・Lobby.unity の直し方を書き足した |

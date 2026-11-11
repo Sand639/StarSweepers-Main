@@ -587,7 +587,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 6700000000000000002, guid: d920db2ffe964e88b69cbdeaca13a7e0, type: 3}
       propertyPath: m_LocalScale.z
-      value: 0.3
+      value: 0.15
       objectReference: {fileID: 0}
     - target: {fileID: 6700000000000000002, guid: d920db2ffe964e88b69cbdeaca13a7e0, type: 3}
       propertyPath: m_LocalPosition.x
@@ -599,7 +599,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 6700000000000000002, guid: d920db2ffe964e88b69cbdeaca13a7e0, type: 3}
       propertyPath: m_LocalPosition.z
-      value: -1.25
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 6700000000000000002, guid: d920db2ffe964e88b69cbdeaca13a7e0, type: 3}
       propertyPath: m_LocalRotation.w
@@ -2220,6 +2220,57 @@ Transform:
   m_CorrespondingSourceObject: {fileID: -8679921383154817045, guid: aae8e7d0da77c8c49afad5ab60f51b55, type: 3}
   m_PrefabInstance: {fileID: 653261881}
   m_PrefabAsset: {fileID: 0}
+--- !u!1 &657512974
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 657512976}
+  - component: {fileID: 657512975}
+  m_Layer: 0
+  m_Name: ConveyorCorner_North
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &657512975
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 657512974}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: b03d56f8b622fb344a81a4928ab9efb0, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::SpaceJunkConveyorCorner
+  speed: 3
+  turnRight: 1
+  itemGrip: 4
+  carryHeight: 1.2
+  radius: 2.75
+  thickness: 0.19
+  minRadius: 0.5
+--- !u!4 &657512976
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 657512974}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0.7071068, z: 0, w: 0.7071068}
+  m_LocalPosition: {x: 7.5, y: 0.19, z: 1.5}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &684813940
 GameObject:
   m_ObjectHideFlags: 0
@@ -3858,6 +3909,57 @@ Transform:
   m_CorrespondingSourceObject: {fileID: -8679921383154817045, guid: ada9c080c1fce7e4d80be9d84ceea102, type: 3}
   m_PrefabInstance: {fileID: 1127819255}
   m_PrefabAsset: {fileID: 0}
+--- !u!1 &1141823237
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1141823239}
+  - component: {fileID: 1141823238}
+  m_Layer: 0
+  m_Name: ConveyorCorner_South
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &1141823238
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1141823237}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: b03d56f8b622fb344a81a4928ab9efb0, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::SpaceJunkConveyorCorner
+  speed: 3
+  turnRight: 1
+  itemGrip: 4
+  carryHeight: 1.2
+  radius: 2.75
+  thickness: 0.19
+  minRadius: 0.5
+--- !u!4 &1141823239
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1141823237}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 7.5, y: 0.19, z: -1.5}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1001 &1165619103
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -4767,11 +4869,11 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 6700000000000000002, guid: d920db2ffe964e88b69cbdeaca13a7e0, type: 3}
       propertyPath: m_LocalScale.z
-      value: 0.2875
+      value: 0.15
       objectReference: {fileID: 0}
     - target: {fileID: 6700000000000000002, guid: d920db2ffe964e88b69cbdeaca13a7e0, type: 3}
       propertyPath: m_LocalPosition.x
-      value: 7.625
+      value: 9
       objectReference: {fileID: 0}
     - target: {fileID: 6700000000000000002, guid: d920db2ffe964e88b69cbdeaca13a7e0, type: 3}
       propertyPath: m_LocalPosition.y
@@ -5643,11 +5745,11 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 6700000000000000002, guid: d920db2ffe964e88b69cbdeaca13a7e0, type: 3}
       propertyPath: m_LocalScale.z
-      value: 0.1625
+      value: 0.15
       objectReference: {fileID: 0}
     - target: {fileID: 6700000000000000002, guid: d920db2ffe964e88b69cbdeaca13a7e0, type: 3}
       propertyPath: m_LocalPosition.x
-      value: 8.875
+      value: 9
       objectReference: {fileID: 0}
     - target: {fileID: 6700000000000000002, guid: d920db2ffe964e88b69cbdeaca13a7e0, type: 3}
       propertyPath: m_LocalPosition.y
@@ -7482,3 +7584,5 @@ SceneRoots:
   - {fileID: 983248860}
   - {fileID: 1098338174}
   - {fileID: 1299617844}
+  - {fileID: 1141823239}
+  - {fileID: 657512976}

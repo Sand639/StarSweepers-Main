@@ -1,5 +1,9 @@
 // SVG（ロビー.svg）から、新しいロビー（Assets/Scenes/MainLoop/Lobby.unity）を作る道具（2026/11/11・Claude Code。大槻さんの依頼）
 //
+// ⛔ **もう使わないこと（記録として残している）。** 2026/11/11 から Lobby.unity は大槻さんが手で調整していて
+//    （カメラ・ゴールの位置・端末の当たり判定）、そのあとコンベアの角（SpaceJunkConveyorCorner）も足した。
+//    この道具は前のロビーを写し直すので、それが全部消える。角はこの道具では置かない。
+//
 // 使い方（Unity を閉じた状態で）：
 //   1. このファイルを Assets/Scripts/Common/UI/Editor/TempLobbyBuilder.cs として一時的に置く
 //   2. 下の SvgPath（SVG の置き場所）と OutDir（画像の書き出し先）を、自分のPCの場所に直す
