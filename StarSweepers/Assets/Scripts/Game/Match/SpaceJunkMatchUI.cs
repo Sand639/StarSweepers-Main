@@ -7,7 +7,7 @@ using UnityEngine;
 /// 出しているもの：
 ///
 ///   ・**いま何ラウンド目か**と、何本先取か
-///   ・**残り時間**（残り10秒を切ると赤くなる）
+///   ・**残り時間**（残り10秒を切ると赤くなる。チームの得点バー <see cref="TeamScoreBarUI"/> を置いたステージでは、バーの丸に任せて出さない）
 ///   ・得点制 … **チームごとの得点**と、**イベントの進み具合**（デブリセットなら、お題のデブリの印）
 ///   ・**イベントの始まる前のカウントダウンと、始まった合図**
 ///   ・3種類ルール … **チームごとに、どの素材をそろえたか**（3種類ぶんの印）
@@ -51,6 +51,12 @@ public class SpaceJunkMatchUI : MonoBehaviour
     /// <summary>真ん中に出す大きな文字（決着・復活まで・イベント発生）。</summary>
     private GUIStyle resultStyle;
 
+    // 見出し・イベントの一行・左のチームの行の高さ。チームの得点バーが出ているときはその下へずらす
+    private float titleY = 8f;
+    private float eventY = 70f;
+    private float listY = 96f;
+    private bool timerOnBar;
+
     private void OnGUI()
     {
         SpaceJunkRound round = SpaceJunkRound.Current;
@@ -72,6 +78,13 @@ public class SpaceJunkMatchUI : MonoBehaviour
         GUI.matrix = Matrix4x4.Scale(new Vector3(scale, scale, 1f));
 
         float viewWidth = Screen.width / scale;
+
+        // チームの得点バーが画面の上を使っていれば、その下から並べる（バーの高さも縮める前の大きさに直す）
+        float barBottom = TeamScoreBarUI.OccupiedScreenHeight / scale;
+        timerOnBar = barBottom > 0f;
+        titleY = timerOnBar ? barBottom + 4f : 8f;
+        eventY = timerOnBar ? barBottom + 28f : 70f;
+        listY = timerOnBar ? Mathf.Max(96f, barBottom + 56f) : 96f;
 
         DrawHeader(round, viewWidth);
         DrawTeamProgress(round, viewWidth);
@@ -144,7 +157,13 @@ public class SpaceJunkMatchUI : MonoBehaviour
             ? $"第 {session.CurrentRound} ラウンド　（{session.RoundsToWin} 本先取）"
             : "ラウンド中";
 
-        GUI.Label(new Rect(0f, 8f, viewWidth, 24f), title, titleStyle);
+        GUI.Label(new Rect(0f, titleY, viewWidth, 24f), title, titleStyle);
+
+        // 残り時間は、チームの得点バーの丸に出ているので、ここでは出さない
+        if (timerOnBar)
+        {
+            return;
+        }
 
         float remaining = round.RemainingSeconds;
         int minutes = Mathf.FloorToInt(remaining / 60f);
@@ -169,7 +188,7 @@ public class SpaceJunkMatchUI : MonoBehaviour
         int myTeam = MyTeam();
 
         // 上の見出し（ラウンド数 8〜32・残り時間 30〜70・イベントの一行 70〜94）の下から並べる
-        float y = 96f;
+        float y = listY;
 
         // 左から 12、幅 260・高さ 240 の枠の中に、上から順に並べる
         GUILayout.BeginArea(new Rect(12f, y, 260f, 240f));
@@ -331,7 +350,7 @@ public class SpaceJunkMatchUI : MonoBehaviour
 
         if (until > 0f && until <= 5f)
         {
-            GUI.Label(new Rect(0f, 70f, viewWidth, 24f), $"イベントまで {Mathf.CeilToInt(until)}", titleStyle);
+            GUI.Label(new Rect(0f, eventY, viewWidth, 24f), $"イベントまで {Mathf.CeilToInt(until)}", titleStyle);
             return;
         }
 
@@ -358,7 +377,7 @@ public class SpaceJunkMatchUI : MonoBehaviour
 
         if (!round.IsEventRunning)
         {
-            GUI.Label(new Rect(0f, 70f, viewWidth, 24f), $"イベント終了：{round.EventName}", titleStyle);
+            GUI.Label(new Rect(0f, eventY, viewWidth, 24f), $"イベント終了：{round.EventName}", titleStyle);
             return;
         }
 
@@ -383,7 +402,7 @@ public class SpaceJunkMatchUI : MonoBehaviour
             line += $"　特殊デブリ あと {round.HeavyRemaining} 個（{points}・引きずるだけ）";
         }
 
-        GUI.Label(new Rect(0f, 70f, viewWidth, 24f), line, titleStyle);
+        GUI.Label(new Rect(0f, eventY, viewWidth, 24f), line, titleStyle);
     }
 
     /// <summary>
