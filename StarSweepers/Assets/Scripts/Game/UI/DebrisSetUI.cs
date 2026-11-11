@@ -113,6 +113,9 @@ public sealed class DebrisSetUI : MonoBehaviour
     /// <summary>いま動いている係（ゲーム中は1つだけ）。</summary>
     public static DebrisSetUI Instance { get; private set; }
 
+    /// <summary>いま画面にお題を出しているか（SpaceJunkMatchUI が、同じお題の文字の行を出さないために見る）。</summary>
+    public static bool IsShowing => Instance != null && Instance.content != null && Instance.content.activeSelf;
+
     // チームごとの、画面に出しているお題とスロットの状態
     private sealed class TeamState
     {

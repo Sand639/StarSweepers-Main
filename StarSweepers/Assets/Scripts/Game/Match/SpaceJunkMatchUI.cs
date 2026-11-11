@@ -277,6 +277,12 @@ public class SpaceJunkMatchUI : MonoBehaviour
             return;
         }
 
+        // お題を画像で出す UI（DebrisSetUI）が出ている間は、この文字の行は出さない
+        if (DebrisSetUI.IsShowing)
+        {
+            return;
+        }
+
         GUILayout.BeginHorizontal();
         GUILayout.Space(16f);
 
