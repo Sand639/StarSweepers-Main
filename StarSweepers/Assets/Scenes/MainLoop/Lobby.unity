@@ -2062,7 +2062,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::SpaceJunkForceRespawnButton
   ShowTopMostFoldoutHeaderGroup: 1
   targetSpawner: {fileID: 1340935821}
-  interactRange: 3
+  interactRange: 2
   interactKey: 19
   interactButton: 6
   highlightRenderer: {fileID: 491621847}
@@ -2622,7 +2622,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 7f8c9da085178c24eb176154483f41c2, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::SpaceJunkLobbyTerminal
-  interactRange: 3
+  interactRange: 2
   interactKey: 19
   interactButton: 6
   highlightRenderer: {fileID: 974692458}
@@ -3945,7 +3945,7 @@ Transform:
   m_GameObject: {fileID: 1170681666}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: -6, y: 0, z: 0}
+  m_LocalPosition: {x: -9, y: 0, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children:
@@ -6708,7 +6708,7 @@ PrefabInstance:
     m_Modifications:
     - target: {fileID: -8679921383154817045, guid: 9ee28ece3d6ba1c4394fb6a974a1f752, type: 3}
       propertyPath: m_LocalPosition.x
-      value: -3
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: -8679921383154817045, guid: 9ee28ece3d6ba1c4394fb6a974a1f752, type: 3}
       propertyPath: m_LocalPosition.y
@@ -7123,7 +7123,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 688fb91ee37c0414abb3c721babf36d7, type: 3}
   m_Name: 
   m_EditorClassIdentifier: '::'
-  interactRange: 3
+  interactRange: 2
   interactKey: 19
   interactButton: 6
   highlightRenderer: {fileID: 0}
