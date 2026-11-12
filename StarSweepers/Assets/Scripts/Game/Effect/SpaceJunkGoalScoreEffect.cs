@@ -25,6 +25,9 @@ public class SpaceJunkGoalScoreEffect : MonoBehaviour
     [Tooltip("ゴールのふちから、光の壁までのすき間（m）")]
     [SerializeField] private float wallOutset = 0.12f;
 
+    [Tooltip("光の壁の上の端が、外へ開く距離（m）。上から見下ろすカメラでも光の帯が見えるように")]
+    [SerializeField] private float wallFlare = 0.8f;
+
     [Tooltip("光の壁がのびきるまでの秒数")]
     [SerializeField] private float wallRiseSeconds = 0.2f;
 
@@ -206,7 +209,7 @@ public class SpaceJunkGoalScoreEffect : MonoBehaviour
 
     /// <summary>
     /// 囲む四角の4辺のすぐ外の、動かない床の上面のいちばん高い所。見つからなければ fallback のまま。
-    /// 物資（動く Rigidbody）とプレイヤー（CharacterController）は床に数えない。
+    /// 物資（HookableObject。参加者のPCでは Kinematic になる）・動く Rigidbody・プレイヤー（CharacterController）は床に数えない。
     /// </summary>
     private static float FloorHeightAround(Vector3 center, Quaternion yaw, Vector2 size, float fallback)
     {
@@ -220,7 +223,8 @@ public class SpaceJunkGoalScoreEffect : MonoBehaviour
             for (int i = 0; i < count; i++)
             {
                 Collider hit = floorHits[i].collider;
-                if (hit is CharacterController || (hit.attachedRigidbody != null && !hit.attachedRigidbody.isKinematic))
+                if (hit is CharacterController || (hit.attachedRigidbody != null && !hit.attachedRigidbody.isKinematic) ||
+                    hit.GetComponentInParent<HookableObject>() != null)
                 {
                     continue;
                 }
@@ -329,6 +333,7 @@ public class SpaceJunkGoalScoreEffect : MonoBehaviour
         block.SetFloat(PartId, 0f);
         block.SetFloat(IntensityId, intensity);
         block.SetVector(SizeId, new Vector4(burst.Size.x, burst.Size.y, ringSpread, 0f));
+        block.SetVector(SparkId, new Vector4(sparkRise, sparkSize, sparkSpread, wallFlare * rise));
         Graphics.RenderMesh(renderParams, wallMesh, 0, Matrix4x4.TRS(burst.Base, burst.Yaw, new Vector3(burst.Size.x, height, burst.Size.y)));
 
         // 光の輪：ふちから外へ広がりながら薄くなる（床とちらつかないよう少し浮かせる）
@@ -344,7 +349,7 @@ public class SpaceJunkGoalScoreEffect : MonoBehaviour
         {
             block.SetFloat(PartId, 2f);
             block.SetFloat(IntensityId, brightness * flash * fade);
-            block.SetVector(SparkId, new Vector4(sparkRise, sparkSize, sparkSpread, 0f));
+            block.SetVector(SparkId, new Vector4(sparkRise, sparkSize, sparkSpread, wallFlare));
             Graphics.RenderMesh(renderParams, sparkMesh, 0, Matrix4x4.TRS(burst.Base, burst.Yaw, new Vector3(burst.Size.x, 1f, burst.Size.y)));
         }
     }

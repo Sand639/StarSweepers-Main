@@ -26,7 +26,7 @@ Material:
     m_Ints: []
     m_Floats:
     - _Cover: 0.55
-    - _EdgeGlow: 0.8
+    - _EdgeGlow: 1
     - _Intensity: 1
     - _Part: 0
     - _Progress: 0.3

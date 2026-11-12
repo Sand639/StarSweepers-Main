@@ -1,6 +1,6 @@
 // ゴールに得点が入ったときの光（SpaceJunkGoalScoreEffect）。説明は Documents/機能ドキュメント/ゴールの得点の演出.md
 // 1つのシェーダーで3つの部品を描く。どれを描くかは、スクリプトが MaterialPropertyBlock の _Part で渡す。
-//   0 = 光の壁 … ゴールのまわりを囲む四角い筒。下ほど明るく、上へ向かって消える。縦の筋が上へ流れる
+//   0 = 光の壁 … ゴールのまわりを囲む四角い筒（上ほど外へ開く）。下ほど明るく、上へ向かって消える。縦の筋が上へ流れる
 //   1 = 光の輪 … ゴールの床の高さで、ゴールのふちから外へ広がる四角い輪（角は広がるほど丸くなる）
 //   2 = 光の粒 … ゴールのふちから立ちのぼる小さな光の粒（カメラのほうを向く板）
 // 色はチームの色（_Color）。光る分を足しつつ、下の床を少し暗くする重ね方（Blend One OneMinusSrcAlpha）なので、明るい床の上でもチームの色が白に飛びにくい。
@@ -13,11 +13,11 @@ Shader "StarSweepers/GoalScoreGlow"
         _Progress ("Progress (進み具合 0-1。スクリプトが入れる)", Range(0, 1)) = 0.3
         _Part ("Part (0=壁 1=輪 2=粒。スクリプトが入れる)", Float) = 0
         _Size ("Size (x,y=ゴールの幅と奥行き m、z=輪の広がり m、w=輪の半径 m。スクリプトが入れる)", Vector) = (4, 4, 2, 1)
-        _Spark ("Spark (x=のぼる高さ m、y=粒の大きさ m、z=外へ広がる距離 m。スクリプトが入れる)", Vector) = (3, 0.12, 0.6, 0)
+        _Spark ("Spark (x=のぼる高さ m、y=粒の大きさ m、z=外へ広がる距離 m、w=壁の上の端が外へ開く距離 m。スクリプトが入れる)", Vector) = (3, 0.12, 0.6, 0.8)
         _WhiteCore ("White Core (光のいちばん明るい所を白に寄せる量)", Range(0, 1)) = 0.3
         _Streaks ("Streaks (壁の縦の筋の濃さ)", Range(0, 1)) = 0.6
         _RingWidth ("Ring Width (輪の太さ m)", Range(0.05, 1.5)) = 0.45
-        _EdgeGlow ("Edge Glow (ゴールのふちの外側の床のにじみ)", Range(0, 2)) = 0.8
+        _EdgeGlow ("Edge Glow (ゴールのふちの外側の床のにじみ)", Range(0, 2)) = 1
         _Cover ("Cover (光の下の床を暗くする強さ。大きいほどチームの色がはっきりする)", Range(0, 1)) = 0.55
     }
 
@@ -102,7 +102,14 @@ Shader "StarSweepers/GoalScoreGlow"
                     return output;
                 }
 
-                output.positionHCS = TransformObjectToHClip(input.positionOS.xyz);
+                float3 positionOS = input.positionOS.xyz;
+                if (_Part < 0.5)
+                {
+                    // 壁は上ほど外へ開く（上から見下ろすカメラでも、光の帯として見えるように）
+                    positionOS.xz += sign(positionOS.xz) * (_Spark.w / max(_Size.xy, 0.01)) * input.uv.y;
+                }
+
+                output.positionHCS = TransformObjectToHClip(positionOS);
                 if (_Part > 0.5)
                 {
                     // 輪の板は、ゴールの幅＋広がりの2倍の大きさ。真ん中からの位置を m で渡す
