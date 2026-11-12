@@ -11,6 +11,7 @@
 //   - 見た目・配置はそのまま。足すのは、当たり判定・ゴール・素材の出る範囲と、STAGE_Train から移し入れる試合の部品だけ
 //   - STAGE_Train は「裏で開いて、部品をこちらへ移し、保存せずに閉じる」ので、ファイルは変わらない
 //   - 実行するたびに STAGE_Train2 を作り直す（手で直した分は消える）
+//   - 最後にステージ全体を Y 軸で 90 度回して横向き（ゴールが東と西）にする（2026/11/12・大槻さんの依頼。Hans さんのシーンは北と南）
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -206,9 +207,47 @@ public static class TempTrain2Builder
         cam.SetPositionAndRotation(new Vector3(0f, 16f, -17f), Quaternion.Euler(60f, 0f, 0f));
         PrefabUtility.RecordPrefabInstancePropertyModifications(cam);
 
+        RotateHorizontal(scene);
+
         EditorSceneManager.MarkSceneDirty(scene);
         EditorSceneManager.SaveScene(scene);
         report.AppendLine("保存: " + DestScene);
+    }
+
+    /// <summary>ステージ全体を真ん中を中心に90度回して横向きにする（試合の部品・光・試合のカメラは回さない）。北→東、南→西。</summary>
+    static void RotateHorizontal(Scene scene)
+    {
+        Quaternion r = Quaternion.Euler(0f, 90f, 0f);
+        foreach (GameObject root in scene.GetRootGameObjects())
+        {
+            if (root.name == "System" || root.name == "TeamScoreBarUI" || root.name == "Directional Light" ||
+                root.GetComponent<SpaceJunkCameraModeSwitch>() != null)
+            {
+                continue;
+            }
+
+            Transform t = root.transform;
+            t.SetPositionAndRotation(r * t.position, r * t.rotation);
+            if (PrefabUtility.IsPartOfPrefabInstance(root))
+            {
+                PrefabUtility.RecordPrefabInstancePropertyModifications(t);
+            }
+        }
+
+        foreach (GameObject root in scene.GetRootGameObjects())
+        {
+            foreach (Transform t in root.GetComponentsInChildren<Transform>(true))
+            {
+                if (t.name == "GoalArea_North") t.name = "GoalArea_East";
+                else if (t.name == "GoalArea_South") t.name = "GoalArea_West";
+                else if (t.name.StartsWith("SpawnZone_")) t.name = t.name.Replace("_North_", "_East_").Replace("_South_", "_West_");
+            }
+        }
+
+        SerializedObject so = new SerializedObject(UnityEngine.Object.FindFirstObjectByType<SpaceJunkSpawner>());
+        so.FindProperty("areaHalfSize").vector2Value = new Vector2(10.5f, 6f);
+        so.ApplyModifiedPropertiesWithoutUndo();
+        report.AppendLine("90度回して横向きにした（ゴール：東 0・西 1）");
     }
 
     static void SetupGoal(Transform parent, GameObject goal, string name, int index, GameObject transporter)
