@@ -7,9 +7,9 @@ using UnityEngine;
 /// ・光線を撃った瞬間に <c>A_SHOOT</c> を流し、**終わったら <c>A_AIM_01</c> に戻る**
 /// ・投げ終わったら Idle State（空なら何もしない。Animator の流れに任せる）
 ///
-/// **キャラクターのモデルとアニメーションはまだ無い**（いまはカプセル）。
+/// ・歩く速さを Animator の Speed に渡す（AC_SweeperPlayer が Idle と Walk を切り替える。2026/11/12）
+///
 /// Animator が無い・その名前の状態が無いときは、何もしない（エラーにもしない）。
-/// モデルが入ったら、体の子にモデルを置いて Animator を付け、状態の名前をここの欄に合わせればよい。
 /// </summary>
 public class SweeperAnimation : MonoBehaviour
 {
@@ -33,7 +33,15 @@ public class SweeperAnimation : MonoBehaviour
     [Min(0f)]
     [SerializeField] private float crossFade = 0.05f;
 
+    [Tooltip("ほかの人の体の速さを、どれだけ早く実際の動きに合わせるか（大きいほど早い）")]
+    [Min(0.1f)]
+    [SerializeField] private float remoteSmoothing = 10f;
+
     private SweeperMover mover;
+    private CharacterController characterController;
+    private Unity.Netcode.NetworkObject network;
+    private Vector3 lastPosition;
+    private float remoteSpeed;
 
     /// <summary>A_SHOOT を流していて、終わったら A_AIM_01 に戻す待ちか。</summary>
     private bool waitingShootEnd;
@@ -50,6 +58,9 @@ public class SweeperAnimation : MonoBehaviour
         }
 
         mover = GetComponent<SweeperMover>();
+        characterController = GetComponent<CharacterController>();
+        network = GetComponent<Unity.Netcode.NetworkObject>();
+        lastPosition = transform.position;
         shootHash = Animator.StringToHash(shootState);
 
         if (animator != null && !string.IsNullOrEmpty(speedParameter))
@@ -94,7 +105,7 @@ public class SweeperAnimation : MonoBehaviour
 
         if (hasSpeed && mover != null)
         {
-            animator.SetFloat(speedHash, mover.CurrentSpeed);
+            animator.SetFloat(speedHash, ReadSpeed());
         }
 
         if (!waitingShootEnd || animator.IsInTransition(0))
@@ -108,6 +119,31 @@ public class SweeperAnimation : MonoBehaviour
             waitingShootEnd = false;
             Play(aimState);
         }
+    }
+
+    /// <summary>
+    /// 歩く速さ。自分で動かしている体は SweeperMover の速さ、
+    /// ほかの人の体（通信で位置だけ届く）は、横に動いた距離から求める。
+    /// </summary>
+    private float ReadSpeed()
+    {
+        if (network != null && network.IsSpawned && !network.IsOwner)
+        {
+            Vector3 position = transform.position;
+            Vector3 moved = position - lastPosition;
+            lastPosition = position;
+            moved.y = 0f;
+
+            float dt = Time.deltaTime;
+            float raw = dt > 0f ? moved.magnitude / dt : 0f;
+            // 届く位置はがたつくので、なめらかにする
+            remoteSpeed = Mathf.Lerp(remoteSpeed, raw, 1f - Mathf.Exp(-remoteSmoothing * dt));
+            return remoteSpeed;
+        }
+
+        lastPosition = transform.position;
+        // 当たり判定が切られている間（運ばれている間など）は、SweeperMover が速さを更新しないので 0
+        return characterController != null && !characterController.enabled ? 0f : mover.CurrentSpeed;
     }
 
     /// <summary>その名前の状態があれば切り替える。切り替えたら true。</summary>
