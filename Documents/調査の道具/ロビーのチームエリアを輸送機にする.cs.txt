@@ -1,0 +1,209 @@
+using System.IO;
+using System.Linq;
+using UnityEditor;
+using UnityEditor.SceneManagement;
+using UnityEngine;
+
+// 一時的な道具（コミットしない）。ロビーのチームエリアの見た目を SM_Transporter に差し替える・撮って確かめる。
+public static class TempLobbyPadTool
+{
+    const string LobbyPath = "Assets/Scenes/MainLoop/Lobby.unity";
+    const string TransporterPath = "Assets/Art/Models/SM_Transporter.fbx";
+
+    static string Arg(string name, string def)
+    {
+        string[] a = System.Environment.GetCommandLineArgs();
+        int i = System.Array.IndexOf(a, name);
+        return i >= 0 && i + 1 < a.Length ? a[i + 1] : def;
+    }
+
+    static string OutDir => Arg("-padOut", "C:/Temp");
+
+    public static void Reimport()
+    {
+        AssetDatabase.ImportAsset("Assets/Scripts", ImportAssetOptions.ImportRecursive | ImportAssetOptions.ForceUpdate);
+        Debug.Log("[PAD] reimport done");
+    }
+
+    // モデルの大きさ・マテリアル、ロビーのチームエリアのまわりを書き出し、モデル単体を撮る
+    public static void Inspect()
+    {
+        GameObject model = AssetDatabase.LoadAssetAtPath<GameObject>(TransporterPath);
+        foreach (MeshFilter mf in model.GetComponentsInChildren<MeshFilter>(true))
+        {
+            Debug.Log($"[PAD] mesh '{mf.name}' bounds center={mf.sharedMesh.bounds.center:F3} size={mf.sharedMesh.bounds.size:F3} local={mf.transform.localPosition:F3} rot={mf.transform.localEulerAngles:F1} scale={mf.transform.localScale:F3}");
+        }
+        foreach (Renderer r in model.GetComponentsInChildren<Renderer>(true))
+        {
+            Debug.Log($"[PAD] renderer '{r.name}' mats={string.Join(",", r.sharedMaterials.Select(m => m ? m.name + "/" + m.shader.name : "null"))}");
+        }
+
+        EditorSceneManager.OpenScene(LobbyPath);
+        foreach (LobbyTeamZone zone in Object.FindObjectsByType<LobbyTeamZone>(FindObjectsSortMode.None))
+        {
+            Transform t = zone.transform;
+            BoxCollider box = zone.GetComponent<BoxCollider>();
+            Debug.Log($"[PAD] zone '{zone.name}' pos={t.position:F3} rot={t.eulerAngles:F1} scale={t.localScale:F3} box={box.size:F3}/{box.center:F3} trigger bounds={box.bounds.center:F3} {box.bounds.size:F3}");
+            Bounds area = new Bounds(t.position, new Vector3(3.2f, 2f, 3.2f));
+            foreach (Renderer r in Object.FindObjectsByType<Renderer>(FindObjectsSortMode.None))
+            {
+                if (r.bounds.Intersects(area))
+                {
+                    Debug.Log($"[PAD]   near '{r.name}' parent='{(r.transform.parent ? r.transform.parent.name : "-")}' bounds={r.bounds.center:F3} {r.bounds.size:F3}");
+                }
+            }
+        }
+        foreach (Collider c in Object.FindObjectsByType<Collider>(FindObjectsSortMode.None))
+        {
+            if (c.name.Contains("Platform") && Vector3.Distance(c.bounds.center, new Vector3(-3, 0, 6)) < 2.5f)
+            {
+                Debug.Log($"[PAD] platform collider '{c.name}' {c.GetType().Name} bounds={c.bounds.center:F3} {c.bounds.size:F3}");
+            }
+        }
+
+        // モデル単体を撮る（北＝+Z に赤い印、東＝+X に青い印）
+        EditorSceneManager.NewScene(NewSceneSetup.DefaultGameObjects);
+        GameObject pad = (GameObject)PrefabUtility.InstantiatePrefab(model);
+        pad.transform.position = Vector3.zero;
+        Marker(new Vector3(0, 0.3f, 2.2f), Color.red);
+        Marker(new Vector3(2.2f, 0.3f, 0), Color.blue);
+        Shot(new Vector3(0, 7, 0.01f), Vector3.zero, "model_top.png");
+        Shot(new Vector3(0, 3, -5), new Vector3(0, 0.3f, 0), "model_from_south.png");
+        Shot(new Vector3(0, 3, 5), new Vector3(0, 0.3f, 0), "model_from_north.png");
+        Shot(new Vector3(5, 3, 0), new Vector3(0, 0.3f, 0), "model_from_east.png");
+        Debug.Log("[PAD] inspect done");
+    }
+
+    static void Marker(Vector3 pos, Color color)
+    {
+        GameObject cube = GameObject.CreatePrimitive(PrimitiveType.Cube);
+        cube.transform.position = pos;
+        cube.transform.localScale = Vector3.one * 0.3f;
+        Material m = new Material(Shader.Find("Universal Render Pipeline/Unlit"));
+        m.color = color;
+        cube.GetComponent<Renderer>().sharedMaterial = m;
+    }
+
+    // ロビーのチームエリアを差し替える（シーンを保存する）
+    public static void Apply()
+    {
+        var scene = EditorSceneManager.OpenScene(LobbyPath);
+        GameObject model = AssetDatabase.LoadAssetAtPath<GameObject>(TransporterPath);
+        float yaw = float.Parse(Arg("-padYaw", "180"), System.Globalization.CultureInfo.InvariantCulture);
+
+        foreach (LobbyTeamZone zone in Object.FindObjectsByType<LobbyTeamZone>(FindObjectsSortMode.None))
+        {
+            Transform t = zone.transform;
+
+            // 下の床のマスを外す（練習用ゴールのマスと同じく、輸送機が床の代わりになる。残すと凹んだ円を床が覆う）
+            GameObject floors = GameObject.Find("Floors");
+            foreach (Transform tile in floors.transform.Cast<Transform>().ToArray())
+            {
+                Vector3 d = tile.position - t.position;
+                if (tile.name.StartsWith("Floor_") && Mathf.Abs(d.x) < 0.1f && Mathf.Abs(d.z) < 0.1f)
+                {
+                    Debug.Log($"[PAD] remove floor tile '{tile.name}' at {tile.position:F3}");
+                    Object.DestroyImmediate(tile.gameObject);
+                }
+            }
+
+            // 板（Plane）の見た目と、板の当たり判定を外す
+            Object.DestroyImmediate(zone.GetComponent<MeshCollider>());
+            Object.DestroyImmediate(zone.GetComponent<MeshRenderer>());
+            Object.DestroyImmediate(zone.GetComponent<MeshFilter>());
+
+            // 大きさを 1 に戻し、判定の箱は世界での大きさが変わらないように直す（3m×4m×3m）
+            BoxCollider box = zone.GetComponent<BoxCollider>();
+            Vector3 s = t.localScale;
+            box.size = Round(Vector3.Scale(box.size, s));
+            box.center = Round(Vector3.Scale(box.center, s));
+            t.localScale = Vector3.one;
+
+            // 輸送機を子に置く（ロビーの練習用ゴール・ガラスマップと同じ高さと当たり判定）
+            GameObject pad = (GameObject)PrefabUtility.InstantiatePrefab(model, scene);
+            pad.name = "SM_Transporter";
+            pad.transform.SetParent(t, false);
+            pad.transform.position = new Vector3(t.position.x, -0.25f, t.position.z);
+            pad.transform.rotation = Quaternion.Euler(0, yaw, 0);
+
+            BoxCollider floor = pad.AddComponent<BoxCollider>();
+            floor.size = new Vector3(3f, 0.29f, 3f);
+            floor.center = new Vector3(0f, 0.145f, 0f);
+            MeshCollider meshCollider = pad.AddComponent<MeshCollider>();
+            meshCollider.sharedMesh = pad.GetComponent<MeshFilter>().sharedMesh;
+
+            SerializedObject so = new SerializedObject(zone);
+            so.FindProperty("padRenderer").objectReferenceValue = pad.GetComponent<MeshRenderer>();
+            so.ApplyModifiedPropertiesWithoutUndo();
+
+            Debug.Log($"[PAD] applied '{zone.name}' box={box.size:F3}/{box.center:F3} pad pos={pad.transform.position:F3} rot={pad.transform.eulerAngles:F1}");
+        }
+
+        EditorSceneManager.MarkSceneDirty(scene);
+        EditorSceneManager.SaveScene(scene);
+        Debug.Log("[PAD] apply done");
+    }
+
+    static Vector3 Round(Vector3 v)
+    {
+        return new Vector3(Mathf.Round(v.x * 1000f) / 1000f, Mathf.Round(v.y * 1000f) / 1000f, Mathf.Round(v.z * 1000f) / 1000f);
+    }
+
+    // ロビー（チームエリア）と試合のゴールを、色を付けた状態で撮る
+    public static void Capture()
+    {
+        EditorSceneManager.OpenScene(LobbyPath);
+        foreach (LobbyTeamZone zone in Object.FindObjectsByType<LobbyTeamZone>(FindObjectsSortMode.None))
+        {
+            typeof(LobbyTeamZone).GetMethod("Start", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)?.Invoke(zone, null);
+            Renderer r = zone.GetComponentInChildren<Renderer>();
+            Debug.Log($"[PAD] lobby zone '{zone.name}' renderer='{(r ? r.name : "none")}' color={(r ? r.sharedMaterial.color.ToString("F2") : "-")} mat={(r ? r.sharedMaterial.name : "-")}");
+        }
+        Shot(new Vector3(0, 7, -2), new Vector3(0, 0, 5.5f), "lobby_pads.png");
+        Shot(new Vector3(0, 3.5f, 1.5f), new Vector3(0, 0, 6f), "lobby_pads_close.png");
+        Shot(new Vector3(0, 22, -12), new Vector3(0, 0, 1), "lobby_overview.png");
+
+        string stage = Arg("-padStage", "Assets/Scenes/Stage/STAGE_GlassChecker.unity");
+        EditorSceneManager.OpenScene(stage);
+        SpaceJunkGoal[] goals = Object.FindObjectsByType<SpaceJunkGoal>(FindObjectsSortMode.None).OrderBy(g => g.GoalIndex).ToArray();
+        for (int i = 0; i < goals.Length; i++)
+        {
+            int team = i % 2;
+            goals[i].ApplyOwnerTeam(team);
+            if (goals[i].TryGetIntroVisualBounds(out Bounds b))
+            {
+                Vector3 c = b.center;
+                Shot(c + new Vector3(0, 4.5f, -4.5f), c, $"stage_goal_{goals[i].GoalIndex}_team{team}.png");
+                Debug.Log($"[PAD] stage goal {goals[i].GoalIndex} team={team} color={SpaceJunkTeams.TeamColor(team):F2} bounds={b.center:F2}");
+            }
+        }
+        Debug.Log("[PAD] capture done");
+    }
+
+    static void Shot(Vector3 from, Vector3 to, string file)
+    {
+        GameObject camGo = new GameObject("TempShotCamera");
+        Camera cam = camGo.AddComponent<Camera>();
+        cam.transform.position = from;
+        cam.transform.LookAt(to);
+        cam.fieldOfView = 50f;
+        cam.nearClipPlane = 0.05f;
+        cam.farClipPlane = 500f;
+        cam.clearFlags = CameraClearFlags.SolidColor;
+        cam.backgroundColor = new Color(0.12f, 0.12f, 0.16f);
+
+        RenderTexture rt = new RenderTexture(1280, 720, 24);
+        cam.targetTexture = rt;
+        cam.Render();
+        RenderTexture.active = rt;
+        Texture2D tex = new Texture2D(1280, 720, TextureFormat.RGB24, false);
+        tex.ReadPixels(new Rect(0, 0, 1280, 720), 0, 0);
+        tex.Apply();
+        Directory.CreateDirectory(OutDir);
+        File.WriteAllBytes(Path.Combine(OutDir, file), tex.EncodeToPNG());
+        RenderTexture.active = null;
+        cam.targetTexture = null;
+        Object.DestroyImmediate(rt);
+        Object.DestroyImmediate(camGo);
+    }
+}
