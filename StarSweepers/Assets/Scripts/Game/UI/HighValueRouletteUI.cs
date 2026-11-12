@@ -76,6 +76,13 @@ public sealed class HighValueRouletteUI : MonoBehaviour
     /// <summary>いま画面にルーレットを出しているか（しまう途中も含む）。</summary>
     public static bool IsShowing => Instance != null && Instance.content != null && Instance.content.activeSelf;
 
+    /// <summary>ルーレットが回っている（種類がまだ決まっていない）か。SpaceJunkMatchUI が、合図の文字で種類を先に出さないために見る。</summary>
+    public static bool IsSpinning => Instance != null && Instance.shown && Instance.wasRunning &&
+                                     Instance.lastTime - Instance.spinStart < Instance.spinSeconds;
+
+    /// <summary>画面の上から、下りきったルーレットの下の端までのピクセル数。出していなければ 0（SpaceJunkMatchUI が見る）。</summary>
+    public static float OccupiedScreenHeight { get; private set; }
+
     // レールに並ぶ物資（左右の Pad 個を含む。reel[reelCount + Pad] が決まる物資）
     private int[] reel;
     private int reelCount;
@@ -93,6 +100,7 @@ public sealed class HighValueRouletteUI : MonoBehaviour
     // 出ているときの位置と、しまうときに上へ動かす量
     private Vector2 shownPosition;
     private float hideOffset;
+    private static readonly Vector3[] Corners = new Vector3[4];
 
     // テスト用
     private bool testStarted;
@@ -153,6 +161,7 @@ public sealed class HighValueRouletteUI : MonoBehaviour
         if (Instance == this)
         {
             Instance = null;
+            OccupiedScreenHeight = 0f;
         }
     }
 
@@ -190,6 +199,10 @@ public sealed class HighValueRouletteUI : MonoBehaviour
         if (shown)
         {
             Draw(now);
+        }
+        else
+        {
+            OccupiedScreenHeight = 0f;
         }
     }
 
@@ -265,7 +278,9 @@ public sealed class HighValueRouletteUI : MonoBehaviour
         if (wheel != null)
         {
             float eased = 1f - (1f - reveal) * (1f - reveal);
-            wheel.anchoredPosition = shownPosition + new Vector2(0f, hideOffset * (1f - eased));
+            float slide = hideOffset * (1f - eased);
+            wheel.anchoredPosition = shownPosition + new Vector2(0f, slide);
+            OccupiedScreenHeight = MeasureOccupiedHeight(slide);
         }
 
         float elapsed = now - spinStart;
@@ -303,6 +318,16 @@ public sealed class HighValueRouletteUI : MonoBehaviour
             float scale = index == reelCount ? 1f + (PopScale - 1f) * pop : 1f;
             image.rectTransform.localScale = new Vector3(scale, scale, 1f);
         }
+    }
+
+    /// <summary>画面の上から、下りきったときのルーレットの下の端までのピクセル数（下りてくる途中でも同じ値にする）。</summary>
+    private float MeasureOccupiedHeight(float slide)
+    {
+        wheel.GetWorldCorners(Corners);
+
+        // 画面に重ねる UI なので、角の位置はそのまま画面のピクセル（下が 0）。いま上へずらしているぶんを戻して測る
+        float slideOnScreen = wheel.parent != null ? wheel.parent.TransformVector(new Vector3(0f, slide, 0f)).y : slide;
+        return Mathf.Max(0f, Screen.height - (Corners[0].y - slideOnScreen));
     }
 
     /// <summary>決まるまでに真下を通る物資の数（減速の曲線の出だしの速さが spinStartSpeed になる数）。</summary>
