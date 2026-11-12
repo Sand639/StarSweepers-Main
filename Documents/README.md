@@ -4,7 +4,7 @@
 | --- | --- |
 | 製作者 | 大槻 海斗 |
 | 作成日 | 2026年8月28日（金） |
-| 最終更新日 | 2026年11月11日（水）　変更者：Claude Code |
+| 最終更新日 | 2026年11月12日（木）　変更者：Claude Code |
 | リポジトリ | https://github.com/Sand639/StarSweepers-Main （本制作用）　旧：https://github.com/Sand639/StarSweepers （保管用） |
 
 > ⚠️ **2026/11/4 に、本制作（宇宙ごみ集め）に必要な物だけを集めた、このリポジトリに移りました。**
@@ -257,7 +257,7 @@ StarSweepers-Main/                     ← リポジトリのルート
     │       ├── MainLoop/             タイトルとロビー（TitleScene・Lobby。2026/11/11 から Lobby。前のロビー SpaceJunkLobby は使っていない）
     │       ├── Stage/            ステージ（`STAGE_Simple`・`STAGE_Train` など。名前の付け方と一覧は `宇宙ごみのマップの作り方.md`）
     │       ├── HansStages/       Hansさんのステージ
-    │       └── Test/             機能ごとの検証用シーン（ビルドには含めない）。いまは `SceneTransitionTest`・`TeamScoreBarUITest`・`DebrisSetUITest`（ほかはメニューで作る）
+    │       └── Test/             機能ごとの検証用シーン（ビルドには含めない）。いまは `SceneTransitionTest`・`TeamScoreBarUITest`・`DebrisSetUITest`・`StageBarrierTest`・`GoalScoreEffectTest`（ほかはメニューで作る）
     ├── Packages/
     ├── steam_appid.txt           Steam のテスト用の App ID（480）。Steam の外で起動するときに使う
     └── ProjectSettings/
@@ -753,3 +753,4 @@ Unityは `.meta` ファイルで各アセットの参照を管理しているた
 | 11/10（火） | Claude Code | リポジトリ構成の図を今の状態に合わせた（`Scripts/Common/UI/` にシーンを切り替えるときの演出が入った、`Scenes/Test/` に検証シーン `SceneTransitionTest` ができた）。ルールの部分は変えていない |
 | 11/11（水） | Claude Code | リポジトリ構成の図の `MainLoop/` を、新しいロビー `Lobby` に合わせた（大槻さんの依頼でロビーを切り替えたため）。ルールの部分は変えていない |
 | 11/11（水） | Claude Code | リポジトリ構成の図を今の状態に合わせた（`Resources/` にデブリセットのUIのプレハブが入った、`Scenes/Test/` の検証シーンに `TeamScoreBarUITest`・`DebrisSetUITest` を足した）。ルールの部分は変えていない |
+| 11/12（木） | Claude Code | リポジトリ構成の図の `Scenes/Test/` の検証シーンに `StageBarrierTest`・`GoalScoreEffectTest` を足した（バリアとゴールの得点の演出の検証シーンができたため）。ルールは変えていない |
