@@ -33,6 +33,9 @@ public class StageBarrier : MonoBehaviour
     [Tooltip("壁の厚み（m）。速い物がすり抜けないよう、薄くしすぎない")]
     [SerializeField] private float thickness = 1f;
 
+    [Tooltip("ON：ベルトコンベアが壁に届いている所を、物資だけ通り抜けられる穴にする（プレイヤーは止まる）。コンベアで外へ落とす・外から運び込む作りのため")]
+    [SerializeField] private bool openForConveyors = true;
+
     [Header("波紋")]
     [Tooltip("波紋の見た目（Art/Materials/BarrierRipple。色や波の数はマテリアルで変える）")]
     [SerializeField] private Material rippleMaterial;
@@ -55,7 +58,19 @@ public class StageBarrier : MonoBehaviour
     /// <summary>プレイヤーの胸の高さ（m）。波紋を出す高さ。</summary>
     private const float PlayerChestHeight = 0.7f;
 
+    /// <summary>ベルトの端が壁からこの距離（m）以内なら、そこに穴を開ける。</summary>
+    private const float ConveyorReach = 1f;
+
+    /// <summary>穴を、ベルトの幅より左右にこれだけ（m）広げる。</summary>
+    private const float GapMargin = 0.5f;
+
+    /// <summary>穴にこの距離（m）まで近づいた物資を、穴と当たらないようにする。</summary>
+    private const float ItemPassRange = 2f;
+
     private readonly List<BoxCollider> walls = new List<BoxCollider>();
+    private readonly List<BoxCollider> gaps = new List<BoxCollider>();
+    private readonly HashSet<Collider> passedItems = new HashSet<Collider>();
+    private readonly Dictionary<BoxCollider, Vector3> inwardOf = new Dictionary<BoxCollider, Vector3>();
     private readonly HashSet<Collider> stageColliders = new HashSet<Collider>();
     private readonly HashSet<Transform> touching = new HashSet<Transform>();
     private readonly HashSet<Transform> touchingNow = new HashSet<Transform>();
@@ -170,7 +185,7 @@ public class StageBarrier : MonoBehaviour
                c.GetComponentInParent<CharacterController>() == null;
     }
 
-    /// <summary>四角のまわりに、見えない壁を4枚作る。</summary>
+    /// <summary>四角のまわりに見えない壁を作る（コンベアが届いている所は、物資だけ通る穴にする）。</summary>
     private void BuildWalls(Rect area, float lowestTop, float highestTop)
     {
         Area = area;
@@ -180,17 +195,85 @@ public class StageBarrier : MonoBehaviour
         float h = top - bottom;
         float t = thickness;
 
-        AddWall("Wall_North", new Vector3(area.center.x, midY, area.yMax + t * 0.5f), new Vector3(area.width + t * 2f, h, t));
-        AddWall("Wall_South", new Vector3(area.center.x, midY, area.yMin - t * 0.5f), new Vector3(area.width + t * 2f, h, t));
-        AddWall("Wall_East", new Vector3(area.xMax + t * 0.5f, midY, area.center.y), new Vector3(t, h, area.height));
-        AddWall("Wall_West", new Vector3(area.xMin - t * 0.5f, midY, area.center.y), new Vector3(t, h, area.height));
+        List<Vector2> north = new List<Vector2>(), south = new List<Vector2>(), east = new List<Vector2>(), west = new List<Vector2>();
+        if (openForConveyors)
+        {
+            CollectConveyorGaps(area, north, south, east, west);
+        }
+
+        // 北と南の辺は厚みぶん長くして、角にすき間を作らない
+        AddSide("North", true, area.xMin - t, area.xMax + t, area.yMax + t * 0.5f, north, midY, h);
+        AddSide("South", true, area.xMin - t, area.xMax + t, area.yMin - t * 0.5f, south, midY, h);
+        AddSide("East", false, area.yMin, area.yMax, area.xMax + t * 0.5f, east, midY, h);
+        AddSide("West", false, area.yMin, area.yMax, area.xMin - t * 0.5f, west, midY, h);
 
         Debug.Log($"[BARRIER] {gameObject.scene.name} を囲みました（東西 {area.width:0.0}m × 南北 {area.height:0.0}m・" +
-                  $"真ん中 ({area.center.x:0.0}, {area.center.y:0.0})・床の上面の高さ {lowestTop:0.00}〜{highestTop:0.00}m・{(autoFit ? "自動" : "手で指定")}）");
+                  $"真ん中 ({area.center.x:0.0}, {area.center.y:0.0})・床の上面の高さ {lowestTop:0.00}〜{highestTop:0.00}m・{(autoFit ? "自動" : "手で指定")}" +
+                  $"・コンベアの穴 {gaps.Count} か所）");
     }
 
-    private void AddWall(string wallName, Vector3 position, Vector3 worldSize)
+    /// <summary>流れる向きが壁に向かっていて、端が壁に届いているベルトコンベアの所を、穴の範囲として集める。</summary>
+    private void CollectConveyorGaps(Rect area, List<Vector2> north, List<Vector2> south, List<Vector2> east, List<Vector2> west)
     {
+        foreach (SpaceJunkConveyor conveyor in FindObjectsByType<SpaceJunkConveyor>(FindObjectsSortMode.None))
+        {
+            if (conveyor.gameObject.scene != gameObject.scene || !conveyor.TryGetComponent(out BoxCollider belt))
+            {
+                continue;
+            }
+
+            Bounds b = belt.bounds;
+            Vector3 flow = conveyor.transform.forward;
+            if (Mathf.Abs(flow.x) > 0.7f)
+            {
+                if (b.max.x >= area.xMax - ConveyorReach) east.Add(new Vector2(b.min.z - GapMargin, b.max.z + GapMargin));
+                if (b.min.x <= area.xMin + ConveyorReach) west.Add(new Vector2(b.min.z - GapMargin, b.max.z + GapMargin));
+            }
+            else if (Mathf.Abs(flow.z) > 0.7f)
+            {
+                if (b.max.z >= area.yMax - ConveyorReach) north.Add(new Vector2(b.min.x - GapMargin, b.max.x + GapMargin));
+                if (b.min.z <= area.yMin + ConveyorReach) south.Add(new Vector2(b.min.x - GapMargin, b.max.x + GapMargin));
+            }
+        }
+    }
+
+    /// <summary>1つの辺を、穴の所で区切って作る（穴は物資だけ通る壁、ほかはふつうの壁）。</summary>
+    private void AddSide(string side, bool alongX, float from, float to, float fixedCoord, List<Vector2> openings, float midY, float h)
+    {
+        openings.Sort((a, b) => a.x.CompareTo(b.x));
+        float cursor = from;
+        int index = 0;
+
+        foreach (Vector2 opening in openings)
+        {
+            float a = Mathf.Max(opening.x, cursor);
+            float b = Mathf.Min(opening.y, to);
+            if (b <= a)
+            {
+                continue;
+            }
+
+            if (a > cursor)
+            {
+                AddSegment($"Wall_{side}_{index++}", alongX, cursor, a, fixedCoord, midY, h, walls);
+            }
+            AddSegment($"Gap_{side}_{index++}", alongX, a, b, fixedCoord, midY, h, gaps);
+            cursor = b;
+        }
+
+        if (to > cursor)
+        {
+            AddSegment(index == 0 ? $"Wall_{side}" : $"Wall_{side}_{index}", alongX, cursor, to, fixedCoord, midY, h, walls);
+        }
+    }
+
+    private void AddSegment(string wallName, bool alongX, float start, float end, float fixedCoord, float midY, float h, List<BoxCollider> into)
+    {
+        float middle = (start + end) * 0.5f;
+        float length = end - start;
+        Vector3 position = alongX ? new Vector3(middle, midY, fixedCoord) : new Vector3(fixedCoord, midY, middle);
+        Vector3 worldSize = alongX ? new Vector3(length, h, thickness) : new Vector3(thickness, h, length);
+
         GameObject wall = new GameObject(wallName);
         wall.transform.SetParent(transform, false);
         wall.transform.SetPositionAndRotation(position, Quaternion.identity);
@@ -199,13 +282,51 @@ public class StageBarrier : MonoBehaviour
         Vector3 scale = wall.transform.lossyScale;
         BoxCollider box = wall.AddComponent<BoxCollider>();
         box.size = new Vector3(worldSize.x / scale.x, worldSize.y / scale.y, worldSize.z / scale.z);
-        walls.Add(box);
+        into.Add(box);
+
+        // ステージ側の向き（波紋を出す面）
+        inwardOf[box] = alongX
+            ? new Vector3(0f, 0f, fixedCoord > Area.center.y ? -1f : 1f)
+            : new Vector3(fixedCoord > Area.center.x ? -1f : 1f, 0f, 0f);
     }
 
     private void Update()
     {
+        LetItemsThroughGaps();
         DetectTouches();
         DrawRipples();
+    }
+
+    /// <summary>穴に近づいた物資（Rigidbody の付いた物）を、穴の壁と当たらないようにする。プレイヤーはそのまま止まる。</summary>
+    private void LetItemsThroughGaps()
+    {
+        foreach (BoxCollider gap in gaps)
+        {
+            Bounds bounds = gap.bounds;
+            int count = Physics.OverlapBoxNonAlloc(bounds.center, bounds.extents + Vector3.one * ItemPassRange, overlapBuffer,
+                Quaternion.identity, ~0, QueryTriggerInteraction.Ignore);
+
+            for (int i = 0; i < count; i++)
+            {
+                Collider other = overlapBuffer[i];
+                if (other.attachedRigidbody == null || other is CharacterController || stageColliders.Contains(other) ||
+                    other.transform.IsChildOf(transform) || other.GetComponentInParent<CharacterController>() != null ||
+                    !passedItems.Add(other))
+                {
+                    continue;
+                }
+
+                foreach (BoxCollider g in gaps)
+                {
+                    Physics.IgnoreCollision(g, other, true);
+                }
+            }
+        }
+
+        if (passedItems.Count > 256)
+        {
+            passedItems.RemoveWhere(c => c == null);
+        }
     }
 
     /// <summary>壁に触れた物を探し、触れ始めた所に波紋を出す（位置で調べるので、どのPCでも同じように出る）。</summary>
@@ -216,8 +337,11 @@ public class StageBarrier : MonoBehaviour
         // 始まりの演出中は、プレイヤーを乗せたゴールエリアが壁を通り抜けるので、波紋を出さない
         bool quiet = SpaceJunkRound.Current != null && SpaceJunkRound.Current.IsIntro;
 
-        foreach (BoxCollider wall in walls)
+        for (int w = 0; w < walls.Count + gaps.Count; w++)
         {
+            // 穴（物資だけ通る壁）では、プレイヤーだけ数える
+            bool isGap = w >= walls.Count;
+            BoxCollider wall = isGap ? gaps[w - walls.Count] : walls[w];
             Bounds bounds = wall.bounds;
             int count = Physics.OverlapBoxNonAlloc(bounds.center, bounds.extents + Vector3.one * touchDistance, overlapBuffer,
                 Quaternion.identity, ~0, QueryTriggerInteraction.Ignore);
@@ -232,7 +356,7 @@ public class StageBarrier : MonoBehaviour
 
                 // 物資は Rigidbody、自分のプレイヤーは CharacterController で数える
                 Transform key = other is CharacterController ? other.transform :
-                    other.attachedRigidbody != null ? other.attachedRigidbody.transform : null;
+                    other.attachedRigidbody != null && !isGap ? other.attachedRigidbody.transform : null;
                 if (key != null)
                 {
                     Touch(key, wall, other.bounds.center, quiet);
@@ -296,12 +420,7 @@ public class StageBarrier : MonoBehaviour
     private void SpawnRipple(BoxCollider wall, Vector3 near)
     {
         Bounds bounds = wall.bounds;
-        Vector3 toStage = new Vector3(Area.center.x, bounds.center.y, Area.center.y) - bounds.center;
-
-        // 壁の向き：薄い向き（X か Z）のうち、ステージ側
-        Vector3 normal = bounds.size.x < bounds.size.z
-            ? new Vector3(Mathf.Sign(toStage.x), 0f, 0f)
-            : new Vector3(0f, 0f, Mathf.Sign(toStage.z));
+        Vector3 normal = inwardOf[wall];
 
         Vector3 point = bounds.ClosestPoint(near);
         Vector3 face = bounds.center + Vector3.Scale(normal, bounds.extents);
@@ -374,11 +493,17 @@ public class StageBarrier : MonoBehaviour
     private void OnDrawGizmosSelected()
     {
         Gizmos.color = new Color(0.4f, 1f, 0.6f, 0.8f);
-        if (walls.Count > 0)
+        if (walls.Count > 0 || gaps.Count > 0)
         {
             foreach (BoxCollider wall in walls)
             {
                 Gizmos.DrawWireCube(wall.bounds.center, wall.bounds.size);
+            }
+
+            Gizmos.color = new Color(1f, 0.85f, 0.2f, 0.9f);
+            foreach (BoxCollider gap in gaps)
+            {
+                Gizmos.DrawWireCube(gap.bounds.center, gap.bounds.size);
             }
             return;
         }
