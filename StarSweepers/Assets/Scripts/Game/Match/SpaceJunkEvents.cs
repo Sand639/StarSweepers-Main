@@ -16,7 +16,7 @@ public enum SpaceJunkEventKind
 
     /// <summary>
     /// **デブリセット**（2026/9/29・大槻さん）。
-    /// チームごとにデブリ4〜6個のお題が出て、そのうち3個をゴールに入れると10点。次のお題に変わる。
+    /// チームごとにデブリ3個のお題が出て、3個全部をゴールに入れると10点。次のお題に変わる（2026/11/12 に 4〜6個のうち3個 から変更）。
     /// 順番どおりか順不同かは設定で切り替える（初期値は順不同）
     /// </summary>
     DebrisSet = 1,
@@ -56,6 +56,14 @@ public static class SpaceJunkEvents
         switch (kind)
         {
             case SpaceJunkEventKind.DebrisSet:
+                // お題を全部入れないとそろわない設定（初期値：お題3個・3個でそろう）なら「全部」と出す
+                if (settings.debrisSetGoal >= Mathf.Max(settings.debrisSetMinSize, settings.debrisSetMaxSize))
+                {
+                    return settings.debrisSetOrdered
+                        ? $"お題のデブリを先頭から順番に全部入れると {settings.debrisSetBonus} 点！"
+                        : $"お題のデブリを全部入れると {settings.debrisSetBonus} 点！（順番は自由）";
+                }
+
                 return settings.debrisSetOrdered
                     ? $"お題のデブリを先頭から順番に {settings.debrisSetGoal} 個入れると {settings.debrisSetBonus} 点！"
                     : $"お題のデブリをどれでも {settings.debrisSetGoal} 個入れると {settings.debrisSetBonus} 点！（順番は自由）";
@@ -148,11 +156,11 @@ public class SpaceJunkEventSettings
 
     [Tooltip("お題のデブリのいちばん少ない数。**個数はイベントの始まりに1回だけ決め、全チーム同じ**（中身はチームごとにばらばら）")]
     [Min(1)]
-    public int debrisSetMinSize = 4;
+    public int debrisSetMinSize = 3;
 
-    [Tooltip("お題のデブリのいちばん多い数（8個まで）")]
+    [Tooltip("お題のデブリのいちばん多い数（8個まで）。Min Size と同じにすると、毎回その個数になる")]
     [Min(1)]
-    public int debrisSetMaxSize = 6;
+    public int debrisSetMaxSize = 3;
 
     [Tooltip("お題のうち、何個ゴールに入れたらそろったことになるか（お題の個数より多くはならない）")]
     [Min(1)]
