@@ -39,10 +39,13 @@ using UnityEngine.AI;
 ///
 /// 試合にボットを出すのは今までどおりロビーの小窓（<see cref="SpaceJunkSession.ServerSetBotCount"/>）。
 /// 体が新しい体（<see cref="SweeperShooter"/> が付いている）なら、こちらの頭が付く。
+///
+/// ギミック（ガラス・ベルト・列車・上下する床・回る床）への対応は SweeperBot.Gimmicks.cs と <see cref="SweeperBotGimmicks"/>。
+/// ファイルの分け方と変数の置き場所は Documents/スクリプトの説明/Game/Bot/SweeperBot.md。
 /// </summary>
 [DefaultExecutionOrder(-50)]
 [RequireComponent(typeof(VirtualPlayerInput))]
-public class SweeperBot : MonoBehaviour
+public partial class SweeperBot : MonoBehaviour
 {
     [Header("チーム")]
     [Tooltip("どのチームのゴールへ運ぶか（0=青 / 1=赤 / 2=緑 / 3=黄）。オンラインではロビーのチーム分けに従う")]
@@ -299,6 +302,7 @@ public class SweeperBot : MonoBehaviour
             return;
         }
 
+        SweeperBotGimmicks.Refresh();
         SweeperShooter.ShotPhase phase = shooter.Phase;
         TrackShotResult(phase);
         UpdateWatching();
@@ -337,6 +341,9 @@ public class SweeperBot : MonoBehaviour
                 }
                 break;
         }
+
+        // 列車が来る・足もとのガラスが割れそうなら、何をしていても逃げる（溜めている間・巻き取り中も歩ける）
+        ApplySafetyMove(phase);
 
         // ボタンは Attack（引っ張る）の1つだけ。溜めている間は押し続け、巻き取り中は1フレームだけ押す
         pad.SetPull(hold);
@@ -493,7 +500,7 @@ public class SweeperBot : MonoBehaviour
         {
             ChooseTarget(goal.Value);
         }
-        else if (!IsMoving(target) &&
+        else if (IsSettled(target) && ridingLift == null &&
                  (Time.time >= replanAt || FlatDistance(target.transform.position, plannedItemPosition) > ReplanMoveDistance))
         {
             if (!Plan(target, goal.Value))
@@ -508,10 +515,10 @@ public class SweeperBot : MonoBehaviour
             return false;
         }
 
-        Vector3 itemPosition = target.transform.position;
+        Vector3 itemPosition = AimPoint(target);
 
         // 撃つ場所に着いた。止まって素材にカーソルを合わせ、少し待ってから撃ち始める
-        if (FlatDistance(transform.position, standPoint) < ArriveDistance)
+        if (FlatDistance(transform.position, standPoint) < ArriveDistance && ridingLift == null)
         {
             pad.Move = Vector2.zero;
             PointAt(itemPosition);
@@ -521,7 +528,7 @@ public class SweeperBot : MonoBehaviour
                 arrivedAt = Time.time;
             }
 
-            return Time.time - arrivedAt >= thinkSeconds;
+            return Time.time - arrivedAt >= ThinkSeconds;
         }
 
         arrivedAt = -1f;
@@ -586,7 +593,7 @@ public class SweeperBot : MonoBehaviour
             return false;
         }
 
-        if (IsMoving(item))
+        if (!IsSettled(item))
         {
             return false;
         }
@@ -617,9 +624,9 @@ public class SweeperBot : MonoBehaviour
     /// </summary>
     private bool Plan(HookableObject item, Vector3 goal)
     {
-        Vector3 itemPosition = item.transform.position;
-        plannedItemPosition = itemPosition;
-        replanAt = Time.time + ReplanSeconds;
+        Vector3 itemPosition = PlanItemPosition(item);
+        plannedItemPosition = item.transform.position;
+        replanAt = Time.time + ReplanDelay(item);
         stuckCount = 0;
         ResetStuck();
 
@@ -734,6 +741,12 @@ public class SweeperBot : MonoBehaviour
             return false;
         }
 
+        // 線路・ベルト・上下する床・もうすぐ割れるガラスには立たない（割れるガラスは減点）
+        if (!SweeperBotGimmicks.CheckStandPoint(floor, out float gimmickPenalty))
+        {
+            return false;
+        }
+
         float toItem = FlatDistance(floor, itemPosition);
         if (toItem > reach || toItem < pullMin * 0.8f)
         {
@@ -750,7 +763,7 @@ public class SweeperBot : MonoBehaviour
             return false;
         }
 
-        score = PathLength(navPath.corners);
+        score = PathLength(navPath.corners) + gimmickPenalty;
 
         // 後ろへ投げるなら、頭の上からゴールまでの間に壁があれば減点（前へ転がすなら、床の上を見る）
         float height = plan == ThrowPlan.Forward ? 0.5f : ArcHeight;
@@ -775,11 +788,11 @@ public class SweeperBot : MonoBehaviour
             return false; // 狙う物が無くなった。その場で撃ってしまう
         }
 
-        Vector3 itemPosition = target.transform.position;
+        Vector3 itemPosition = AimPoint(target);
         PointAt(itemPosition);
 
         float need = FlatDistance(transform.position, itemPosition) + 0.3f;
-        return shooter.CurrentReach < need && shooter.CurrentReach < shooter.MaxReach;
+        return (shooter.CurrentReach < need && shooter.CurrentReach < shooter.MaxReach) || ShouldHoldShotForGlass();
     }
 
     // ------------------------------------------------------------
@@ -815,6 +828,13 @@ public class SweeperBot : MonoBehaviour
         else
         {
             PointAt(item.transform.position);
+        }
+
+        // 足もとのガラスがもうすぐ割れる。今すぐ投げて、速く歩けるようにする
+        if (!pressedThisReel && pressAt >= 0f && !reel.IsWaitingForClaim && ShouldThrowNowForGlass())
+        {
+            pressedThisReel = true;
+            return true;
         }
 
         if (pressedThisReel || pressAt < 0f || reel.IsWaitingForClaim || reel.Elapsed < pressAt)
@@ -932,6 +952,11 @@ public class SweeperBot : MonoBehaviour
 
     private void FollowPath()
     {
+        if (HandlePathGimmicks())
+        {
+            return;
+        }
+
         while (cornerIndex < pathCorners.Count - 1 &&
                FlatDistance(transform.position, pathCorners[cornerIndex]) < CornerReachDistance)
         {

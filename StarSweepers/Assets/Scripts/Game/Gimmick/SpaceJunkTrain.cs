@@ -261,6 +261,62 @@ public class SpaceJunkTrain : MonoBehaviour
         item.Body.AddForce(velocity, ForceMode.VelocityChange);
     }
 
+    // ------------------------------------------------------------
+    // ボットに教える情報（読むだけ。列車の動きは変えない）
+    // ------------------------------------------------------------
+
+    /// <summary>線路の真ん中の線から、列車の横のはしまでの距離（m）。</summary>
+    public float HalfWidth => trainSize.x * 0.5f;
+
+    /// <summary>線路の真ん中から、端（現れる・消える場所）までの距離（m）。</summary>
+    public float RunHalfLength => Mathf.Max(1f, runHalfLength);
+
+    /// <summary><paramref name="point"/> が、線路の帯（列車の幅＋<paramref name="margin"/>）の中にあるか。</summary>
+    public bool InBand(Vector3 point, float margin)
+    {
+        Vector3 offset = point - transform.position;
+        return Mathf.Abs(Vector3.Dot(offset, transform.right)) <= HalfWidth + margin
+               && Mathf.Abs(Vector3.Dot(offset, transform.forward)) <= RunHalfLength;
+    }
+
+    /// <summary>
+    /// 列車が <paramref name="point"/> の所を通るまでの秒数（<paramref name="horizon"/> 秒より先・帯の外なら float.MaxValue）。
+    /// 時計から列車の場所を出す計算は <see cref="Update"/> と同じ。
+    /// </summary>
+    public float SecondsUntilPasses(Vector3 point, float margin, float horizon)
+    {
+        if (!InBand(point, margin))
+        {
+            return float.MaxValue;
+        }
+
+        float along = Vector3.Dot(point - transform.position, transform.forward);
+        float interval = Mathf.Max(1f, intervalSeconds);
+        float halfLength = RunHalfLength;
+        float speed = Mathf.Max(0.1f, Mathf.Abs(moveSpeed));
+        double now = SharedClock() - timeOffsetSeconds;
+
+        for (float t = 0f; t <= horizon; t += 0.05f)
+        {
+            double clock = now + t;
+            long index = (long)System.Math.Floor(clock / interval);
+            float travelled = (float)(clock - index * (double)interval) * speed;
+            if (travelled > halfLength * 2f)
+            {
+                continue;
+            }
+
+            float sign = GoesSouth(index) ? -1f : 1f;
+            float trainAlong = -sign * halfLength + sign * travelled;
+            if (Mathf.Abs(trainAlong - along) <= trainSize.z * 0.5f + margin)
+            {
+                return t;
+            }
+        }
+
+        return float.MaxValue;
+    }
+
     private void OnDrawGizmos()
     {
         // 線路を黄色の線で、両端に列車の大きさの枠を出す（選んでいなくても見えるように）

@@ -166,6 +166,45 @@ public class SpaceJunkLiftFloor : MonoBehaviour
         }
     }
 
+    // ------------------------------------------------------------
+    // ボットに教える情報（読むだけ。床の動きは変えない）
+    // ------------------------------------------------------------
+
+    /// <summary>下にいるときの位置（置いた位置）。</summary>
+    public Vector3 BottomPosition => basePosition;
+
+    /// <summary>下から上まで、何m上がるか。</summary>
+    public float RiseHeight => riseHeight;
+
+    /// <summary>いまの高さ（置いた位置からの m）。</summary>
+    public float CurrentHeight => currentHeight;
+
+    /// <summary>いま下で止まっているなら、あと何秒止まっているか。止まっていなければ -1。</summary>
+    public float SecondsLeftAtBottom()
+    {
+        double t = CycleTime(out float waitBottom, out _, out _);
+        return t < waitBottom ? (float)(waitBottom - t) : -1f;
+    }
+
+    /// <summary>いま上で止まっているなら、あと何秒止まっているか。止まっていなければ -1。</summary>
+    public float SecondsLeftAtTop()
+    {
+        double t = CycleTime(out float waitBottom, out float move, out float waitTop);
+        double start = waitBottom + move;
+        return t >= start && t < start + waitTop ? (float)(start + waitTop - t) : -1f;
+    }
+
+    /// <summary>1回の上がり下がりの中で、いま何秒目か（<see cref="TargetHeight"/> と同じ時計）。</summary>
+    private double CycleTime(out float waitBottom, out float move, out float waitTop)
+    {
+        move = Mathf.Max(0.01f, moveSeconds);
+        waitBottom = Mathf.Max(0f, waitBottomSeconds);
+        waitTop = Mathf.Max(0f, waitTopSeconds);
+        double cycle = waitBottom + move + waitTop + move;
+        double t = (SharedClock() - timeOffsetSeconds) % cycle;
+        return t < 0d ? t + cycle : t;
+    }
+
     private void OnDrawGizmosSelected()
     {
         // 上に上がったときの床の位置を、黄色の枠で出す
