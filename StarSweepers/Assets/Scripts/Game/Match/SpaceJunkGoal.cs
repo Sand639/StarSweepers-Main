@@ -328,10 +328,20 @@ public class SpaceJunkGoal : NetworkBehaviour
         item.Vanish();
     }
 
+    /// <summary>得点が入った瞬間（全員のPCで呼ばれる）。ゴールの得点の演出（SpaceJunkGoalScoreEffect）が受け取る。</summary>
+    public static event System.Action<SpaceJunkGoal> Scored;
+
     /// <summary>全員の画面で床を一瞬光らせる。</summary>
     [ClientRpc]
     private void FlashClientRpc()
     {
+        ShowScored();
+    }
+
+    /// <summary>得点が入ったときの見た目を、このPCで出す（床を一瞬光らせ、得点の演出に知らせる）。検証シーンからも呼ぶ。</summary>
+    public void ShowScored()
+    {
         flashUntil = Time.time + flashSeconds;
+        Scored?.Invoke(this);
     }
 }
