@@ -99,7 +99,7 @@ public sealed class DebrisSetUI : MonoBehaviour
     [SerializeField, Range(1, MaxTeams)] private int testTeamCount = 2;
 
     [Tooltip("テストのお題の物資の数")]
-    [SerializeField, Range(1, MaxSlots)] private int testSetSize = 5;
+    [SerializeField, Range(1, MaxSlots)] private int testSetSize = 3;
 
     [Tooltip("テストで、何個入れたらそろうか（そろうと次のお題を引いて、スロットを回す）")]
     [SerializeField, Min(1)] private int testGoal = 3;

@@ -76,6 +76,9 @@ public partial class SpaceJunkPlayerSetup : MonoBehaviour
     [SerializeField] private float respawnLockSeconds = 3f;
 
     [Header("レーダー（自分のぶんにだけ付く）")]
+    [Tooltip("オンなら、画面の右下にレーダーを出す（2026/11/12 大槻さんの依頼で、一旦オフにした）")]
+    [SerializeField] private bool showRadar;
+
     [Tooltip("レーダーの外枠の画像（Assets/Art/Sprites/Radar）")]
     [SerializeField] private Sprite radarFrame;
 
@@ -357,7 +360,8 @@ public partial class SpaceJunkPlayerSetup : MonoBehaviour
     /// </summary>
     private void EnsureRadar()
     {
-        if (GetComponent<SpaceJunkRadar>() != null)
+        // 一旦オフ（Show Radar をオンにすれば、また出る）
+        if (!showRadar || GetComponent<SpaceJunkRadar>() != null)
         {
             return;
         }
