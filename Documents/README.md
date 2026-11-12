@@ -252,12 +252,12 @@ StarSweepers-Main/                     ← リポジトリのルート
     │   │   │                     Match＝試合の進行、Camera、Bot、Effect＝演出、UI＝試合中の表示
     │   │   ├── Common/           どのシーンでも使う土台：Input＝入力、Network＝通信、Settings＝設定・ポーズ画面、UI＝ポインター・フォント・シーンを切り替えるときの演出
     │   │   └── SG_Character/・SG_Stage/  Hansさんのスクリプト（動かす前に本人の了承が要る）
-    │   ├── Resources/            名前で読み込むもの（タイトル・ロビーの画面のプレハブ、ボタンのテーマ、名前タグ、デブリセットのUI）
+    │   ├── Resources/            名前で読み込むもの（タイトル・ロビーの画面のプレハブ、ボタンのテーマ、名前タグ、デブリセットのUI、高単価デブリのルーレットUI）
     │   └── Scenes/               シーン（直下の SpaceJunkMapList.asset は、使うマップの一覧）
     │       ├── MainLoop/             タイトルとロビー（TitleScene・Lobby。2026/11/11 から Lobby。前のロビー SpaceJunkLobby は使っていない）
     │       ├── Stage/            ステージ（`STAGE_Simple`・`STAGE_Train` など。名前の付け方と一覧は `宇宙ごみのマップの作り方.md`）
     │       ├── HansStages/       Hansさんのステージ
-    │       └── Test/             機能ごとの検証用シーン（ビルドには含めない）。いまは `SceneTransitionTest`・`TeamScoreBarUITest`・`DebrisSetUITest`（ほかはメニューで作る）
+    │       └── Test/             機能ごとの検証用シーン（ビルドには含めない）。いまは `SceneTransitionTest`・`TeamScoreBarUITest`・`DebrisSetUITest`・`StageBarrierTest`・`HighValueRouletteUITest`（ほかはメニューで作る）
     ├── Packages/
     ├── steam_appid.txt           Steam のテスト用の App ID（480）。Steam の外で起動するときに使う
     └── ProjectSettings/
@@ -753,3 +753,4 @@ Unityは `.meta` ファイルで各アセットの参照を管理しているた
 | 11/10（火） | Claude Code | リポジトリ構成の図を今の状態に合わせた（`Scripts/Common/UI/` にシーンを切り替えるときの演出が入った、`Scenes/Test/` に検証シーン `SceneTransitionTest` ができた）。ルールの部分は変えていない |
 | 11/11（水） | Claude Code | リポジトリ構成の図の `MainLoop/` を、新しいロビー `Lobby` に合わせた（大槻さんの依頼でロビーを切り替えたため）。ルールの部分は変えていない |
 | 11/11（水） | Claude Code | リポジトリ構成の図を今の状態に合わせた（`Resources/` にデブリセットのUIのプレハブが入った、`Scenes/Test/` の検証シーンに `TeamScoreBarUITest`・`DebrisSetUITest` を足した）。ルールの部分は変えていない |
+| 11/12（木） | Claude Code | リポジトリ構成の図を今の状態に合わせた（`Resources/` に高単価デブリのルーレットUIのプレハブが入った、`Scenes/Test/` の検証シーンに `StageBarrierTest`・`HighValueRouletteUITest` を足した）。ルールの部分は変えていない |
