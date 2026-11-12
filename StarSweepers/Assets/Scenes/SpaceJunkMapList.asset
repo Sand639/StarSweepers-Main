@@ -104,3 +104,10 @@ MonoBehaviour:
     sceneName: STAGE_GlassChecker2
     scenePath: Assets/Scenes/Stage/STAGE_GlassChecker2.unity
     goalMask: 10
+  - scene: {fileID: 102900000, guid: 6faa9be24b06b1f4fa993baf4a3abc49, type: 3}
+    showInLobby: 1
+    displayName: "\u96FB\u8ECA\u30DE\u30C3\u30D72"
+    thumbnail: {fileID: 0}
+    sceneName: STAGE_Train2
+    scenePath: Assets/Scenes/Stage/STAGE_Train2.unity
+    goalMask: 3

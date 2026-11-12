@@ -1,0 +1,358 @@
+// 【道具の控え】Hans さんのステージ（HansStage01_Ver01）を複製して、遊べるステージ STAGE_Train2（電車マップ2）にする。2026/11/12・Claude Code
+//
+// 使い方（Unity は閉じておく）：
+//   1. このファイルを Assets/Scripts/Game/Match/Editor/TempTrain2Builder.cs として一時的に置く
+//   2. 下の OutDir（画像と結果の書き出し先）を、自分のPCの場所に直す
+//   3. Unity.exe -batchmode -quit -projectPath … -executeMethod TempTrain2Builder.Run   （-nographics は付けない。画像を撮るため）
+//   4. 終わったら Assets に置いた .cs と .meta を消す（Assets の中にはコミットしない）
+//
+// やること：
+//   - 元の HansStage01_Ver01 は変えない（AssetDatabase.CopyAsset で複製してから、複製のほうだけを書き換える）
+//   - 見た目・配置はそのまま。足すのは、当たり判定・ゴール・素材の出る範囲と、STAGE_Train から移し入れる試合の部品だけ
+//   - STAGE_Train は「裏で開いて、部品をこちらへ移し、保存せずに閉じる」ので、ファイルは変わらない
+//   - 実行するたびに STAGE_Train2 を作り直す（手で直した分は消える）
+using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Reflection;
+using System.Text;
+using Unity.Netcode;
+using UnityEditor;
+using UnityEditor.SceneManagement;
+using UnityEngine;
+using UnityEngine.SceneManagement;
+
+public static class TempTrain2Builder
+{
+    const string OutDir = @"C:\Users\yziku\AppData\Local\Temp\claude\6918af49c9fc72ff\ee0e469d-b0ee-488f-99ea-4228e7b3c3ec\scratchpad\";
+    const string SourceScene = "Assets/Scenes/HansStages/HansStage01_Ver01.unity";
+    const string PartsScene = "Assets/Scenes/Stage/STAGE_Train.unity";
+    const string DestScene = "Assets/Scenes/Stage/STAGE_Train2.unity";
+    const string DisplayName = "電車マップ2";
+
+    // Hans さんの床の上面の高さ（SM_Platform の原点が 0、厚み 0.25）
+    const float FloorTop = 0.25f;
+    // 橋（SM_Bridge）は厚みの無い板で、高さ 0.063 にある
+    const float BridgeTop = 0.063f;
+
+    static readonly StringBuilder report = new StringBuilder();
+
+    /// <summary>Library を別のフォルダから複製したとき、スクリプトがシーンの部品に結びつかない（MISSING）ことがある。読み込み直す。</summary>
+    public static void Reimport()
+    {
+        StringBuilder sb = new StringBuilder();
+        MonoScript ms = AssetDatabase.LoadAssetAtPath<MonoScript>("Assets/Scripts/Game/Match/SpaceJunkGoal.cs");
+        sb.AppendLine("before: " + (ms == null ? "null" : ms.GetClass() == null ? "class=null" : ms.GetClass().FullName));
+        AssetDatabase.ImportAsset("Assets/Scripts", ImportAssetOptions.ImportRecursive | ImportAssetOptions.ForceUpdate);
+        ms = AssetDatabase.LoadAssetAtPath<MonoScript>("Assets/Scripts/Game/Match/SpaceJunkGoal.cs");
+        sb.AppendLine("after: " + (ms == null ? "null" : ms.GetClass() == null ? "class=null" : ms.GetClass().FullName));
+        File.WriteAllText(OutDir + "train2_reimport.txt", sb.ToString(), new UTF8Encoding(false));
+    }
+
+    public static void Run()
+    {
+        MonoScript check = AssetDatabase.LoadAssetAtPath<MonoScript>("Assets/Scripts/Game/Match/SpaceJunkGoal.cs");
+        report.AppendLine("SpaceJunkGoal の結びつき: " + (check == null || check.GetClass() == null ? "なし" : check.GetClass().FullName));
+
+        try
+        {
+            Build();
+            Register();
+            Snapshot();
+            report.AppendLine("RUN OK");
+        }
+        catch (Exception e)
+        {
+            report.AppendLine("ERROR " + e);
+            Debug.LogError(e);
+        }
+
+        File.WriteAllText(OutDir + "train2_report.txt", report.ToString(), new UTF8Encoding(false));
+    }
+
+    static void Build()
+    {
+        if (AssetDatabase.LoadAssetAtPath<SceneAsset>(DestScene) != null)
+        {
+            // 2回目からは、中身だけ元に戻して作り直す（シーンの GUID を変えないので、マップの一覧・ビルドの一覧はそのまま）
+            File.Copy(SourceScene, DestScene, true);
+            AssetDatabase.ImportAsset(DestScene, ImportAssetOptions.ForceUpdate);
+        }
+        else if (!AssetDatabase.CopyAsset(SourceScene, DestScene))
+        {
+            throw new Exception("複製に失敗: " + DestScene);
+        }
+
+        Scene scene = EditorSceneManager.OpenScene(DestScene, OpenSceneMode.Single);
+        Scene parts = EditorSceneManager.OpenScene(PartsScene, OpenSceneMode.Additive);
+
+        // ---- STAGE_Train から、試合の部品を移し入れる（プレハブのつながりと上書きの値はそのまま）
+        string[] moveRoots = { "System", "TeamScoreBarUI", "Train (1)", "Train (2)", "BombPoints", "SpecialDebrisPoint", "Main Camera" };
+        Dictionary<string, GameObject> moved = new Dictionary<string, GameObject>();
+        foreach (string name in moveRoots)
+        {
+            GameObject go = FindRoot(parts, name);
+            SceneManager.MoveGameObjectToScene(go, scene);
+            moved[name] = go;
+        }
+
+        // ゴール（GoalArea_East／West）は Stage の下にあるので、外してから移す
+        GameObject goalA = GameObject.Find("GoalArea_East");
+        GameObject goalB = GameObject.Find("GoalArea_West");
+        if (goalA == null || goalB == null || goalA.scene != parts || goalB.scene != parts)
+        {
+            throw new Exception("STAGE_Train のゴールが見つかりません");
+        }
+        goalA.transform.SetParent(null, true);
+        goalB.transform.SetParent(null, true);
+        SceneManager.MoveGameObjectToScene(goalA, scene);
+        SceneManager.MoveGameObjectToScene(goalB, scene);
+
+        // 保存せずに閉じる（STAGE_Train のファイルは変わらない）
+        EditorSceneManager.CloseScene(parts, true);
+        SceneManager.SetActiveScene(scene);
+
+        // ---- Hans さんのカメラと、大きさ見本のキャラクターは、試合では使わないので隠す（消さない）
+        foreach (GameObject root in scene.GetRootGameObjects())
+        {
+            if (root == moved["Main Camera"]) continue;
+            if (root.name == "Main Camera" || root.name == "SK_Character")
+            {
+                root.SetActive(false);
+                report.AppendLine("隠した: " + root.name);
+            }
+        }
+
+        // ---- 当たり判定（Hans さんのモデルには入っていない）
+        int floors = 0, bridges = 0;
+        foreach (MeshFilter mf in UnityEngine.Object.FindObjectsByType<MeshFilter>(FindObjectsInactive.Include, FindObjectsSortMode.None))
+        {
+            if (mf.gameObject.scene != scene || mf.sharedMesh == null) continue;
+            string mesh = mf.sharedMesh.name;
+            Bounds b = mf.sharedMesh.bounds;
+
+            if (mesh == "Platform" || mesh == "Half_Platform")
+            {
+                BoxCollider box = mf.gameObject.AddComponent<BoxCollider>();
+                box.center = b.center;
+                box.size = b.size;
+                floors++;
+            }
+            else if (mesh == "Bridge")
+            {
+                // 厚みの無い板なので、上面を板に合わせた厚み 0.25m の箱にする。
+                // 3枚の継ぎ目と、両端の床との 0.125m のすき間を埋めるため、前後に 0.125m ずつ伸ばす
+                BoxCollider box = mf.gameObject.AddComponent<BoxCollider>();
+                box.center = new Vector3(b.center.x, b.center.y - 0.125f, b.center.z);
+                box.size = new Vector3(b.size.x, 0.25f, b.size.z + 0.25f);
+                bridges++;
+            }
+        }
+        report.AppendLine($"当たり判定: 床 {floors} 枚・橋 {bridges} 枚");
+
+        // ---- ゴール：Hans さんの輸送機 2 台（北 z=+9・南 z=-9）
+        GameObject transporterSouth = FindRoot(scene, "SM_Transporter");
+        GameObject transporterNorth = FindRoot(scene, "SM_Transporter (1)");
+        Transform goals = new GameObject("Goals").transform;
+        SetupGoal(goals, goalA, "GoalArea_North", 0, transporterNorth);
+        SetupGoal(goals, goalB, "GoalArea_South", 1, transporterSouth);
+
+        // ---- 素材の出る範囲：北と南の台地（輸送機のマスと、端から 0.3m は避ける）
+        Transform zones = new GameObject("SpawnZones").transform;
+        List<Transform> zoneList = new List<Transform>();
+        foreach (int sign in new[] { 1, -1 })
+        {
+            string side = sign > 0 ? "North" : "South";
+            zoneList.Add(MakeZone(zones, $"SpawnZone_{side}_Front", new Vector3(0f, FloorTop, sign * 6.0f), new Vector3(11.4f, 1f, 2.4f)));
+            zoneList.Add(MakeZone(zones, $"SpawnZone_{side}_Left", new Vector3(-3.75f, FloorTop, sign * 9.0f), new Vector3(3.9f, 1f, 2.4f)));
+            zoneList.Add(MakeZone(zones, $"SpawnZone_{side}_Right", new Vector3(3.75f, FloorTop, sign * 9.0f), new Vector3(3.9f, 1f, 2.4f)));
+        }
+
+        SpaceJunkSpawner spawner = UnityEngine.Object.FindFirstObjectByType<SpaceJunkSpawner>();
+        spawner.transform.position = new Vector3(0f, FloorTop, 0f);
+        SerializedObject spawnerSo = new SerializedObject(spawner);
+        SerializedProperty zoneProp = spawnerSo.FindProperty("spawnZones");
+        zoneProp.arraySize = zoneList.Count;
+        for (int i = 0; i < zoneList.Count; i++)
+        {
+            zoneProp.GetArrayElementAtIndex(i).objectReferenceValue = zoneList[i];
+        }
+        spawnerSo.FindProperty("areaHalfSize").vector2Value = new Vector2(6f, 10.5f);
+        spawnerSo.FindProperty("requireGroundBelow").boolValue = true;
+        spawnerSo.ApplyModifiedPropertiesWithoutUndo();
+
+        // ---- 列車：橋の斜線のマス（z = ±2.875）を東西に横切る。STAGE_Train の2本を90度回した置き方
+        PlaceTrain(moved["Train (1)"], new Vector3(0f, BridgeTop + 1.25f, 2.875f));
+        PlaceTrain(moved["Train (2)"], new Vector3(0f, BridgeTop + 1.25f, -2.875f));
+
+        // ---- 爆弾の置き場所：北と南の台地に2つずつ。特殊デブリ：橋の真ん中のマス
+        Transform bombs = moved["BombPoints"].transform;
+        Vector3[] bombPositions =
+        {
+            new Vector3(-4.5f, FloorTop + 0.6f, 6f), new Vector3(-4.5f, FloorTop + 0.6f, -6f),
+            new Vector3(4.5f, FloorTop + 0.6f, 6f), new Vector3(4.5f, FloorTop + 0.6f, -6f),
+        };
+        for (int i = 0; i < bombs.childCount && i < bombPositions.Length; i++)
+        {
+            bombs.GetChild(i).position = bombPositions[i];
+            PrefabUtility.RecordPrefabInstancePropertyModifications(bombs.GetChild(i));
+        }
+        Transform special = moved["SpecialDebrisPoint"].transform;
+        special.GetChild(0).position = new Vector3(0f, BridgeTop + 0.6f, 0f);
+        PrefabUtility.RecordPrefabInstancePropertyModifications(special.GetChild(0));
+
+        // ---- 試合のカメラ（全体／自陣の切り替え付き）：南の斜め上から
+        Transform cam = moved["Main Camera"].transform;
+        cam.SetPositionAndRotation(new Vector3(0f, 16f, -17f), Quaternion.Euler(60f, 0f, 0f));
+        PrefabUtility.RecordPrefabInstancePropertyModifications(cam);
+
+        EditorSceneManager.MarkSceneDirty(scene);
+        EditorSceneManager.SaveScene(scene);
+        report.AppendLine("保存: " + DestScene);
+    }
+
+    static void SetupGoal(Transform parent, GameObject goal, string name, int index, GameObject transporter)
+    {
+        goal.name = name;
+        goal.transform.SetParent(parent, true);
+        Vector3 p = transporter.transform.position;
+        goal.transform.SetPositionAndRotation(new Vector3(p.x, 2.5f, p.z), Quaternion.identity);
+
+        BoxCollider trigger = goal.GetComponent<BoxCollider>();
+        trigger.center = Vector3.zero;
+        trigger.size = new Vector3(3f, 5f, 3f);
+
+        // 輸送機の当たり判定（ガラスマップと同じ）：形どおりの判定と、ボットの地図に入れるための乗る面の箱
+        MeshCollider collider = transporter.AddComponent<MeshCollider>();
+        collider.sharedMesh = transporter.GetComponent<MeshFilter>().sharedMesh;
+        BoxCollider deck = transporter.AddComponent<BoxCollider>();
+        deck.center = new Vector3(0f, 0.145f, 0f);
+        deck.size = new Vector3(3f, 0.29f, 3f);
+
+        SerializedObject so = new SerializedObject(goal.GetComponent<SpaceJunkGoal>());
+        so.FindProperty("goalIndex").intValue = index;
+        so.FindProperty("padRenderer").objectReferenceValue = transporter.GetComponent<MeshRenderer>();
+        so.FindProperty("introVisual").objectReferenceValue = transporter.transform;
+        so.ApplyModifiedPropertiesWithoutUndo();
+        report.AppendLine($"ゴール: {name} 番号 {index} 位置 {goal.transform.position} 輸送機 {transporter.name}");
+    }
+
+    static Transform MakeZone(Transform parent, string name, Vector3 position, Vector3 scale)
+    {
+        Transform zone = new GameObject(name).transform;
+        zone.SetParent(parent, false);
+        zone.position = position;
+        zone.localScale = scale;
+        return zone;
+    }
+
+    static void PlaceTrain(GameObject train, Vector3 position)
+    {
+        train.transform.SetPositionAndRotation(position, Quaternion.Euler(0f, 90f, 0f));
+        PrefabUtility.RecordPrefabInstancePropertyModifications(train.transform);
+    }
+
+    /// <summary>マップの一覧とビルドの一覧に入れ、通信の番号を新しいシーン用に付け直して、点検する。</summary>
+    static void Register()
+    {
+        SpaceJunkMapList list = SpaceJunkMapListSetup.EnsureList();
+        SpaceJunkMapListSetup.AddMap(DestScene, true);
+
+        SerializedObject listSo = new SerializedObject(list);
+        SerializedProperty maps = listSo.FindProperty("maps");
+        for (int m = 0; m < maps.arraySize; m++)
+        {
+            SerializedProperty entry = maps.GetArrayElementAtIndex(m);
+            if (entry.FindPropertyRelative("scenePath").stringValue == DestScene)
+            {
+                entry.FindPropertyRelative("displayName").stringValue = DisplayName;
+            }
+        }
+        listSo.ApplyModifiedPropertiesWithoutUndo();
+        EditorUtility.SetDirty(list);
+        AssetDatabase.SaveAssets();
+
+        SpaceJunkSetup.RegisterScenesInBuildSettings(SpaceJunkMapListSetup.ScenePaths());
+
+        // 通信の番号（GlobalObjectIdHash）は、シーンに保存された物の番号から作られる。
+        // 保存とビルドの一覧への登録が済んだ今、開き直して付け直す（STAGE_Train と同じ番号のままにしない）
+        Scene scene = EditorSceneManager.OpenScene(DestScene, OpenSceneMode.Single);
+        MethodInfo validate = typeof(NetworkObject).GetMethod("OnValidate", BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public);
+        foreach (NetworkObject no in UnityEngine.Object.FindObjectsByType<NetworkObject>(FindObjectsInactive.Include, FindObjectsSortMode.None))
+        {
+            validate.Invoke(no, null);
+            EditorUtility.SetDirty(no);
+        }
+        EditorSceneManager.MarkSceneDirty(scene);
+        EditorSceneManager.SaveScene(scene);
+
+        foreach (NetworkObject no in UnityEngine.Object.FindObjectsByType<NetworkObject>(FindObjectsInactive.Include, FindObjectsSortMode.None))
+        {
+            SerializedObject so = new SerializedObject(no);
+            report.AppendLine($"  NetworkObject {no.name} hash={(uint)so.FindProperty("GlobalObjectIdHash").longValue}");
+        }
+
+        SpaceJunkSetup.VerifyMap(DestScene);
+        SpaceJunkMapListSetup.RefreshGoalInfo();
+        AssetDatabase.SaveAssets();
+        report.AppendLine("登録: マップの一覧・ビルドの一覧");
+
+        // 比べるため、STAGE_Train の番号も控える
+        EditorSceneManager.OpenScene(PartsScene, OpenSceneMode.Single);
+        foreach (NetworkObject no in UnityEngine.Object.FindObjectsByType<NetworkObject>(FindObjectsInactive.Include, FindObjectsSortMode.None))
+        {
+            SerializedObject so = new SerializedObject(no);
+            report.AppendLine($"  (STAGE_Train) NetworkObject {no.name} hash={(uint)so.FindProperty("GlobalObjectIdHash").longValue}");
+        }
+    }
+
+    static GameObject FindRoot(Scene scene, string name)
+    {
+        foreach (GameObject root in scene.GetRootGameObjects())
+        {
+            if (root.name == name) return root;
+        }
+        throw new Exception(scene.name + " に " + name + " がありません");
+    }
+
+    /// <summary>真上からと、南の斜め上からの画像を書き出す（シーンには残さない）。</summary>
+    static void Snapshot()
+    {
+        EditorSceneManager.OpenScene(DestScene, OpenSceneMode.Single);
+        GameObject camObject = new GameObject("TempSnapshotCamera") { hideFlags = HideFlags.HideAndDontSave };
+        Camera cam = camObject.AddComponent<Camera>();
+        cam.clearFlags = CameraClearFlags.SolidColor;
+        cam.backgroundColor = new Color(0.08f, 0.08f, 0.12f);
+        cam.farClipPlane = 300f;
+        const int W = 1280, H = 720;
+        RenderTexture rt = new RenderTexture(W, H, 24);
+        cam.targetTexture = rt;
+
+        cam.orthographic = true;
+        cam.orthographicSize = 12.5f;
+        cam.transform.SetPositionAndRotation(new Vector3(0f, 60f, 0f), Quaternion.Euler(90f, 0f, 0f));
+        Shoot(cam, rt, OutDir + "train2_top.png");
+
+        cam.orthographic = false;
+        cam.fieldOfView = 50f;
+        cam.transform.position = new Vector3(0f, 16f, -17f);
+        cam.transform.rotation = Quaternion.Euler(60f, 0f, 0f);
+        Shoot(cam, rt, OutDir + "train2_angle.png");
+
+        cam.targetTexture = null;
+        UnityEngine.Object.DestroyImmediate(rt);
+        UnityEngine.Object.DestroyImmediate(camObject);
+    }
+
+    static void Shoot(Camera cam, RenderTexture rt, string path)
+    {
+        cam.Render();
+        RenderTexture.active = rt;
+        Texture2D tex = new Texture2D(rt.width, rt.height, TextureFormat.RGB24, false);
+        tex.ReadPixels(new Rect(0, 0, rt.width, rt.height), 0, 0);
+        tex.Apply();
+        RenderTexture.active = null;
+        File.WriteAllBytes(path, tex.EncodeToPNG());
+        UnityEngine.Object.DestroyImmediate(tex);
+    }
+}
