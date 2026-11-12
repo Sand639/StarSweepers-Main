@@ -69,7 +69,7 @@
 | --- | --- |
 | シーン | `Assets/Scenes/Stage/STAGE_Train2.unity`（新しく作った） |
 | 元のシーン（変えていない） | `Assets/Scenes/HansStages/HansStage01_Ver01.unity`（Hans さんの制作物） |
-| モデル（使うだけ） | `Assets/Art/Models/SM_Platform.fbx`・`SM_Half_Platform.fbx`・`SM_Bridge.fbx`・`SM_Edge.fbx`・`SM_Half_Edge.fbx`・`SM_Corner.fbx`・`SM_Transporter.fbx`（**Hans さんの制作物。ファイルは変えていない**） |
+| モデル（使うだけ） | `Assets/Art/Models/SM_Platform.fbx`・`SM_Half_Platform.fbx`・`SM_Bridge.fbx`・`SM_Edge.fbx`・`SM_Half_Edge.fbx`・`SM_Corner.fbx`・`SM_Transporter.fbx`（**Hans さんの制作物。このステージを作ったときはファイルを変えていない**。輸送機は 2026/11/12 に Hans さんの了承で手すりを4方向にし、床と接している側は着地のときにしまわれるようになった。`ゴールの輸送機の手すり.md`） |
 | プレハブ（使うだけ） | `Assets/Prefabs/Gimmick/Train.prefab`・`BombPoints.prefab`・`SpecialDebrisPoint.prefab`、`Assets/Prefabs/System/SpaceJunkRound.prefab`・`SpaceJunkStageCamera.prefab` ほか |
 | 一覧 | `Assets/Scenes/SpaceJunkMapList.asset`（ロビーに出す・表示名「電車マップ2」）・ビルドのシーン一覧に登録した |
 | 作った道具 | `Documents/調査の道具/Hansさんのステージから電車マップ2を作る.cs.txt`（Hans さんがステージを直したら、これで作り直せる。使い方はファイルの頭） |
@@ -113,3 +113,4 @@
 | --- | --- | --- |
 | 2026/11/12 | Claude Code | 新規作成（大槻さんの依頼）。Hans さんの `HansStage01_Ver01` を複製して、遊べるステージ `STAGE_Train2`（電車マップ2）を作った |
 | 2026/11/12 | Claude Code | **ステージ全体を90度回して横向きにした**（大槻さんの依頼）。ゴールは東（0＝青）と西（1＝赤）、列車は南北に横切る。作る道具にも回す手順を足した |
+| 2026/11/12 | Claude Code（依頼：小野田 喬） | 輸送機の手すりが4方向になり、床と接している側が着地のときにしまわれるようになったことを書いた |
