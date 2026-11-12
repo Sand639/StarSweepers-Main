@@ -53,24 +53,25 @@ public class DebrisSetUITests
     [Test]
     public void Unordered_ChecksSameKindFromTheLeft()
     {
-        // お題：装甲板・装甲板・燃料タンク・回路基板・装甲板。装甲板を2個、燃料タンクを1個入れた
-        int[] kinds = { 0, 0, 2, 1, 0, -1, -1, -1 };
-        int[] progress = { 2, 0, 1, 0, 0 };
+        // お題（3個）：装甲板・燃料タンク・装甲板。装甲板を1個、燃料タンクを1個入れた
+        int[] kinds = { 0, 2, 0, -1, -1, -1, -1, -1 };
+        int[] progress = { 1, 0, 1, 0, 0 };
         var result = new bool[DebrisSetUI.MaxSlots];
 
-        DebrisSetUI.MarkCollected(kinds, 5, false, 0, progress, result);
+        DebrisSetUI.MarkCollected(kinds, 3, false, 0, progress, result);
 
-        Assert.That(result, Is.EqualTo(new[] { true, true, true, false, false, false, false, false }));
+        Assert.That(result, Is.EqualTo(new[] { true, true, false, false, false, false, false, false }));
     }
 
     [Test]
     public void Ordered_ChecksFromTheLeftByStep()
     {
-        int[] kinds = { 3, 4, 3, 0, -1, -1, -1, -1 };
+        // お題（3個）の左から2個まで入れた
+        int[] kinds = { 3, 4, 3, -1, -1, -1, -1, -1 };
         int[] progress = { 0, 0, 0, 1, 1 };
         var result = new bool[DebrisSetUI.MaxSlots];
 
-        DebrisSetUI.MarkCollected(kinds, 4, true, 2, progress, result);
+        DebrisSetUI.MarkCollected(kinds, 3, true, 2, progress, result);
 
         Assert.That(result, Is.EqualTo(new[] { true, true, false, false, false, false, false, false }));
     }
