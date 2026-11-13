@@ -345,6 +345,12 @@ public partial class SweeperBot : MonoBehaviour
         // 列車が来る・足もとのガラスが割れそうなら、何をしていても逃げる（溜めている間・巻き取り中も歩ける）
         ApplySafetyMove(phase);
 
+        // 撃っている・投げたあと休んでいる・撃つ場所で止まっている間は、「動いていない」と数えない
+        if (phase != SweeperShooter.ShotPhase.Idle || Time.time < pauseUntil || arrivedAt >= 0f)
+        {
+            ResetBodyStuck();
+        }
+
         // ボタンは Attack（引っ張る）の1つだけ。溜めている間は押し続け、巻き取り中は1フレームだけ押す
         pad.SetPull(hold);
         lastPhase = phase;
@@ -533,6 +539,13 @@ public partial class SweeperBot : MonoBehaviour
 
         arrivedAt = -1f;
 
+        if (IsBodyStuck())
+        {
+            GiveUp(target);
+            pad.Move = Vector2.zero;
+            return false;
+        }
+
         if (IsStuck(RemainingPathLength()))
         {
             stuckCount++;
@@ -562,9 +575,7 @@ public partial class SweeperBot : MonoBehaviour
             }
         }
 
-        Vector3 me = transform.position;
-        candidates.Sort((a, b) =>
-            FlatDistance(me, a.transform.position).CompareTo(FlatDistance(me, b.transform.position)));
+        candidates.Sort((a, b) => ChoiceDistance(a).CompareTo(ChoiceDistance(b)));
 
         int tries = Mathf.Min(candidates.Count, MaxPlanTriesPerFrame);
         for (int i = 0; i < tries; i++)
@@ -1046,6 +1057,7 @@ public partial class SweeperBot : MonoBehaviour
         }
 
         ResetStuck();
+        ResetBodyStuck();
     }
 
     private void GiveUp(HookableObject item)

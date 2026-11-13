@@ -1,0 +1,263 @@
+using System.Collections.Generic;
+using System.Linq;
+using Unity.Netcode;
+using Unity.Netcode.Transports.UTP;
+using UnityEditor;
+using UnityEditor.SceneManagement;
+using UnityEngine;
+using UnityEngine.SceneManagement;
+
+/// <summary>
+/// 【一時的な調査用。コミットしない】ホスト＋ボット3人で、決めたステージの試合を動かし、
+/// ボットごとの「落ちた回数・投げた回数・止まっていた秒数」とチームの点数をログに出す。
+/// 起動：Unity.exe -batchmode -projectPath … -executeMethod TempBotGimmickProbe.Run -probeMap STAGE_GlassFull -probeSeconds 60 -logFile …
+/// </summary>
+[InitializeOnLoad]
+public static class TempBotGimmickProbe
+{
+    private const string Flag = "TempBotGimmickProbe.Active";
+    private const string MapKey = "TempBotGimmickProbe.Map";
+    private const string SecondsKey = "TempBotGimmickProbe.Seconds";
+    private const string StepKey = "TempBotGimmickProbe.Step";
+    private const string TimeKey = "TempBotGimmickProbe.T";
+    private const string StartKey = "TempBotGimmickProbe.Start";
+    private const ushort Port = 17995;
+
+    private class Stat
+    {
+        public int falls;
+        public int throws;
+        public float idle;
+        public bool below;
+        public SweeperShooter.ShotPhase last;
+        public int stuckLogs;
+        public string lastGround = "";
+        public float lastFallSecs;
+    }
+
+    private static readonly Dictionary<SweeperBot, Stat> stats = new Dictionary<SweeperBot, Stat>();
+    private static float playStart = -1f;
+    private static float lastDump;
+    private static float lastSample;
+
+    static TempBotGimmickProbe()
+    {
+        if (SessionState.GetBool(Flag, false))
+        {
+            EditorApplication.update += Tick;
+        }
+    }
+
+    public static void Run()
+    {
+        string[] args = System.Environment.GetCommandLineArgs();
+        string map = "STAGE_Simple";
+        float seconds = 60f;
+        for (int i = 0; i < args.Length - 1; i++)
+        {
+            if (args[i] == "-probeMap") map = args[i + 1];
+            if (args[i] == "-probeSeconds") seconds = float.Parse(args[i + 1]);
+        }
+
+        SessionState.SetBool(Flag, true);
+        SessionState.SetString(MapKey, map);
+        SessionState.SetFloat(SecondsKey, seconds);
+        SessionState.SetInt(StepKey, 0);
+        SessionState.SetFloat(TimeKey, 0f);
+        SessionState.SetFloat(StartKey, 0f);
+        EditorSceneManager.OpenScene("Assets/Scenes/MainLoop/TitleScene.unity");
+        EditorApplication.update += Tick;
+        EditorApplication.EnterPlaymode();
+    }
+
+    private static float Now => (float)EditorApplication.timeSinceStartup;
+
+    private static void Next(int step)
+    {
+        SessionState.SetInt(StepKey, step);
+        SessionState.SetFloat(TimeKey, Now);
+        Debug.Log($"[PROBE] step -> {step}（シーン：{SceneManager.GetActiveScene().name}）");
+    }
+
+    private static void Tick()
+    {
+        if (!EditorApplication.isPlaying)
+        {
+            return;
+        }
+
+        Application.runInBackground = true;
+        if (EditorApplication.isPaused)
+        {
+            EditorApplication.isPaused = false;
+        }
+        EditorApplication.QueuePlayerLoopUpdate();
+
+        if (SessionState.GetFloat(TimeKey, 0f) <= 0f)
+        {
+            SessionState.SetFloat(TimeKey, Now);
+            SessionState.SetFloat(StartKey, Now);
+            return;
+        }
+
+        int step = SessionState.GetInt(StepKey, 0);
+        float waited = Now - SessionState.GetFloat(TimeKey, 0f);
+
+        if (Now - SessionState.GetFloat(StartKey, 0f) > 240f)
+        {
+            Debug.Log("[PROBE] 時間切れ");
+            Report();
+            Finish(3);
+            return;
+        }
+
+        try
+        {
+            TickHost(step, waited);
+        }
+        catch (System.Exception e)
+        {
+            Debug.LogError("[PROBE] 例外：" + e);
+            Finish(2);
+        }
+    }
+
+    private static void TickHost(int step, float waited)
+    {
+        switch (step)
+        {
+            case 0:
+                if (waited < 3f) return;
+                NetworkManager.Singleton.GetComponent<UnityTransport>().SetConnectionData("127.0.0.1", Port, "127.0.0.1");
+                Debug.Log($"[PROBE] StartHost={NetworkManager.Singleton.StartHost()}");
+                Next(1);
+                break;
+
+            case 1:
+                if (waited < 5f || SpaceJunkSession.Current == null) return;
+                SpaceJunkSession.Current.ServerSetTeamCount(2);
+                SpaceJunkSession.Current.ServerSetFixedMap(SessionState.GetString(MapKey, "STAGE_Simple"), false);
+                SpaceJunkSession.Current.ServerSetBotCount(3);
+                Next(2);
+                break;
+
+            case 2:
+                if (waited < 6f) return;
+                SpaceJunkSession.Current.ServerStartMatch();
+                Next(3);
+                break;
+
+            case 3:
+                if (!SpaceJunkRound.PlayAllowed || SpaceJunkRound.Current == null || Object.FindObjectsByType<SweeperBot>(FindObjectsSortMode.None).Length == 0)
+                {
+                    if (waited > 60f)
+                    {
+                        Debug.Log("[PROBE] 試合が始まらない");
+                        Finish(4);
+                    }
+                    return;
+                }
+                Debug.Log($"[PROBE] 試合開始（{SceneManager.GetActiveScene().name}） frame={Time.frameCount}");
+                playStart = Time.time;
+                lastDump = Time.time;
+                lastSample = Time.time;
+                stats.Clear();
+                Next(4);
+                break;
+
+            case 4:
+                Sample();
+                if (Time.time - lastDump >= 10f)
+                {
+                    lastDump = Time.time;
+                    Report();
+                }
+                if (Time.time - playStart >= SessionState.GetFloat(SecondsKey, 60f))
+                {
+                    Report();
+                    Finish(0);
+                }
+                break;
+        }
+    }
+
+    private static void Sample()
+    {
+        float dt = Time.time - lastSample;
+        lastSample = Time.time;
+        if (dt <= 0f) return;
+        foreach (SweeperBot bot in Object.FindObjectsByType<SweeperBot>(FindObjectsSortMode.None))
+        {
+            if (!stats.TryGetValue(bot, out Stat s))
+            {
+                s = new Stat();
+                stats[bot] = s;
+            }
+
+            SweeperShooter shooter = bot.GetComponent<SweeperShooter>();
+            VirtualPlayerInput pad = bot.GetComponent<VirtualPlayerInput>();
+            float y = bot.transform.position.y;
+            if (y > -0.3f)
+            {
+                GravityGlassFloor g = SweeperBotGimmicks.GlassAt(bot.transform.position);
+                s.lastGround = g != null ? $"{g.name}:{g.State}" : "solid";
+                s.lastFallSecs = g != null ? Mathf.Min(g.SecondsUntilFall, 99f) : 99f;
+            }
+            if (!s.below && y < -2f)
+            {
+                s.below = true;
+                s.falls++;
+                Debug.Log($"[PROBE] FALL {bot.name} t={Time.time - playStart:0.0} pos={bot.transform.position:F1} phase={s.last} lastGround={s.lastGround} lastFall={s.lastFallSecs:0.00}");
+            }
+            else if (s.below && y > -0.5f)
+            {
+                s.below = false;
+            }
+
+            SweeperShooter.ShotPhase phase = shooter.Phase;
+            if (s.last == SweeperShooter.ShotPhase.Reeling && phase != SweeperShooter.ShotPhase.Reeling)
+            {
+                s.throws++;
+            }
+            s.last = phase;
+
+            if (SpaceJunkRound.PlayAllowed && phase == SweeperShooter.ShotPhase.Idle && pad.Move.sqrMagnitude < 0.01f && !s.below)
+            {
+                s.idle += dt;
+            }
+        }
+    }
+
+    private static void Report()
+    {
+        SpaceJunkRound round = SpaceJunkRound.Current;
+        string score = round != null ? $"team0={round.ScoreOf(0)} team1={round.ScoreOf(1)}" : "round無し";
+        Debug.Log($"[PROBE] ==== {SceneManager.GetActiveScene().name} t={Time.time - playStart:0} {score} navReady={SpaceJunkBotNavMesh.Ready} ====");
+        foreach (KeyValuePair<SweeperBot, Stat> e in stats)
+        {
+            if (e.Key == null) continue;
+            var flags = System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance;
+            object target = typeof(SweeperBot).GetField("target", flags)?.GetValue(e.Key);
+            object stand = typeof(SweeperBot).GetField("standPoint", flags)?.GetValue(e.Key);
+            object given = typeof(SweeperBot).GetField("givenUp", flags)?.GetValue(e.Key);
+            object riding = typeof(SweeperBot).GetField("ridingLift", flags)?.GetValue(e.Key);
+            var corners = typeof(SweeperBot).GetField("pathCorners", flags)?.GetValue(e.Key) as List<Vector3>;
+            object ci = typeof(SweeperBot).GetField("cornerIndex", flags)?.GetValue(e.Key);
+            Vector3 p = e.Key.transform.position;
+            bool esc = SweeperBotGimmicks.TryFindGlassEscape(p, 0.65f, out _);
+            GravityGlassFloor gl = SweeperBotGimmicks.GlassAt(p);
+            string cornerText = corners != null ? string.Join(" ", corners.Select(c => c.ToString("F1"))) : "-";
+            Debug.Log($"[PROBE]   diag move={e.Key.GetComponent<VirtualPlayerInput>().Move} riding={riding} esc={esc} glass={(gl != null ? gl.name + ":" + gl.State + ":" + gl.BreaksOnNextEntry : "-")} train={SweeperBotGimmicks.SecondsUntilTrain(p, 3f)} ci={ci} corners={cornerText}");
+            string targetText =target is HookableObject h && h != null ? $"{h.name}@{h.transform.position:F1}" : "なし";
+            Debug.Log($"[PROBE] {e.Key.name} team={e.Key.Team} falls={e.Value.falls} throws={e.Value.throws} idle={e.Value.idle:0.0}s pos={e.Key.transform.position:F1} target={targetText} stand={stand} givenUp={(given as System.Collections.ICollection)?.Count} items={HookableObject.All.Count}");
+        }
+        Debug.Log($"[PROBE] TOTAL falls={stats.Values.Sum(s => s.falls)} throws={stats.Values.Sum(s => s.throws)} idle={stats.Values.Sum(s => s.idle):0.0}s");
+    }
+
+    private static void Finish(int code)
+    {
+        SessionState.SetBool(Flag, false);
+        Debug.Log($"[PROBE] finish {code}");
+        EditorApplication.Exit(code);
+    }
+}

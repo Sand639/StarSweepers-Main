@@ -18,6 +18,35 @@ public partial class SweeperBot
     /// <summary>乗って上がるのを待っている、上下する床（乗っていなければ null）。</summary>
     private SpaceJunkLiftFloor ridingLift;
 
+    /// <summary>体が最後に 0.5m 以上動いた場所と時刻（道に無い物に引っかかって進めないのを見つける）。</summary>
+    private Vector3 bodyAnchor;
+    private float bodyAnchorTime;
+
+    // ------------------------------------------------------------
+    // 引っかかり（道を引き直しても、体が動いていない）
+    // ------------------------------------------------------------
+
+    /// <summary>
+    /// 歩いているのに、体が Stuck Seconds＋1 秒のあいだ 0.5m も動いていないか。
+    /// 道を引き直すたびに戻る「近づけたか」の判定（<see cref="IsStuck"/>）では、地図に無い物（土台の上の爆弾など）に引っかかったのを見つけられないため。
+    /// </summary>
+    private bool IsBodyStuck()
+    {
+        if (FlatDistance(transform.position, bodyAnchor) > 0.5f)
+        {
+            ResetBodyStuck();
+            return false;
+        }
+        return Time.time - bodyAnchorTime > stuckSeconds + 1f;
+    }
+
+    /// <summary>わざと止まっている（撃っている・待っている）ときに呼ぶ。</summary>
+    private void ResetBodyStuck()
+    {
+        bodyAnchor = transform.position;
+        bodyAnchorTime = Time.time;
+    }
+
     // ------------------------------------------------------------
     // 安全（列車・割れるガラス）
     // ------------------------------------------------------------
@@ -38,6 +67,7 @@ public partial class SweeperBot
         {
             Steer(exit, idle);
             ResetStuck();
+            ResetBodyStuck();
             return true;
         }
 
@@ -48,6 +78,7 @@ public partial class SweeperBot
         {
             Steer(safe, idle);
             ResetStuck();
+            ResetBodyStuck();
             return true;
         }
 
@@ -85,6 +116,19 @@ public partial class SweeperBot
     private bool ShouldHoldShotForGlass() => SweeperBotGimmicks.SecondsUntilFallAt(transform.position) < GlassReleaseSeconds;
 
     private bool ShouldThrowNowForGlass() => SweeperBotGimmicks.SecondsUntilFallAt(transform.position) < GlassThrowSeconds;
+
+    /// <summary>違う段（上下する床で行き来する段）の素材を、何m遠い物とみなすか（床を待つ時間のぶん、同じ段の素材を先に狙う）。</summary>
+    private const float OtherLevelPenalty = 12f;
+
+    /// <summary>素材を選ぶ順番に使う距離（近い順）。違う段の素材は遠いとみなす。</summary>
+    private float ChoiceDistance(HookableObject item)
+    {
+        Vector3 position = item.transform.position;
+        float distance = FlatDistance(transform.position, position);
+        return position.y - transform.position.y > SameLevelHeight + 0.5f || transform.position.y - position.y > SameLevelHeight
+            ? distance + OtherLevelPenalty
+            : distance;
+    }
 
     /// <summary>撃つ場所に着いてから撃ち始めるまでの秒数。割れるガラスの上では待たない。</summary>
     private float ThinkSeconds => SweeperBotGimmicks.OnBreakingGlass(transform.position) ? 0f : thinkSeconds;
@@ -155,6 +199,7 @@ public partial class SweeperBot
             pad.Move = Vector2.zero;
             PointAt(next);
             ResetStuck();
+            ResetBodyStuck();
             return true;
         }
 
@@ -181,6 +226,7 @@ public partial class SweeperBot
 
             pad.Move = Vector2.zero;
             ResetStuck();
+            ResetBodyStuck();
             return true;
         }
 
@@ -197,6 +243,7 @@ public partial class SweeperBot
             ridingLift = link.lift;
             pad.Move = Vector2.zero;
             ResetStuck();
+            ResetBodyStuck();
             return true;
         }
 
@@ -220,6 +267,7 @@ public partial class SweeperBot
         }
 
         ResetStuck();
+        ResetBodyStuck();
         return true;
     }
 }

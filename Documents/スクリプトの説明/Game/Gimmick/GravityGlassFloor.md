@@ -19,6 +19,7 @@
 | `GravityGlassFloor.Break.cs` | 割れる・戻る（破片） |
 | `GravityGlassFloor.Cracks.cs` | ヒビ |
 | `GravityGlassFloor.Stepping.cs` | 踏まれたかを調べる |
+| `GravityGlassFloor.BotInfo.cs` | ボットに教える情報（あと何秒で割れるか・乗ってよいか・床の上か）。**読むだけで、床の動きは変えない**（2026/11/12） |
 | `GlassFractureGeometry.cs` | 割れた破片の形の計算（別のクラス） |
 
 割れた破片の形の計算（多角形を作る・三角形に分ける・厚みを付ける）は、別のクラス `GlassFractureGeometry`（`GlassFractureGeometry.cs`）にある。
@@ -41,3 +42,4 @@
 | 2026/11/6 | Claude Code | 新規作成（大槻さんの依頼）。長いスクリプトを機能ごとのファイルに分けたので、分け方を書いた |
 | 2026/11/7 | Claude Code | 「変数の置き場所」を足し、ずれやすい行数の列を表から消した（大槻さんの依頼。AIが読んで気づいた弱点の修正） |
 | 2026/11/7 | Claude Code | ステージの名前を付け直した（`STAGE_01`〜`09` → `STAGE_Simple` など）のに合わせて、本文の名前を置き換えた。対応は `宇宙ごみのマップの作り方.md` の「ステージの名前」 |
+| 2026/11/12 | Claude Code | ボット用に `GravityGlassFloor.BotInfo.cs`（あと何秒で割れるか・乗ってよいかを読むだけの関数）を足したので、表に足した（小野田さんの依頼。ボットがガラスの上を歩けるようにする作業） |
