@@ -17,8 +17,8 @@ using UnityEngine.SceneManagement;
 /// **ゲームを止めないよう、裏で少しずつ作る**（`UpdateNavMeshDataAsync`）。作り終わるまでの間、ボットはまっすぐ歩く。
 /// 作る範囲は、マップの当たり判定がある所だけ（最初は 300m 四方を細かく作っていて重かった。2026/10/21・大槻さんの報告）。
 ///
-/// 地図に入れないもの：素材（動く物）・プレイヤーの体・すり抜ける当たり判定（ゴールの判定など）。
-/// 動く床・回る床は、**地図を作った瞬間の場所**のまま（簡易版）。
+/// 地図に入れないもの：素材（動く物）・プレイヤーの体・すり抜ける当たり判定（ゴールの判定など）・列車。
+/// ギミック（ガラス・ベルト・線路・上下する床・回る床）に合わせた直しは <see cref="SweeperBotGimmicks"/> がする（2026/11/12）。
 ///
 /// 歩ける坂の角度・段差・体の太さは、ボットの体（CharacterController）に合わせる。
 /// </summary>
@@ -34,23 +34,34 @@ public static class SpaceJunkBotNavMesh
     private const float VoxelSize = 0.2f;
 
     private static NavMeshDataInstance instance;
+    private static NavMeshData data;
     private static AsyncOperation building;
     private static int builtSceneHandle = -1;
     private static float buildStartedAt;
     private static bool reported;
     private static bool hasSettings;
+    private static bool builtOnce;
+    private static bool rebuildWanted;
     private static NavMeshBuildSettings settings;
 
-    /// <summary>いまのマップの地図ができている（作り終わっている）か。</summary>
+    /// <summary>いまのマップの地図ができている（作り終わっている）か。作り直している途中も、前の地図が使えるので true。</summary>
     public static bool Ready => instance.valid && builtSceneHandle == SceneManager.GetActiveScene().handle
-                                && (building == null || building.isDone);
+                                && (builtOnce || (building != null && building.isDone));
 
-    /// <summary>道を調べるときの条件（ボットの体に合わせた種類）。</summary>
-    public static NavMeshQueryFilter Filter => new NavMeshQueryFilter
+    /// <summary>道を調べるときの条件（ボットの体に合わせた種類。ガラス・ベルト・線路は遠回りしてでも避けたい）。</summary>
+    public static NavMeshQueryFilter Filter
     {
-        agentTypeID = settings.agentTypeID,
-        areaMask = NavMesh.AllAreas
-    };
+        get
+        {
+            NavMeshQueryFilter filter = new NavMeshQueryFilter
+            {
+                agentTypeID = settings.agentTypeID,
+                areaMask = NavMesh.AllAreas
+            };
+            SweeperBotGimmicks.ApplyAreaCosts(ref filter);
+            return filter;
+        }
+    }
 
     /// <summary>
     /// **いまのマップの地図が無ければ、裏で作り始める。** マップ（いま動いているシーン）が変わっていたら作り直す。
@@ -62,6 +73,10 @@ public static class SpaceJunkBotNavMesh
         if (builtSceneHandle == scene.handle)
         {
             ReportWhenDone(scene);
+            if (rebuildWanted)
+            {
+                RequestRebuild();
+            }
             return Ready;
         }
 
@@ -72,6 +87,8 @@ public static class SpaceJunkBotNavMesh
 
         building = null;
         reported = false;
+        builtOnce = false;
+        rebuildWanted = false;
         builtSceneHandle = scene.handle; // 作れなかったときも、同じマップで何度も作り直さない
 
         if (!hasSettings)
@@ -90,21 +107,13 @@ public static class SpaceJunkBotNavMesh
             hasSettings = true;
         }
 
-        // まず広めに当たり判定を集め、床や壁ではない物を外してから、残った物を囲む範囲だけで作る
-        Bounds search = new Bounds(Vector3.zero, Vector3.one * MaxBuildSize * 2f);
-        List<NavMeshBuildSource> sources = new List<NavMeshBuildSource>();
-        NavMeshBuilder.CollectSources(search, ~0, NavMeshCollectGeometry.PhysicsColliders, 0,
-            new List<NavMeshBuildMarkup>(), sources);
-        sources.RemoveAll(IsNotGround);
-        sources.RemoveAll(IsUnreadableMesh);
-
-        if (!TryGetBounds(sources, out Bounds bounds))
+        if (!CollectSources(out List<NavMeshBuildSource> sources, out Bounds bounds))
         {
             Debug.LogWarning($"[BOT] {scene.name} に床が見つからないので、歩ける床の地図を作りませんでした。ボットはまっすぐ歩きます。");
             return false;
         }
 
-        NavMeshData data = new NavMeshData(settings.agentTypeID);
+        data = new NavMeshData(settings.agentTypeID);
         instance = NavMesh.AddNavMeshData(data);
         building = NavMeshBuilder.UpdateNavMeshDataAsync(data, settings, sources, bounds);
         buildStartedAt = Time.realtimeSinceStartup;
@@ -113,7 +122,59 @@ public static class SpaceJunkBotNavMesh
         return false;
     }
 
-    /// <summary>作り終わったら、かかった時間を1回だけ知らせる（重さを調べるとき用）。</summary>
+    /// <summary>
+    /// **いまの形で地図を作り直す**（回る床が回り終わったときなど）。作っている途中なら、終わってからもう一度作る。
+    /// 作り直しを始めた（または予約した）ら true。
+    /// </summary>
+    public static bool RequestRebuild()
+    {
+        if (data == null || !instance.valid || builtSceneHandle != SceneManager.GetActiveScene().handle)
+        {
+            return false;
+        }
+
+        if (building != null && !building.isDone)
+        {
+            rebuildWanted = true;
+            return true;
+        }
+
+        if (!CollectSources(out List<NavMeshBuildSource> sources, out Bounds bounds))
+        {
+            return false;
+        }
+
+        builtOnce = true;
+        rebuildWanted = false;
+        reported = false;
+        building = NavMeshBuilder.UpdateNavMeshDataAsync(data, settings, sources, bounds);
+        buildStartedAt = Time.realtimeSinceStartup;
+        return true;
+    }
+
+    /// <summary>
+    /// まず広めに当たり判定を集め、床や壁ではない物を外し、ギミックに合わせて直してから、残った物を囲む範囲を出す。
+    /// 床が1つも無ければ false。
+    /// </summary>
+    private static bool CollectSources(out List<NavMeshBuildSource> sources, out Bounds bounds)
+    {
+        Bounds search = new Bounds(Vector3.zero, Vector3.one * MaxBuildSize * 2f);
+        sources = new List<NavMeshBuildSource>();
+        NavMeshBuilder.CollectSources(search, ~0, NavMeshCollectGeometry.PhysicsColliders, 0,
+            new List<NavMeshBuildMarkup>(), sources);
+        sources.RemoveAll(IsNotGround);
+        sources.RemoveAll(IsUnreadableMesh);
+
+        if (!TryGetBounds(sources, out bounds))
+        {
+            return false;
+        }
+
+        SweeperBotGimmicks.AdjustSources(sources);
+        return true;
+    }
+
+    /// <summary>作り終わったら、かかった時間を1回だけ知らせ、ギミックのつなぎ（上下する床など）を作る。</summary>
     private static void ReportWhenDone(Scene scene)
     {
         if (reported || building == null || !building.isDone)
@@ -122,6 +183,8 @@ public static class SpaceJunkBotNavMesh
         }
 
         reported = true;
+        builtOnce = true;
+        SweeperBotGimmicks.OnNavMeshBuilt(settings.agentTypeID);
         Debug.Log($"[BOT] {scene.name} の歩ける床の地図ができました（{Time.realtimeSinceStartup - buildStartedAt:0.0} 秒）。");
     }
 
@@ -198,6 +261,11 @@ public static class SpaceJunkBotNavMesh
         if (!(source.sourceObject is Mesh mesh) || mesh.isReadable)
         {
             return false;
+        }
+
+        if (builtOnce)
+        {
+            return true; // 作り直しのときは、同じ注意をくり返さない
         }
 
         string owner = source.component != null ? source.component.name : "?";
