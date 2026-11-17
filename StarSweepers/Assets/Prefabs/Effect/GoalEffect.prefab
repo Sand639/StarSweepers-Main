@@ -64,7 +64,7 @@ MonoBehaviour:
   pillarHeight: 1.5
   pillarUseTeamColor: 1
   pillarColor: {r: 0.35, g: 1, b: 0.55, a: 1}
-  pillarBrightness: 1.2
+  pillarBrightness: 0.8
   streakCount: 14
   sparkleCount: 22
   pillarMoveSeconds: 0.4
