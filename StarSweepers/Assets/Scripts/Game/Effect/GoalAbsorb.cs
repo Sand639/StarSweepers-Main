@@ -27,9 +27,31 @@ public class GoalAbsorb : MonoBehaviour
     private GoalEffect settings;
     private bool finished;
     private float finishedAt;
+    private bool pillar;
+    private Vector3 startPosition;
+    private float itemSize = 0.6f;
+
+    /// <summary>いま吸い込み中の物資（光の柱が、消える前の光を描くのに使う）。</summary>
+    public static readonly System.Collections.Generic.List<GoalAbsorb> All = new System.Collections.Generic.List<GoalAbsorb>();
 
     /// <summary>吸い込みの進み具合（0〜1）。</summary>
     public float Progress { get; private set; }
+
+    /// <summary>光の柱の動きか（始まったときの見た目の種類で決まる）。</summary>
+    public bool IsPillar => pillar;
+
+    /// <summary>物資の見た目のおおよその大きさ（m）。消える瞬間の光の大きさに使う。</summary>
+    public float ItemSize => itemSize;
+
+    private void OnEnable()
+    {
+        All.Add(this);
+    }
+
+    private void OnDisable()
+    {
+        All.Remove(this);
+    }
 
     /// <summary>
     /// 物資の吸い込みを始める。位置を動かすのはホスト（1人用ならそのPC）だけで、参加者のPCは小さくするだけ
@@ -79,6 +101,15 @@ public class GoalAbsorb : MonoBehaviour
         startRadius = new Vector2(offset.x, offset.z).magnitude;
         startAngle = Mathf.Atan2(offset.z, offset.x);
         startY = transform.position.y;
+        startPosition = transform.position;
+        // 参加者のPCには円柱の大きさが届かない（位置はホストが動かす）ので、見た目の種類だけで決める
+        pillar = settings != null && settings.Style == GoalEffectStyle.Pillar;
+
+        Renderer look = GetComponentInChildren<Renderer>();
+        if (look != null)
+        {
+            itemSize = Mathf.Max(0.2f, look.bounds.size.magnitude);
+        }
 
         item.SetAbsorbing(true);
 
@@ -141,6 +172,10 @@ public class GoalAbsorb : MonoBehaviour
         {
             finished = true;
             finishedAt = Time.time;
+            if (pillar && settings != null)
+            {
+                settings.PlayFlash(transform.position, itemSize);
+            }
         }
         else if (!item.IsAbsorbing)
         {
@@ -153,10 +188,21 @@ public class GoalAbsorb : MonoBehaviour
         }
     }
 
-    /// <summary>進み具合 t の姿にする（小さくする・回す・中心へ寄せる）。</summary>
+    /// <summary>進み具合 t の姿にする（渦：小さくしながら回して中心へ／光の柱：真ん中の上へ運んで、ゆっくり上げる）。</summary>
     private void Apply(float t)
     {
         Progress = t;
+
+        if (pillar)
+        {
+            // 光の柱：大きさはそのまま。位置はホストだけが動かす
+            if (authority && area.Radius > 0f)
+            {
+                ApplyPillar(t);
+            }
+            return;
+        }
+
         float endScale = settings != null ? settings.EndScale : 0.05f;
         float shrink = Mathf.Lerp(1f, endScale, Mathf.Pow(t, 1.6f));
         transform.localScale = startScale * shrink;
@@ -169,18 +215,6 @@ public class GoalAbsorb : MonoBehaviour
         float turns = settings != null ? settings.SpinTurns : 1.25f;
         float selfSpin = settings != null ? settings.SelfSpinDegrees : 540f;
         float sink = settings != null ? settings.SinkDepth : 0.4f;
-
-        if (settings != null && settings.Style == GoalEffectStyle.Pillar && area.Radius > 0f)
-        {
-            // 光の柱：真ん中へ寄りながら、ゆっくり回って上へ浮かび、小さくなって消える
-            float ease = t * t * (3f - 2f * t);
-            float pillarRadius = startRadius * (1f - 0.85f * ease);
-            float pillarAngle = startAngle + turns * 0.35f * Mathf.PI * 2f * t;
-            float rise = Mathf.Lerp(startY, Mathf.Max(startY + 0.6f, settings.RiseTopY(area)), ease);
-            transform.position = new Vector3(center.x + Mathf.Cos(pillarAngle) * pillarRadius, rise, center.z + Mathf.Sin(pillarAngle) * pillarRadius);
-            transform.rotation = Quaternion.AngleAxis(-selfSpin * 0.35f * t, Vector3.up) * startRotation;
-            return;
-        }
 
         // 渦：中心へ寄りながら、だんだん速く回る（渦の見た目と同じ、上から見て左回り）
         float inward = t * t * (3f - 2f * t);
@@ -195,6 +229,31 @@ public class GoalAbsorb : MonoBehaviour
         transform.rotation = Quaternion.AngleAxis(-selfSpin * t * t, Vector3.up) * startRotation;
     }
 
+    /// <summary>
+    /// 光の柱の動き。前半（Pillar Move Seconds）で、真ん中の上（光の柱の一番上あたり）へ一直線に運ぶ。
+    /// 後半（Pillar Rise Seconds）で、そこからゆっくり上げる。最後に光って消える（光は <see cref="GoalEffect.PlayFlash"/>）。
+    /// </summary>
+    private void ApplyPillar(float t)
+    {
+        float move = settings.PillarMoveSeconds;
+        float total = Mathf.Max(0.05f, move + settings.PillarRiseSeconds);
+        float elapsed = t * total;
+        Vector3 top = new Vector3(center.x, settings.PillarTopY(area), center.z);
+
+        if (elapsed < move)
+        {
+            float k = Mathf.Clamp01(elapsed / Mathf.Max(0.01f, move));
+            float ease = 1f - (1f - k) * (1f - k);
+            transform.position = Vector3.Lerp(startPosition, top, ease);
+            return;
+        }
+
+        float r = Mathf.Clamp01((elapsed - move) / Mathf.Max(0.01f, total - move));
+        float riseEase = r * r * (3f - 2f * r);
+        transform.position = top + Vector3.up * (settings.PillarRiseDistance * riseEase);
+        transform.rotation = Quaternion.AngleAxis(-90f * r, Vector3.up) * startRotation;
+    }
+
     /// <summary>ホスト：吸い込み終わり。大きさを戻してから知らせる（知らせた先ですぐ消すので、戻した姿は見えない）。</summary>
     private void Finish()
     {
@@ -206,6 +265,11 @@ public class GoalAbsorb : MonoBehaviour
         finished = true;
         item.SetAbsorbing(false);
         transform.localScale = startScale;
+
+        if (pillar && settings != null && !item.IsVanished)
+        {
+            settings.PlayFlash(transform.position, itemSize);
+        }
 
         // 吸い込み中に、ほかの理由（爆発など）で消されていたら、何もしない（得点にしない）
         if (!item.IsVanished)

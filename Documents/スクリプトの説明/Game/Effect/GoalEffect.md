@@ -14,7 +14,8 @@
 
 - **見た目の種類（`GoalEffectStyle`）**：`style` のプルダウンで **渦（Vortex）** と **光の柱（Pillar）** を選ぶ。`DrawAt` は種類によって `DrawVortices`（渦）か `DrawPillars`（光の柱）を呼ぶ。判定の円柱・引き寄せ・吸い込みの始まりと終わり・得点の流れ（`ServerFeed`）は共通。
 - **光の柱（`DrawPillars`）**：床の光（円の板。筒の 1.35 倍まで）・筒（`CreateCylinderMesh`。半径 1・高さ 1 の筒を、渦の半径×高さ×渦の半径にする）・光の筋・きらめき（`CreateBillboardMesh`。カメラのほうを向く板。足もとは筒の中の床で、高さと動きはシェーダーが決める）を `GoalPillar.shader` の `_Part` 0〜3 で描く。色は `pillarUseTeamColor` ならチームの色、そうでなければ `pillarColor`。`_Funnel` に（半径, 高さ）を渡す。
-- **光の柱のときの物資の動き（`GoalAbsorb.Apply`）**：半径を 15% まで縮め（smoothstep）、Spin Turns×0.35 周だけゆっくり回り、高さを「`RiseTopY`（床＋筒の高さ＋Rise Above Pillar）」と「始めの高さ＋0.6m」の高いほうへ上げる。大きさの変化は渦と同じ。
+- **光の柱のときの物資の動き（`GoalAbsorb.ApplyPillar`）**：吸い込みの長さは `CurrentAbsorbSeconds`＝Pillar Move Seconds＋Pillar Rise Seconds（ホストが参加者へ送る秒数もこれ）。前半は、始めの位置から「真ん中の上（`PillarTopY`＝床＋光の柱の高さ）」へ一直線に運ぶ（だんだん遅く）。後半は、そこから Pillar Rise Distance だけゆっくり上げる（smoothstep）。**大きさは変えない**（当たり判定は渦と同じく、始まったときに切る）。位置はホストだけが動かす。どのPCでも、そのPCの吸い込みが終わったときに `GoalEffect.PlayFlash` で消えた瞬間の光を出す（ホストは `Finish`、参加者は進み具合が 1 になったとき）。光の柱かどうかは、吸い込みが始まったときの見た目の種類で決める（`IsPillar`）。
+- **消える光（`DrawFlashes`）**：見た目の種類にかかわらず毎回描く。吸い込み中の物資（`GoalAbsorb.All`）のうち光の柱の物は、残りが Pillar Glow Seconds より短くなったら、物資の位置にやわらかい光の玉（`_Flash.x`＝0）。`PlayFlash` で足した光は、Pillar Flash Seconds の間、白っぽい芯・十字・広がる輪（`_Flash.x`＝1）。色は、いちばん近いゴールの光の柱の色（`ColorNear`）。`GoalPillar.shader` の `_Part`＝4 で、カメラのほうを向く板（`CreateFlashMesh`）に描く。
 
 - **渦の係（`GoalEffect`）**：同じシーンの全部のゴール（試合のゴール `SpaceJunkGoal` と、ロビーの練習用ゴール `SpaceJunkLobbyGoal`）の床に黒い渦を、その上に半透明のすり鉢（立体の渦）・らせんの帯・黒いかけらを描く（どれも黒と灰色。Use Team Color がオンなら明るい所がチームの色）。ホストからは、ゴールの中の物資について「渦の円柱に入っていれば吸い込みを始める／外なら渦のほうへ引き寄せる」を受け持つ。
 - **吸い込まれる係（`GoalAbsorb`）**：吸い込み中の物資1つの動き。ホスト（1人用ならそのPC）は位置・回転・大きさを、参加者のPCは大きさだけを動かす。時間が来たら、ホストがゴールに知らせる（ゴールが点を数えて物資を消す）。
@@ -82,7 +83,9 @@
 | 変数 | ファイル | 意味 |
 | --- | --- | --- |
 | `style`（`Style`） | `GoalEffect.cs` | 見た目の種類（渦・光の柱）。テスト・検証シーンからも切り替える |
-| `pillarMaterial`・`pillarHeight`・`pillarUseTeamColor`・`pillarColor`・`pillarBrightness`・`streakCount`・`sparkleCount`・`riseAbovePillar` | `GoalEffect.cs` | 光の柱（インスペクター）。`cylinderMesh`・`streakMesh`・`sparkleMesh` は作った形 |
+| `pillarMaterial`・`pillarHeight`・`pillarUseTeamColor`・`pillarColor`・`pillarBrightness`・`streakCount`・`sparkleCount` | `GoalEffect.cs` | 光の柱（インスペクター）。`cylinderMesh`・`streakMesh`・`sparkleMesh` は作った形 |
+| `pillarMoveSeconds`・`pillarRiseSeconds`・`pillarRiseDistance`・`pillarGlowSeconds`・`pillarFlashSeconds` | `GoalEffect.cs` | 光の柱のときの物資の動きと、消える光。`flashes` は出している途中の光 |
+| `pillar`・`startPosition`・`itemSize`、`All`（static） | `GoalAbsorb.cs` | 光の柱の動きか・始めの位置・物資のおおよその大きさ、吸い込み中の物資の一覧 |
 | `switchStyleSeconds` | `GoalEffectTestDriver.cs` | 検証シーンで、渦と光の柱を入れ替える秒数（0 なら入れ替えない） |
 | `vortexMaterial`・`fill`・`lift`・`appearSeconds`・`brightness` | `GoalEffect.cs` | 見た目（インスペクター） |
 | `funnelHeight`・`funnelBottom`・`funnelCurve` | `GoalEffect.cs` | すり鉢の形（インスペクター）。`funnelMesh`・`funnelMeshShape` は作った形と、そのときの値 |
@@ -114,3 +117,4 @@
 | 2026/11/17 | Claude Code（依頼：大槻 海斗） | 黒と灰色・光らせない描き方、らせんの帯、黒いかけら、チームの色の切り替え（Use Team Color）を書き足した |
 | 2026/11/17 | Claude Code（依頼：大槻 海斗） | 床の平らな渦を描くかの切り替え（Show Floor Vortex。いまはオフ）を書き足した |
 | 2026/11/17 | Claude Code（依頼：大槻 海斗） | 名前を変えた（このファイルも `SpaceJunkGoalVortex.md` から `GoalEffect.md` に）。見た目の種類のプルダウンと光の柱、光の柱のときの物資の動きを書き足した |
+| 2026/11/17 | Claude Code（依頼：大槻 海斗） | 光の柱のときの物資の動き（真ん中の上へ運ぶ → ゆっくり上げる → 光って消える）と、消える光（`DrawFlashes`・`PlayFlash`）を書いた |

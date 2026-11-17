@@ -72,9 +72,9 @@ public class GoalEffectTests
         yield return new ExitPlayMode();
     }
 
-    /// <summary>光の柱のときは、物資が上へ浮かびながら小さくなって消える（判定・引き寄せ・得点の流れは渦と同じ）。</summary>
+    /// <summary>光の柱のときは、物資を大きさそのままで真ん中の上へ運び、ゆっくり上げてから消す（判定・引き寄せ・得点の流れは渦と同じ）。</summary>
     [UnityTest]
-    public IEnumerator Online_Pillar_ItemRisesAndShrinksOnBothPcs()
+    public IEnumerator Online_Pillar_ItemIsCarriedToCenterAndRises()
     {
         yield return new EnterPlayMode();
         yield return RunOnline(GoalEffectStyle.Pillar);
@@ -147,6 +147,7 @@ public class GoalEffectTests
             float minHostDistance = startDistance;
             float startY = hostItem.transform.position.y;
             float maxHostY = startY;
+            float lastHostY = startY;
             float deadline = Time.realtimeSinceStartup + 6f;
             while ((hostItem != null || clientItem != null) && Time.realtimeSinceStartup < deadline)
             {
@@ -158,17 +159,24 @@ public class GoalEffectTests
                 {
                     minHostDistance = Mathf.Min(minHostDistance, Flat(hostItem.transform.position).magnitude);
                     maxHostY = Mathf.Max(maxHostY, hostItem.transform.position.y);
+                    lastHostY = hostItem.transform.position.y;
                 }
                 yield return null;
             }
 
             Assert.That(hostItem == null, Is.True, "ホストで物資が消えていない");
             Assert.That(clientItem == null, Is.True, "参加者のPCで物資が消えていない");
-            Assert.That(minClientScale, Is.LessThan(0.5f), "参加者のPCで、消える前に小さくなっていない");
-            Assert.That(minHostDistance, Is.LessThan(startDistance * 0.3f + 0.05f), "ホストで真ん中へ寄っていない");
             if (style == GoalEffectStyle.Pillar)
             {
-                Assert.That(maxHostY, Is.GreaterThan(startY + 0.4f), "光の柱のときに、ホストで上へ浮かんでいない");
+                // 光の柱：大きさはそのまま、真ん中へ一直線に運んで（光の柱の上 1.5m）、そこからゆっくり上げて（0.6m）消える
+                Assert.That(minClientScale, Is.GreaterThan(0.95f), "光の柱のときは、大きさを変えない");
+                Assert.That(minHostDistance, Is.LessThan(0.05f), "光の柱のときに、ホストで真ん中へ運ばれていない");
+                Assert.That(lastHostY, Is.GreaterThan(1.9f), "光の柱のときに、光の柱の上から上へ上がっていない");
+            }
+            else
+            {
+                Assert.That(minClientScale, Is.LessThan(0.5f), "参加者のPCで、消える前に小さくなっていない");
+                Assert.That(minHostDistance, Is.LessThan(startDistance * 0.3f + 0.05f), "ホストで真ん中へ寄っていない");
             }
             Assert.That(absorbedEvents, Is.EqualTo(1));
 

@@ -100,8 +100,21 @@ public class GoalEffect : MonoBehaviour
     [Range(0, 64)]
     [SerializeField] private int sparkleCount = 22;
 
-    [Tooltip("光の柱のとき、物資が浮かぶ高さ（筒の高さより何 m 上で消えるか）")]
-    [SerializeField] private float riseAbovePillar = 0.4f;
+    [Header("光の柱のときの物資の動き")]
+    [Tooltip("ゴールに入った物資を、真ん中の上（光の柱の一番上あたり）へ一直線に運ぶ秒数。大きさはそのまま、当たり判定は無くなる")]
+    [SerializeField] private float pillarMoveSeconds = 0.4f;
+
+    [Tooltip("真ん中の上に着いてから、ゆっくり上げる秒数。上げ終わったら光って消え、得点になる")]
+    [SerializeField] private float pillarRiseSeconds = 1.2f;
+
+    [Tooltip("ゆっくり上げる高さ（m）")]
+    [SerializeField] private float pillarRiseDistance = 0.6f;
+
+    [Tooltip("消える前に、物資のまわりが光り始める秒数（上げ終わる何秒前からか）")]
+    [SerializeField] private float pillarGlowSeconds = 0.35f;
+
+    [Tooltip("消えた瞬間の光が広がって消えるまでの秒数")]
+    [SerializeField] private float pillarFlashSeconds = 0.3f;
 
     [Header("吸い込み")]
     [Tooltip("渦の円柱に入ってから、中心で消えて得点になるまでの秒数")]
@@ -143,8 +156,52 @@ public class GoalEffect : MonoBehaviour
     /// <summary>そのゴールの光の柱の高さ（m）。円柱の高さを超えない。</summary>
     public float PillarHeightOf(Area area) => Mathf.Clamp(pillarHeight, 0f, Mathf.Max(0f, area.Top - area.Center.y));
 
-    /// <summary>光の柱のとき、物資が浮かんで消える高さ（世界の y）。</summary>
-    public float RiseTopY(Area area) => area.Center.y + PillarHeightOf(area) + riseAbovePillar;
+    /// <summary>光の柱の一番上の高さ（世界の y）。光の柱のとき、物資をまずここへ運ぶ。</summary>
+    public float PillarTopY(Area area) => area.Center.y + PillarHeightOf(area);
+
+    public float PillarMoveSeconds => Mathf.Max(0f, pillarMoveSeconds);
+    public float PillarRiseSeconds => Mathf.Max(0f, pillarRiseSeconds);
+    public float PillarRiseDistance => pillarRiseDistance;
+
+    /// <summary>いまの見た目の種類での、吸い込みの長さ（秒）。光の柱なら「運ぶ＋上げる」の秒数。</summary>
+    public float CurrentAbsorbSeconds => style == GoalEffectStyle.Pillar ? PillarMoveSeconds + PillarRiseSeconds : absorbSeconds;
+
+    /// <summary>消えた瞬間の光1つ分。</summary>
+    private struct Flash
+    {
+        public Vector3 Position;
+        public Color Color;
+        public float Start;
+        public float Size;
+    }
+
+    private readonly List<Flash> flashes = new List<Flash>();
+
+    /// <summary>光の柱のとき、物資が消えた瞬間の光を出す（どのPCでも、そのPCの吸い込みが終わったときに呼ばれる）。</summary>
+    public void PlayFlash(Vector3 position, float size)
+    {
+        flashes.Add(new Flash { Position = position, Color = ColorNear(position), Start = Time.time, Size = size });
+    }
+
+    /// <summary>その場所にいちばん近いゴールの、光の柱の色。</summary>
+    private Color ColorNear(Vector3 position)
+    {
+        Color best = pillarColor;
+        float bestDistance = float.MaxValue;
+        foreach (GoalView view in Goals())
+        {
+            if (TryGetArea(view.Goal, out Area area))
+            {
+                float distance = (new Vector2(area.Center.x, area.Center.z) - new Vector2(position.x, position.z)).sqrMagnitude;
+                if (distance < bestDistance)
+                {
+                    bestDistance = distance;
+                    best = pillarUseTeamColor ? view.TeamColor : pillarColor;
+                }
+            }
+        }
+        return best;
+    }
 
     /// <summary>そのゴールのすり鉢の高さ（m）。円柱の高さを超えない。</summary>
     public float FunnelHeightOf(Area area) => Mathf.Clamp(funnelHeight, 0f, Mathf.Max(0f, area.Top - area.Center.y));
@@ -200,6 +257,8 @@ public class GoalEffect : MonoBehaviour
     private static readonly int BrightnessId = Shader.PropertyToID("_Brightness");
     private static readonly int PartId = Shader.PropertyToID("_Part");
     private static readonly int FunnelId = Shader.PropertyToID("_Funnel");
+    private static readonly int FlashId = Shader.PropertyToID("_Flash");
+    private static Mesh flashMesh;
 
     /// <summary>そのシーンの渦（無ければ null）。</summary>
     public static GoalEffect In(Scene scene)
@@ -259,7 +318,8 @@ public class GoalEffect : MonoBehaviour
         if (IsInside(area, point))
         {
             float start = GoalAbsorb.ClockOf(item);
-            GoalAbsorb.Begin(item, area, start, absorbSeconds, done =>
+            float seconds = CurrentAbsorbSeconds;
+            GoalAbsorb.Begin(item, area, start, seconds, done =>
             {
                 Absorbed?.Invoke(goal);
                 onAbsorbed?.Invoke(done);
@@ -267,7 +327,7 @@ public class GoalEffect : MonoBehaviour
 
             if (supply != null && supply.IsSpawned)
             {
-                supply.ServerBeginAbsorb(start, absorbSeconds);
+                supply.ServerBeginAbsorb(start, seconds);
             }
 
             AbsorbCount++;
@@ -420,6 +480,71 @@ public class GoalEffect : MonoBehaviour
         else
         {
             DrawVortices(now, targetCamera);
+        }
+
+        DrawFlashes(targetCamera);
+    }
+
+    /// <summary>
+    /// 光の柱のときの、物資が光って消える光を描く。消える少し前から物資のまわりが光り始め（Pillar Glow Seconds）、
+    /// 消えた瞬間にぱっと光って広がり、Pillar Flash Seconds で消える。
+    /// </summary>
+    private void DrawFlashes(Camera targetCamera)
+    {
+        if (pillarMaterial == null)
+        {
+            flashes.Clear();
+            return;
+        }
+
+        flashMesh ??= CreateFlashMesh();
+        RenderParams renderParams = new RenderParams(pillarMaterial)
+        {
+            matProps = block,
+            camera = targetCamera,
+            layer = gameObject.layer,
+            shadowCastingMode = ShadowCastingMode.Off,
+            receiveShadows = false,
+        };
+        block.SetFloat(PartId, 4f);
+        block.SetFloat(AppearId, 1f);
+        block.SetFloat(BrightnessId, pillarBrightness);
+        block.SetFloat(VortexTimeId, Time.time);
+
+        // 消える前の光（物資のまわり）
+        float total = Mathf.Max(0.05f, PillarMoveSeconds + PillarRiseSeconds);
+        foreach (GoalAbsorb absorb in GoalAbsorb.All)
+        {
+            if (absorb == null || !absorb.IsPillar || absorb.gameObject.scene != gameObject.scene)
+            {
+                continue;
+            }
+
+            float remaining = (1f - absorb.Progress) * total;
+            if (remaining >= pillarGlowSeconds || pillarGlowSeconds <= 0f)
+            {
+                continue;
+            }
+
+            float amount = 1f - remaining / pillarGlowSeconds;
+            block.SetColor(ColorId, ColorNear(absorb.transform.position));
+            block.SetVector(FlashId, new Vector4(0f, amount, absorb.ItemSize * (0.8f + 0.4f * amount), 0f));
+            Graphics.RenderMesh(renderParams, flashMesh, 0, Matrix4x4.Translate(absorb.transform.position));
+        }
+
+        // 消えた瞬間の光
+        for (int i = flashes.Count - 1; i >= 0; i--)
+        {
+            float p = (Time.time - flashes[i].Start) / Mathf.Max(0.05f, pillarFlashSeconds);
+            if (p >= 1f)
+            {
+                flashes.RemoveAt(i);
+                continue;
+            }
+
+            block.SetColor(ColorId, flashes[i].Color);
+            block.SetVector(FlashId, new Vector4(1f, Mathf.Clamp01(p), flashes[i].Size * (1.2f + 1.6f * p), 0f));
+            Graphics.RenderMesh(renderParams, flashMesh, 0, Matrix4x4.Translate(flashes[i].Position));
         }
     }
 
@@ -645,6 +770,17 @@ public class GoalEffect : MonoBehaviour
         DestroyMesh(debrisMesh);
         DestroyMesh(streakMesh);
         DestroyMesh(sparkleMesh);
+    }
+
+    /// <summary>消えるときの光の板（1枚。4つの角はどれも原点で、カメラのほうを向く大きさはシェーダーが決める）。</summary>
+    private static Mesh CreateFlashMesh()
+    {
+        Mesh mesh = new Mesh { name = "GoalPillarFlash" };
+        mesh.vertices = new Vector3[4];
+        mesh.uv = new[] { new Vector2(-1f, -1f), new Vector2(1f, -1f), new Vector2(-1f, 1f), new Vector2(1f, 1f) };
+        mesh.triangles = new[] { 0, 2, 1, 2, 3, 1 };
+        mesh.bounds = new Bounds(Vector3.zero, Vector3.one * 6f);
+        return mesh;
     }
 
     /// <summary>光の柱の筒（半径 1・高さ 1。上も下も開いている）。形の中の位置の y が高さ（シェーダーが使う）。</summary>

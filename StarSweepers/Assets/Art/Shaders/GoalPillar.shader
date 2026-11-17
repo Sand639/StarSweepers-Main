@@ -4,6 +4,7 @@
 //   1 = 筒 … うすく光る半透明の筒。上へ行くほど消える。縦の光の筋が下から上へ流れる
 //   2 = 光の筋 … 筒の中に立つ細長い光（カメラのほうを向く板）。下から上へ流れる
 //   3 = きらめき … 小さな十字の光。筒の中から上へ立ちのぼり、筒より上まで漂って消える
+//   4 = 消える光 … 吸い込まれた物資が、消える前にまわりから光り始め（_Flash.x=0）、消えた瞬間にぱっと光って広がる（_Flash.x=1）
 // 色を足して光らせる。下の床も少しだけ暗くして（アルファ）、明るい床の上でも色が白に飛びにくくする（Blend One OneMinusSrcAlpha）。
 Shader "StarSweepers/GoalPillar"
 {
@@ -13,7 +14,7 @@ Shader "StarSweepers/GoalPillar"
         _VortexTime ("Vortex Time (時刻。スクリプトが入れる)", Float) = 0
         _Appear ("Appear (出ている量 0-1。スクリプトが入れる)", Range(0, 1)) = 1
         _Brightness ("Brightness (明るさ。スクリプトが入れる)", Range(0, 4)) = 1.2
-        _Part ("Part (0=床 1=筒 2=筋 3=きらめき。スクリプトが入れる)", Float) = 0
+        _Part ("Part (0=床 1=筒 2=筋 3=きらめき 4=消える光。スクリプトが入れる)", Float) = 0
         _Funnel ("Funnel (x=筒の半径 m、y=筒の高さ m。スクリプトが入れる)", Vector) = (1.8, 1.5, 0, 0)
         _WallGlow ("Wall Glow (筒の光の濃さ)", Range(0, 2)) = 1
         _FloorGlow ("Floor Glow (床の光の濃さ)", Range(0, 2)) = 0.8
@@ -22,6 +23,8 @@ Shader "StarSweepers/GoalPillar"
         _SparkleSize ("Sparkle Size (きらめきの大きさ m)", Range(0.02, 0.6)) = 0.16
         _RiseSpeed ("Rise Speed (筋ときらめきがのぼる速さ)", Range(0.05, 3)) = 0.6
         _Cover ("Cover (下の床を暗くする強さ)", Range(0, 1)) = 0.35
+        _Flash ("Flash (x=0 消える前・1 消えた瞬間、y=進み具合 0-1、z=大きさ m。スクリプトが入れる)", Vector) = (1, 0, 1, 0)
+        _FlashGlow ("Flash Glow (消えるときの光の強さ)", Range(0, 4)) = 1.8
     }
 
     SubShader
@@ -56,6 +59,8 @@ Shader "StarSweepers/GoalPillar"
                 float _SparkleSize;
                 float _RiseSpeed;
                 float _Cover;
+                float4 _Flash;
+                float _FlashGlow;
             CBUFFER_END
 
             #define TAU 6.2831853
@@ -91,6 +96,15 @@ Shader "StarSweepers/GoalPillar"
 
                 float3 cameraRight = UNITY_MATRIX_V[0].xyz;
                 float3 cameraUp = UNITY_MATRIX_V[1].xyz;
+
+                if (_Part > 3.5)
+                {
+                    // ---- 消える光：物資の位置（形の原点）に、カメラのほうを向く板 ----
+                    float3 centerWS = TransformObjectToWorld(float3(0, 0, 0));
+                    float3 positionWS = centerWS + (cameraRight * input.uv.x + cameraUp * input.uv.y) * _Flash.z;
+                    output.positionHCS = TransformWorldToHClip(positionWS);
+                    return output;
+                }
 
                 if (_Part > 2.5)
                 {
@@ -190,8 +204,37 @@ Shader "StarSweepers/GoalPillar"
                 return glow;
             }
 
+            // 消える光：消える前はまわりがだんだん光り（やわらかい光の玉）、消えた瞬間は白っぽい芯・十字・広がる輪がぱっと出て消える
+            half4 FlashPart(Varyings input)
+            {
+                float2 p = input.uv;
+                float r = length(p);
+                float a = saturate(_Flash.y);
+                float intensity;
+                float white;
+                if (_Flash.x < 0.5)
+                {
+                    intensity = exp(-r * r * 5.0) * a * a * 1.2;
+                    white = 0.2 * a;
+                }
+                else
+                {
+                    float fade = (1.0 - a) * (1.0 - a);
+                    float core = exp(-r * r * 9.0) * fade * 2.0;
+                    float ring = exp(-abs(r - (0.25 + 0.6 * a)) * 22.0) * (1.0 - a) * 1.2;
+                    float star = (exp(-abs(p.x) * 20.0) * exp(-abs(p.y) * 3.0) + exp(-abs(p.y) * 20.0) * exp(-abs(p.x) * 3.0)) * fade * 1.4;
+                    intensity = core + ring + star;
+                    white = saturate(core * 0.5);
+                }
+                // 板の四角いふちが見えないよう、ふちへ向かって 0 にする
+                intensity *= 1.0 - smoothstep(0.7, 1.0, r);
+                float3 color = lerp(_Color.rgb, float3(1, 1, 1), white) * intensity * _FlashGlow * _Brightness;
+                return half4(color, 0.0);
+            }
+
             half4 frag(Varyings input) : SV_Target
             {
+                if (_Part > 3.5) return FlashPart(input);
                 if (_Part > 2.5) return SparklePart(input);
                 if (_Part > 1.5) return StreakPart(input);
                 if (_Part > 0.5) return WallPart(input);

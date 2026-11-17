@@ -28,6 +28,7 @@ Material:
     - _Appear: 1
     - _Brightness: 1.2
     - _Cover: 0.35
+    - _FlashGlow: 1.8
     - _FloorGlow: 0.8
     - _Part: 0
     - _RiseSpeed: 0.6
