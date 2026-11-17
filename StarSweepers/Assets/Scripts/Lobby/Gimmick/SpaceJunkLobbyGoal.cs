@@ -1,9 +1,11 @@
+using System.Collections.Generic;
 using Unity.Netcode;
 using UnityEngine;
 
 /// <summary>
 /// **ロビー（試合前）の練習エリアに置く簡易ゴール。**
 /// チーム分けや得点計算は一切せず、素材が入ってきたら「消える（Vanish）」挙動だけを再現する。
+/// シーンにゴールの渦（<see cref="SpaceJunkGoalVortex"/>）があれば、試合のゴールと同じく渦に吸い込まれてから消える（2026/11/17）。
 /// </summary>
 [RequireComponent(typeof(Collider))]
 [RequireComponent(typeof(NetworkObject))]
@@ -23,6 +25,25 @@ public class SpaceJunkLobbyGoal : NetworkBehaviour
     [SerializeField] private float flashSeconds = 0.4f;
 
     private float flashUntil = -999f;
+
+    /// <summary>シーンにある練習用ゴール全部（ゴールの渦が使う）。</summary>
+    public static readonly List<SpaceJunkLobbyGoal> All = new List<SpaceJunkLobbyGoal>();
+
+    /// <summary>ゴールの基本色（ゴールの渦のふちの色に使う）。</summary>
+    public Color BaseColor => defaultColor;
+
+    private void OnEnable()
+    {
+        if (!All.Contains(this))
+        {
+            All.Add(this);
+        }
+    }
+
+    private void OnDisable()
+    {
+        All.Remove(this);
+    }
 
     private void Awake()
     {
@@ -82,6 +103,24 @@ public class SpaceJunkLobbyGoal : NetworkBehaviour
 
         // ⚠ 試合中とは違い、練習用なので「フックで引っ張ったまま持ち込んだ場合」でも
         // 手を離した瞬間に綺麗に消えるように、item.IsHooked のガードはあえて外しています。
+        // （渦があるときは、引っ掛けている間は吸い込まず、手を離したら吸い込む）
+        SpaceJunkGoalVortex vortex = SpaceJunkGoalVortex.In(gameObject.scene);
+        if (vortex != null)
+        {
+            vortex.ServerFeed(this, item, Collect);
+            return;
+        }
+
+        Collect(item);
+    }
+
+    /// <summary>素材を消して、全員の画面でゴールを光らせる（ホストだけ）。</summary>
+    private void Collect(HookableObject item)
+    {
+        if (item == null)
+        {
+            return;
+        }
 
         // 全員の画面でゴールをピカッと光らせる
         FlashClientRpc();

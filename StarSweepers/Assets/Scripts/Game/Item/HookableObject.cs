@@ -46,8 +46,27 @@ public class HookableObject : MonoBehaviour
     /// <summary>いまフックされているか。**二重に引っ掛けるのを防ぐ**ために使う。</summary>
     public bool IsHooked { get; private set; }
 
-    /// <summary>いま消えている（復活や削除を待っている）か。</summary>
-    public bool IsVanished { get; private set; }
+    /// <summary>いま消えている（復活や削除を待っている）か。ゴールの渦に吸い込まれている途中も true（フック・ボット・仕掛けが触らないように）。</summary>
+    public bool IsVanished
+    {
+        get => vanished || IsAbsorbing;
+        private set => vanished = value;
+    }
+
+    private bool vanished;
+
+    /// <summary>ゴールの渦に吸い込まれている途中か（<see cref="SpaceJunkVortexAbsorb"/> が切り替える）。</summary>
+    public bool IsAbsorbing { get; private set; }
+
+    /// <summary>吸い込みの始まり・終わりに <see cref="SpaceJunkVortexAbsorb"/> から呼ばれる。</summary>
+    public void SetAbsorbing(bool absorbing)
+    {
+        IsAbsorbing = absorbing;
+        if (absorbing)
+        {
+            SetHooked(false);
+        }
+    }
 
     /// <summary>ポケットに入れたときに入る点数。</summary>
     public int ScoreValue => scoreValue;
@@ -119,10 +138,13 @@ public class HookableObject : MonoBehaviour
     /// </summary>
     public void Vanish()
     {
-        if (IsVanished)
+        if (vanished)
         {
             return;
         }
+
+        // 渦に吸い込まれている途中なら、吸い込みはここで終わり（SpaceJunkVortexAbsorb が気づいて外れる）
+        IsAbsorbing = false;
 
         // 消える物を誰かが引っ掛けたままにしない（フック側が「外れた」と気づけるように）
         SetHooked(false);

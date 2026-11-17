@@ -587,6 +587,30 @@ public class FishingNetSupply : NetworkBehaviour
         }
     }
 
+    /// <summary>
+    /// **ホストだけが呼ぶ。** ゴールの渦に吸い込まれ始めたことを、参加者のPCへ知らせる（小さくなる動きを同じ時刻で出すため）。
+    /// 位置と回転はホストが動かし、NetworkTransform で配られる。
+    /// </summary>
+    public void ServerBeginAbsorb(float startTime, float seconds)
+    {
+        if (!IsServer)
+        {
+            return;
+        }
+
+        hookedByPlayerIndex.Value = -1;
+        BeginAbsorbClientRpc(startTime, seconds);
+    }
+
+    [ClientRpc]
+    private void BeginAbsorbClientRpc(float startTime, float seconds)
+    {
+        if (!IsServer)
+        {
+            SpaceJunkVortexAbsorb.Begin(hookable, Vector3.zero, startTime, seconds, null);
+        }
+    }
+
     /// <summary>ホストが点を入れたあとに、投げた人の記録を消す。</summary>
     public void ClearLastThrower()
     {
