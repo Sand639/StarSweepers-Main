@@ -117,7 +117,12 @@ public partial class SpaceJunkSession
         }
 
         currentRound.Value = currentRound.Value + 1;
-        LoadNextMap();
+
+        // 勝ったチームの色の演出で画面を覆ってから次のマップへ（演出が出せないときは、そのまま移る）
+        if (!SceneTransition.PlayForEveryone(LoadNextMap, SceneTransitionType.RoundWinner))
+        {
+            LoadNextMap();
+        }
     }
 
     /// <summary>試合の結果を見せる時間だけ待ってから、全員をロビーへ戻す。</summary>

@@ -22,12 +22,12 @@
 - どちらも2つ目の引数で種類を指定できる（`SceneTransition.Play(Load, SceneTransitionType.Wipe)`）。省くとプレハブのプルダウンの種類
 - 演出の途中に呼ぶと何もせず `false` を返す（`onCovered` も呼ばれない）
 
-いま呼んでいるのは `SpaceJunkSession.ServerStartMatch`（`SpaceJunkSession.Match.cs`）の1か所だけ。
+いま呼んでいるのは `SpaceJunkSession.ServerStartMatch` と `SpaceJunkSession.NextRoundAfterDelay`（どちらも `SpaceJunkSession.Match.cs`）の2か所。
 ほかの場面に付けるときは、シーンを切り替えている行をこう包めばよい。
 
 | 場面 | 今の行（`SpaceJunkSession.Match.cs`） | 包んだ形 |
 | --- | --- | --- |
-| 次のラウンドへ | `LoadNextMap();`（`NextRoundAfterDelay`） | `SceneTransition.PlayForEveryone(LoadNextMap);` |
+| 次のラウンドへ | **付けた（2026/11/17）**。種類は「勝ったチームの色」で固定 | `if (!SceneTransition.PlayForEveryone(LoadNextMap, SceneTransitionType.RoundWinner)) { LoadNextMap(); }`（演出中で出せなかったときも、マップは必ず移る） |
 | 試合が終わってロビーへ | `LoadScene(lobbySceneName);`（`ReturnToLobbyAfterDelay`） | `SceneTransition.PlayForEveryone(() => LoadScene(lobbySceneName));` |
 
 ただし、マップの読み込みに失敗したとき（`LoadNextMap` の中の `AbortToLobby`）のように、`onCovered` の戻り値を使う処理は、包むと戻り値を受け取れなくなる。いまの `LoadNextMap` は戻り値が無いので問題ない。
@@ -68,3 +68,4 @@
 | 日付 | 変更者 | 内容 |
 | --- | --- | --- |
 | 2026/11/10 | Claude Code | 新規作成（大槻さんの依頼。ロビーから試合へ移るときの演出） |
+| 2026/11/17 | Claude Code（依頼：ソウホイチョン） | 次のラウンドへ移るときに、種類「勝ったチームの色」（`RoundWinnerTransitionEffect`）を付けたので、呼び方の表を直した |
