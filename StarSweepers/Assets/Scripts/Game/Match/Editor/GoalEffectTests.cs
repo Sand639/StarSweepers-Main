@@ -68,7 +68,16 @@ public class GoalEffectTests
     public IEnumerator Online_ItemShrinksOnBothPcs_AndCornerItemIsPulledIn()
     {
         yield return new EnterPlayMode();
-        yield return RunOnline();
+        yield return RunOnline(GoalEffectStyle.Vortex);
+        yield return new ExitPlayMode();
+    }
+
+    /// <summary>光の柱のときは、物資が上へ浮かびながら小さくなって消える（判定・引き寄せ・得点の流れは渦と同じ）。</summary>
+    [UnityTest]
+    public IEnumerator Online_Pillar_ItemRisesAndShrinksOnBothPcs()
+    {
+        yield return new EnterPlayMode();
+        yield return RunOnline(GoalEffectStyle.Pillar);
         yield return new ExitPlayMode();
     }
 
@@ -76,7 +85,7 @@ public class GoalEffectTests
     /// 中身。**再生を始めてから呼ぶ別の関数にしてある**（同じ関数の中でラムダに渡す値を作ると、
     /// 再生の切り替えのときに入れ物が消えて NullReferenceException になるため。SweeperOnlineTests と同じ）。
     /// </summary>
-    private static IEnumerator RunOnline()
+    private static IEnumerator RunOnline(GoalEffectStyle style)
     {
         GameObject supplyPrefab = AssetDatabase.LoadAssetAtPath<GameObject>(SupplyPrefabPath);
         Assert.That(supplyPrefab, Is.Not.Null);
@@ -85,6 +94,7 @@ public class GoalEffectTests
         ground.transform.localScale = new Vector3(10f, 1f, 10f);
         var vortexObject = new GameObject("VortexUnderTest");
         GoalEffect vortex = vortexObject.AddComponent<GoalEffect>();
+        vortex.Style = style;
         GameObject goalObject = null;
         int absorbedEvents = 0;
         System.Action<Component> onAbsorbed = _ => absorbedEvents++;
@@ -135,6 +145,8 @@ public class GoalEffectTests
             float minClientScale = 1f;
             float startDistance = Flat(hostItem.transform.position).magnitude;
             float minHostDistance = startDistance;
+            float startY = hostItem.transform.position.y;
+            float maxHostY = startY;
             float deadline = Time.realtimeSinceStartup + 6f;
             while ((hostItem != null || clientItem != null) && Time.realtimeSinceStartup < deadline)
             {
@@ -145,6 +157,7 @@ public class GoalEffectTests
                 if (hostItem != null && hostItem.GetComponent<GoalAbsorb>() != null)
                 {
                     minHostDistance = Mathf.Min(minHostDistance, Flat(hostItem.transform.position).magnitude);
+                    maxHostY = Mathf.Max(maxHostY, hostItem.transform.position.y);
                 }
                 yield return null;
             }
@@ -152,7 +165,11 @@ public class GoalEffectTests
             Assert.That(hostItem == null, Is.True, "ホストで物資が消えていない");
             Assert.That(clientItem == null, Is.True, "参加者のPCで物資が消えていない");
             Assert.That(minClientScale, Is.LessThan(0.5f), "参加者のPCで、消える前に小さくなっていない");
-            Assert.That(minHostDistance, Is.LessThan(startDistance * 0.3f + 0.05f), "ホストで渦の中心へ寄っていない");
+            Assert.That(minHostDistance, Is.LessThan(startDistance * 0.3f + 0.05f), "ホストで真ん中へ寄っていない");
+            if (style == GoalEffectStyle.Pillar)
+            {
+                Assert.That(maxHostY, Is.GreaterThan(startY + 0.4f), "光の柱のときに、ホストで上へ浮かんでいない");
+            }
             Assert.That(absorbedEvents, Is.EqualTo(1));
 
             // ---- 2個目：ゴールの角（渦の外）に落とす → 引き寄せられて吸い込まれる ----

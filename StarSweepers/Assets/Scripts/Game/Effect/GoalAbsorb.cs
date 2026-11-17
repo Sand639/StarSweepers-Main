@@ -170,7 +170,19 @@ public class GoalAbsorb : MonoBehaviour
         float selfSpin = settings != null ? settings.SelfSpinDegrees : 540f;
         float sink = settings != null ? settings.SinkDepth : 0.4f;
 
-        // 中心へ寄りながら、だんだん速く回る（渦の見た目と同じ、上から見て左回り）
+        if (settings != null && settings.Style == GoalEffectStyle.Pillar && area.Radius > 0f)
+        {
+            // 光の柱：真ん中へ寄りながら、ゆっくり回って上へ浮かび、小さくなって消える
+            float ease = t * t * (3f - 2f * t);
+            float pillarRadius = startRadius * (1f - 0.85f * ease);
+            float pillarAngle = startAngle + turns * 0.35f * Mathf.PI * 2f * t;
+            float rise = Mathf.Lerp(startY, Mathf.Max(startY + 0.6f, settings.RiseTopY(area)), ease);
+            transform.position = new Vector3(center.x + Mathf.Cos(pillarAngle) * pillarRadius, rise, center.z + Mathf.Sin(pillarAngle) * pillarRadius);
+            transform.rotation = Quaternion.AngleAxis(-selfSpin * 0.35f * t, Vector3.up) * startRotation;
+            return;
+        }
+
+        // 渦：中心へ寄りながら、だんだん速く回る（渦の見た目と同じ、上から見て左回り）
         float inward = t * t * (3f - 2f * t);
         float radius = startRadius * (1f - inward);
         float angle = startAngle + turns * Mathf.PI * 2f * t * t;

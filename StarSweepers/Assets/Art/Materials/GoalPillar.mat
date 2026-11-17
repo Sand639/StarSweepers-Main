@@ -1,0 +1,43 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!21 &2100000
+Material:
+  serializedVersion: 8
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_Name: GoalPillar
+  m_Shader: {fileID: 4800000, guid: 9192e3b3b6d3a94458cceffbbe3d4b56, type: 3}
+  m_Parent: {fileID: 0}
+  m_ModifiedSerializedProperties: 0
+  m_ValidKeywords: []
+  m_InvalidKeywords: []
+  m_LightmapFlags: 4
+  m_EnableInstancingVariants: 0
+  m_DoubleSidedGI: 0
+  m_CustomRenderQueue: -1
+  stringTagMap: {}
+  disabledShaderPasses: []
+  m_LockedProperties: 
+  m_SavedProperties:
+    serializedVersion: 3
+    m_TexEnvs: []
+    m_Ints: []
+    m_Floats:
+    - _Appear: 1
+    - _Brightness: 1.2
+    - _Cover: 0.35
+    - _FloorGlow: 0.8
+    - _Part: 0
+    - _RiseSpeed: 0.6
+    - _SparkleGlow: 1.4
+    - _SparkleSize: 0.16
+    - _StreakGlow: 1
+    - _VortexTime: 0
+    - _WallGlow: 1
+    m_Colors:
+    - _Color: {r: 0.34999996, g: 1, b: 0.54999995, a: 1}
+    - _Funnel: {r: 1.8, g: 1.5, b: 0, a: 0}
+  m_BuildTextureStacks: []
+  m_AllowLocking: 1

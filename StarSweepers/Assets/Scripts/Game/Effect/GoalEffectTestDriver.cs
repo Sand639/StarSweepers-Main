@@ -3,7 +3,7 @@ using Unity.Netcode.Transports.UTP;
 using UnityEngine;
 
 /// <summary>
-/// ゴールの渦の検証シーン専用。ホストとして始め、ゴールの上から物資（の代わりの箱）を順番に落として、渦に吸い込ませる。
+/// ゴールの演出の検証シーン専用。ホストとして始め、ゴールの上から物資（の代わりの箱）を順番に落として吸い込ませる。決めた秒数ごとに、渦と光の柱を入れ替える。
 /// 吸い込み終わったら、得点が入ったときの光る演出も出す（検証シーンには試合の進行役が無いので、ここで出す）。
 /// 説明は Documents/スクリプトの説明/Game/Effect/GoalEffect.md
 /// </summary>
@@ -25,7 +25,11 @@ public class GoalEffectTestDriver : MonoBehaviour
     [Range(0f, 1f)]
     [SerializeField] private float cornerChance = 0.35f;
 
+    [Tooltip("何秒ごとに、渦と光の柱を入れ替えるか（0 なら入れ替えない。プルダウンで選んだまま）")]
+    [SerializeField] private float switchStyleSeconds = 10f;
+
     private float timer;
+    private float styleTimer;
     private int next;
     private NetworkManager createdManager;
     private System.Random random = new System.Random(17);
@@ -79,6 +83,17 @@ public class GoalEffectTestDriver : MonoBehaviour
 
     private void Update()
     {
+        styleTimer += Time.deltaTime;
+        if (switchStyleSeconds > 0f && styleTimer >= switchStyleSeconds)
+        {
+            styleTimer = 0f;
+            GoalEffect effect = GoalEffect.In(gameObject.scene);
+            if (effect != null)
+            {
+                effect.Style = effect.Style == GoalEffectStyle.Vortex ? GoalEffectStyle.Pillar : GoalEffectStyle.Vortex;
+            }
+        }
+
         timer += Time.deltaTime;
         if (timer < interval || goals.Length == 0)
         {

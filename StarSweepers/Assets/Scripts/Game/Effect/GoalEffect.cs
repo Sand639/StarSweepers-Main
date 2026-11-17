@@ -4,14 +4,25 @@ using UnityEngine;
 using UnityEngine.Rendering;
 using UnityEngine.SceneManagement;
 
+/// <summary>ゴールの演出の見た目の種類（インスペクターのプルダウン）。</summary>
+public enum GoalEffectStyle
+{
+    [InspectorName("渦")] Vortex,
+    [InspectorName("光の柱")] Pillar,
+}
+
 /// <summary>
-/// ゴールに常に出ている黒い渦。渦の円柱に入った物資を、小さくしながら回して中心へ吸い込む（吸い込み終わったら得点）。
+/// ゴールに常に出ている演出（渦か光の柱）。円柱の判定に入った物資を、小さくしながら吸い込む（吸い込み終わったら得点）。
 /// 1つのシーンに1つ置けば、そのシーンの全部のゴールに出る。
 /// 説明は Documents/スクリプトの説明/Game/Effect/GoalEffect.md
 /// </summary>
 public class GoalEffect : MonoBehaviour
 {
-    [Header("見た目")]
+    [Header("種類")]
+    [Tooltip("ゴールの演出の見た目。渦＝黒い立体の渦（物資は回りながら真ん中へ吸い込まれる）／光の柱＝光る筒（物資は上へ浮かんで消える）。判定と得点は同じ")]
+    [SerializeField] private GoalEffectStyle style = GoalEffectStyle.Vortex;
+
+    [Header("渦の見た目")]
     [Tooltip("渦の見た目（Art/Materials/GoalVortex。腕の数・回る速さ・壁や帯の濃さ・かけらの大きさと速さはマテリアルで変える）")]
     [SerializeField] private Material vortexMaterial;
 
@@ -65,6 +76,33 @@ public class GoalEffect : MonoBehaviour
     [Range(0, 64)]
     [SerializeField] private int debrisCount = 14;
 
+    [Header("光の柱の見た目")]
+    [Tooltip("光の柱の見た目（Art/Materials/GoalPillar。筋・きらめきの濃さはマテリアルで変える）")]
+    [SerializeField] private Material pillarMaterial;
+
+    [Tooltip("光の柱（筒）の高さ（m）。物資を吸い込む円柱より高くはならない")]
+    [SerializeField] private float pillarHeight = 1.5f;
+
+    [Tooltip("光の柱をチームの色にするか（オフなら Pillar Color）。2026/11/17 の大槻さんの回答でオン")]
+    [SerializeField] private bool pillarUseTeamColor = true;
+
+    [Tooltip("チームの色を使わないときの、光の柱の色（参考画像の緑）")]
+    [SerializeField] private Color pillarColor = new Color(0.35f, 1f, 0.55f);
+
+    [Tooltip("光の柱の明るさ")]
+    [SerializeField] private float pillarBrightness = 1.2f;
+
+    [Tooltip("筒の中を下から上へ流れる、光の筋の数")]
+    [Range(0, 40)]
+    [SerializeField] private int streakCount = 14;
+
+    [Tooltip("筒の中から上へ立ちのぼる、十字のきらめきの数")]
+    [Range(0, 64)]
+    [SerializeField] private int sparkleCount = 22;
+
+    [Tooltip("光の柱のとき、物資が浮かぶ高さ（筒の高さより何 m 上で消えるか）")]
+    [SerializeField] private float riseAbovePillar = 0.4f;
+
     [Header("吸い込み")]
     [Tooltip("渦の円柱に入ってから、中心で消えて得点になるまでの秒数")]
     [SerializeField] private float absorbSeconds = 1f;
@@ -94,6 +132,19 @@ public class GoalEffect : MonoBehaviour
     public float SelfSpinDegrees => selfSpinDegrees;
     public float EndScale => endScale;
     public float SinkDepth => sinkDepth;
+
+    /// <summary>いまの見た目の種類（インスペクターのプルダウン）。テストからも切り替えられる。</summary>
+    public GoalEffectStyle Style
+    {
+        get => style;
+        set => style = value;
+    }
+
+    /// <summary>そのゴールの光の柱の高さ（m）。円柱の高さを超えない。</summary>
+    public float PillarHeightOf(Area area) => Mathf.Clamp(pillarHeight, 0f, Mathf.Max(0f, area.Top - area.Center.y));
+
+    /// <summary>光の柱のとき、物資が浮かんで消える高さ（世界の y）。</summary>
+    public float RiseTopY(Area area) => area.Center.y + PillarHeightOf(area) + riseAbovePillar;
 
     /// <summary>そのゴールのすり鉢の高さ（m）。円柱の高さを超えない。</summary>
     public float FunnelHeightOf(Area area) => Mathf.Clamp(funnelHeight, 0f, Mathf.Max(0f, area.Top - area.Center.y));
@@ -137,6 +188,11 @@ public class GoalEffect : MonoBehaviour
     private Vector4 ribbonMeshShape;
     private Mesh debrisMesh;
     private int debrisMeshCount = -1;
+    private static Mesh cylinderMesh;
+    private Mesh streakMesh;
+    private int streakMeshCount = -1;
+    private Mesh sparkleMesh;
+    private int sparkleMeshCount = -1;
 
     private static readonly int ColorId = Shader.PropertyToID("_Color");
     private static readonly int VortexTimeId = Shader.PropertyToID("_VortexTime");
@@ -356,6 +412,91 @@ public class GoalEffect : MonoBehaviour
     /// </summary>
     public void DrawAt(float now, Camera targetCamera = null)
     {
+        block ??= new MaterialPropertyBlock();
+        if (style == GoalEffectStyle.Pillar)
+        {
+            DrawPillars(now, targetCamera);
+        }
+        else
+        {
+            DrawVortices(now, targetCamera);
+        }
+    }
+
+    /// <summary>光の柱を描く（床の光・筒・光の筋・十字のきらめき）。</summary>
+    private void DrawPillars(float now, Camera targetCamera)
+    {
+        if (pillarMaterial == null)
+        {
+            return;
+        }
+
+        discMesh ??= CreateDiscMesh();
+        cylinderMesh ??= CreateCylinderMesh();
+        if (streakMesh == null || streakMeshCount != streakCount)
+        {
+            DestroyMesh(streakMesh);
+            streakMeshCount = streakCount;
+            streakMesh = CreateBillboardMesh(streakCount, 11, 0.85f);
+        }
+        if (sparkleMesh == null || sparkleMeshCount != sparkleCount)
+        {
+            DestroyMesh(sparkleMesh);
+            sparkleMeshCount = sparkleCount;
+            sparkleMesh = CreateBillboardMesh(sparkleCount, 23, 0.8f);
+        }
+
+        RenderParams renderParams = new RenderParams(pillarMaterial)
+        {
+            matProps = block,
+            camera = targetCamera,
+            layer = gameObject.layer,
+            shadowCastingMode = ShadowCastingMode.Off,
+            receiveShadows = false,
+        };
+
+        foreach (GoalView view in Goals())
+        {
+            float amount = targetCamera != null ? (view.Shown ? 1f : 0f) : appear.TryGetValue(view.Goal, out float a) ? a : 0f;
+            if (amount <= 0f || !TryGetArea(view.Goal, out Area area))
+            {
+                continue;
+            }
+
+            float height = PillarHeightOf(area);
+            Vector3 floorPoint = area.Center + Vector3.up * lift;
+            block.SetColor(ColorId, pillarUseTeamColor ? view.TeamColor : pillarColor);
+            block.SetFloat(VortexTimeId, now);
+            block.SetFloat(AppearId, amount);
+            block.SetFloat(BrightnessId, pillarBrightness);
+            block.SetVector(FunnelId, new Vector4(area.Radius, height, 0f, 0f));
+
+            // 床の光（筒より少し外まで、もやのように広がる）
+            float glowDiameter = area.Radius * 2f * 1.35f;
+            block.SetFloat(PartId, 0f);
+            Graphics.RenderMesh(renderParams, discMesh, 0, Matrix4x4.TRS(floorPoint, Quaternion.identity, new Vector3(glowDiameter, 1f, glowDiameter)));
+
+            Matrix4x4 tube = Matrix4x4.TRS(floorPoint, Quaternion.identity, new Vector3(area.Radius, height * amount, area.Radius));
+            block.SetFloat(PartId, 1f);
+            Graphics.RenderMesh(renderParams, cylinderMesh, 0, tube);
+
+            if (streakCount > 0)
+            {
+                block.SetFloat(PartId, 2f);
+                Graphics.RenderMesh(renderParams, streakMesh, 0, tube);
+            }
+
+            if (sparkleCount > 0)
+            {
+                block.SetFloat(PartId, 3f);
+                Graphics.RenderMesh(renderParams, sparkleMesh, 0, tube);
+            }
+        }
+    }
+
+    /// <summary>渦を描く（床の渦・すり鉢・らせんの帯・かけら）。</summary>
+    private void DrawVortices(float now, Camera targetCamera)
+    {
         if (vortexMaterial == null)
         {
             return;
@@ -384,7 +525,6 @@ public class GoalEffect : MonoBehaviour
             debrisMesh = CreateDebrisMesh(debrisCount);
         }
 
-        block ??= new MaterialPropertyBlock();
         RenderParams renderParams = new RenderParams(vortexMaterial)
         {
             matProps = block,
@@ -402,7 +542,7 @@ public class GoalEffect : MonoBehaviour
                 continue;
             }
 
-            block.SetColor(ColorId, view.Color);
+            block.SetColor(ColorId, useTeamColor ? view.TeamColor : neutralColor);
             block.SetFloat(VortexTimeId, now);
             block.SetFloat(AppearId, amount);
             block.SetFloat(BrightnessId, brightness);
@@ -439,11 +579,11 @@ public class GoalEffect : MonoBehaviour
         }
     }
 
-    /// <summary>渦を出すゴール1つ分（どのゴールか・ふちの色・いま見えているか）。</summary>
+    /// <summary>演出を出すゴール1つ分（どのゴールか・チームの色・いま見えているか）。</summary>
     private struct GoalView
     {
         public Component Goal;
-        public Color Color;
+        public Color TeamColor;
         public bool Shown;
     }
 
@@ -459,7 +599,7 @@ public class GoalEffect : MonoBehaviour
         {
             if (goal != null && goal.gameObject.scene == scene && !goal.IsClosed)
             {
-                views.Add(new GoalView { Goal = goal, Color = useTeamColor ? SpaceJunkTeams.TeamColor(goal.OwnerTeam) : neutralColor, Shown = IsVisualShown(goal) });
+                views.Add(new GoalView { Goal = goal, TeamColor = SpaceJunkTeams.TeamColor(goal.OwnerTeam), Shown = IsVisualShown(goal) });
             }
         }
 
@@ -467,7 +607,7 @@ public class GoalEffect : MonoBehaviour
         {
             if (goal != null && goal.gameObject.scene == scene)
             {
-                views.Add(new GoalView { Goal = goal, Color = useTeamColor ? goal.BaseColor : neutralColor, Shown = true });
+                views.Add(new GoalView { Goal = goal, TeamColor = goal.BaseColor, Shown = true });
             }
         }
 
@@ -503,6 +643,73 @@ public class GoalEffect : MonoBehaviour
         DestroyMesh(funnelMesh);
         DestroyMesh(ribbonMesh);
         DestroyMesh(debrisMesh);
+        DestroyMesh(streakMesh);
+        DestroyMesh(sparkleMesh);
+    }
+
+    /// <summary>光の柱の筒（半径 1・高さ 1。上も下も開いている）。形の中の位置の y が高さ（シェーダーが使う）。</summary>
+    private static Mesh CreateCylinderMesh()
+    {
+        const int around = 48;
+        var vertices = new Vector3[(around + 1) * 2];
+        var triangles = new int[around * 6];
+        for (int i = 0; i <= around; i++)
+        {
+            float a = i * Mathf.PI * 2f / around;
+            vertices[i * 2] = new Vector3(Mathf.Cos(a), 0f, Mathf.Sin(a));
+            vertices[i * 2 + 1] = new Vector3(Mathf.Cos(a), 1f, Mathf.Sin(a));
+        }
+        for (int i = 0; i < around; i++)
+        {
+            int v = i * 2;
+            int k = i * 6;
+            triangles[k] = v; triangles[k + 1] = v + 1; triangles[k + 2] = v + 2;
+            triangles[k + 3] = v + 2; triangles[k + 4] = v + 1; triangles[k + 5] = v + 3;
+        }
+        Mesh mesh = new Mesh { name = "GoalPillarTube" };
+        mesh.vertices = vertices;
+        mesh.triangles = triangles;
+        mesh.RecalculateBounds();
+        return mesh;
+    }
+
+    /// <summary>
+    /// カメラのほうを向く板を count 枚（光の筋・きらめき用）。どれも足もとは筒の中（半径 spread 以内）の床の上で、
+    /// 大きさ・動きはシェーダーが決める。UV は板の角（−1〜1）、2つ目の UV が板ごとの乱数。乱数は毎回同じ（どのPCでも同じ）。
+    /// </summary>
+    private static Mesh CreateBillboardMesh(int count, int seed, float spread)
+    {
+        var random = new System.Random(seed);
+        var vertices = new Vector3[count * 4];
+        var uvs = new Vector2[count * 4];
+        var seeds = new Vector2[count * 4];
+        var triangles = new int[count * 6];
+        Vector2[] corners = { new Vector2(-1f, -1f), new Vector2(1f, -1f), new Vector2(-1f, 1f), new Vector2(1f, 1f) };
+        for (int i = 0; i < count; i++)
+        {
+            float angle = (float)random.NextDouble() * Mathf.PI * 2f;
+            float radius = Mathf.Sqrt((float)random.NextDouble()) * spread;
+            Vector3 root = new Vector3(Mathf.Cos(angle) * radius, 0f, Mathf.Sin(angle) * radius);
+            Vector2 s = new Vector2((float)random.NextDouble(), (float)random.NextDouble());
+            for (int c = 0; c < 4; c++)
+            {
+                vertices[i * 4 + c] = root;
+                uvs[i * 4 + c] = corners[c];
+                seeds[i * 4 + c] = s;
+            }
+            int v = i * 4;
+            int k = i * 6;
+            triangles[k] = v; triangles[k + 1] = v + 2; triangles[k + 2] = v + 1;
+            triangles[k + 3] = v + 2; triangles[k + 4] = v + 3; triangles[k + 5] = v + 1;
+        }
+        Mesh mesh = new Mesh { name = "GoalPillarBillboards" };
+        mesh.vertices = vertices;
+        mesh.uv = uvs;
+        mesh.uv2 = seeds;
+        mesh.triangles = triangles;
+        // 頂点はシェーダーで動かすので、筒より上まで入る大きさの箱にしておく
+        mesh.bounds = new Bounds(new Vector3(0f, 1.2f, 0f), new Vector3(3f, 3f, 3f));
+        return mesh;
     }
 
     /// <summary>
