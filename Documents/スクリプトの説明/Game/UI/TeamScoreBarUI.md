@@ -3,7 +3,7 @@
 | 項目 | 内容 |
 | --- | --- |
 | スクリプト | `StarSweepers/Assets/Scripts/Game/UI/TeamScoreBarUI.cs`（本体）・`Editor/TeamScoreBarUISetup.cs`（プレハブ・検証シーンを作り、ステージに置くメニュー） |
-| 付いている場所 | `Prefabs/UI/TeamScoreBarUI.prefab` の一番上（Canvas ごとのプレハブ）。`TeamScoreFlameEffect` と一緒に付いている。ステージ8つにプレハブのまま置いてある |
+| 付いている場所 | `Prefabs/UI/TeamScoreBarFrameUI.prefab`（フレーム版。**2026/11/17 から全ステージに置いてあるのはこちら**）と `Prefabs/UI/TeamScoreBarUI.prefab`（今までの版。いまはどのステージにも置いていない）の一番上（Canvas ごとのプレハブ）。`TeamScoreFlameEffect` と一緒に付いている |
 | 関係するドキュメント | `機能ドキュメント/チームの得点バー.md`・`スクリプトの説明/Game/UI/TeamScoreFlameEffect.md` |
 
 ## 何をするスクリプトか
@@ -60,7 +60,7 @@
 - 作るフォント：同じ場所の `DSEG14ClassicBoldSDF.asset`・`DSEG7ClassicBoldSDF.asset`。90pt・SDF・**1024×1024**。数字・大文字の英字・空白・`:.-` を焼き込んでから**静的**にする（ビルドで ttf を読みに行かない）。**512 だと半分ほどしか入らず、残りの字が別のフォント（LiberationSans）で出た**
 - 足りない文字は、作るときに `入らなかった文字` の警告がログに出る。焼き込む文字を増やすなら `DsegCharacters` に足し、`.asset` を消してメニューを実行し直す
 - DSEG の空白は細いので、板の文字は `wordSpacing = 60`（「ROUND」と「01」の間）。字間（characterSpacing）は 0、太字の指定はしない（もともと Bold の字なので）
-| `Tools > StarSweepers > チーム得点バーをステージに置く` | `StageScenePaths` のステージを順に開き、まだ無ければ**今までの版**のプレハブのまま置いて保存する。**ステージのほかの物には触らない**。何度実行してもよい |
+| `Tools > StarSweepers > チーム得点バー（フレーム版）を全ステージに置く` | `PlaceInStages`。`StageFolder`（`Assets/Scenes/Stage`）の中のシーンを `FindAssets("t:Scene")` で全部開き、置いてある得点バーのプレハブの元を `GetCorrespondingObjectFromSource` で見分けて、**今までの版なら外し、フレーム版が無ければ置いて**保存する。**ステージのほかの物には触らない**。何度実行してもよい |
 
 - 今までの版のプレハブは毎回組み立て直すので、プレハブを手で直した部分は消える。**フレーム版は、無いときだけ作る**（手で直す前提のため）
 - マテリアル（`TeamScoreBarFire.mat`・`TeamScoreNumber.mat`）と丸の画像は、**無いときだけ作る**（インスペクターで調整した値を残すため）。ただし炎のマテリアルの `_BarRatio` は帯の高さで決まる値なので、毎回入れ直す
@@ -103,3 +103,4 @@
 | 2026/11/12 | Claude Code（依頼：ソウホイチョン） | フレーム版（新しいデザイン案）の組み立てと、足した欄（ラウンドの文字・時間の書き方・使っている範囲）、メニューの変更を書いた |
 | 2026/11/12 | Claude Code（依頼：ソウホイチョン） | DSEG のフォントの作り方と、フォントを付けるメニューを書いた |
 | 2026/11/12 | Claude Code（依頼：ソウホイチョン） | フレーム版の炎の層（FireArea）と、それを足すメニューを書いた |
+| 2026/11/17 | Claude Code（依頼：ソウホイチョン） | ステージに置くメニューを、フレーム版を全ステージに置く（今までの版と入れ替える）形に直したので書き直した |

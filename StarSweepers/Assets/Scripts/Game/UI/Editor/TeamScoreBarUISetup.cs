@@ -137,21 +137,14 @@ public static class TeamScoreBarUISetup
         }
     }
 
-    /// <summary>得点バーを置くステージ。増やすときはここに足してメニューを実行する。</summary>
-    private static readonly string[] StageScenePaths =
-    {
-        "Assets/Scenes/Stage/STAGE_Simple.unity",
-        "Assets/Scenes/Stage/STAGE_Train.unity",
-        "Assets/Scenes/Stage/STAGE_Meteor.unity",
-        "Assets/Scenes/Stage/STAGE_Anchor.unity",
-        "Assets/Scenes/Stage/STAGE_Island.unity",
-        "Assets/Scenes/Stage/STAGE_Conveyor1.unity",
-        "Assets/Scenes/Stage/STAGE_Glass1.unity",
-        "Assets/Scenes/Stage/STAGE_Glass2.unity",
-    };
+    /// <summary>得点バーを置くステージの置き場所（この中のシーンを全部対象にする。Hans さんのステージは別の場所なので入らない）。</summary>
+    private const string StageFolder = "Assets/Scenes/Stage";
 
-    /// <summary>ステージに得点バーのプレハブを置く（置いてあるステージは飛ばす。ほかの物には触らない）。</summary>
-    [MenuItem("Tools/StarSweepers/チーム得点バーをステージに置く")]
+    /// <summary>
+    /// ステージ全部に、フレーム版の得点バーを置く。今までの版が置いてあれば入れ替える。
+    /// フレーム版がもうあるステージは飛ばす。ステージのほかの物には触らない。
+    /// </summary>
+    [MenuItem("Tools/StarSweepers/チーム得点バー（フレーム版）を全ステージに置く")]
     public static void PlaceInStages()
     {
         // 開いているシーンに保存していない変更があれば、先に聞く（ステージを順に開くと閉じてしまうため）
@@ -160,38 +153,60 @@ public static class TeamScoreBarUISetup
             return;
         }
 
-        var prefab = AssetDatabase.LoadAssetAtPath<GameObject>(PrefabPath);
-        if (prefab == null)
+        var framePrefab = AssetDatabase.LoadAssetAtPath<GameObject>(FramePrefabPath);
+        var oldPrefab = AssetDatabase.LoadAssetAtPath<GameObject>(PrefabPath);
+        if (framePrefab == null)
         {
-            prefab = BuildPrefab();
-            if (prefab == null) return;
+            Debug.LogError($"フレーム版のプレハブが見つかりません: {FramePrefabPath}");
+            return;
         }
 
         string previousScene = EditorSceneManager.GetActiveScene().path;
-        int placed = 0;
+        int placed = 0, replaced = 0;
 
-        foreach (string path in StageScenePaths)
+        foreach (string guid in AssetDatabase.FindAssets("t:Scene", new[] { StageFolder }))
         {
-            if (AssetDatabase.LoadAssetAtPath<SceneAsset>(path) == null)
-            {
-                Debug.LogWarning($"[チーム得点バー] ステージが見つからないので飛ばしました: {path}");
-                continue;
-            }
-
+            string path = AssetDatabase.GUIDToAssetPath(guid);
             var scene = EditorSceneManager.OpenScene(path, OpenSceneMode.Single);
+            bool hasFrame = false;
+            bool changed = false;
 
-            if (Object.FindFirstObjectByType<TeamScoreBarUI>(FindObjectsInactive.Include) != null)
+            // 置いてある得点バーを調べ、今までの版なら消す
+            foreach (var bar in Object.FindObjectsByType<TeamScoreBarUI>(FindObjectsInactive.Include, FindObjectsSortMode.None))
             {
-                Debug.Log($"[チーム得点バー] すでに置いてあります: {path}");
-                continue;
+                GameObject root = PrefabUtility.GetOutermostPrefabInstanceRoot(bar.gameObject);
+                GameObject source = root != null ? PrefabUtility.GetCorrespondingObjectFromSource(root) : null;
+
+                if (source == framePrefab)
+                {
+                    hasFrame = true;
+                }
+                else if (source == oldPrefab && root != null)
+                {
+                    Object.DestroyImmediate(root);
+                    replaced++;
+                    changed = true;
+                }
             }
 
-            var instance = (GameObject)PrefabUtility.InstantiatePrefab(prefab, scene);
-            instance.name = "TeamScoreBarUI";
-            EditorSceneManager.MarkSceneDirty(scene);
-            EditorSceneManager.SaveScene(scene);
-            placed++;
-            Debug.Log($"[チーム得点バー] 置きました: {path}");
+            if (!hasFrame)
+            {
+                var instance = (GameObject)PrefabUtility.InstantiatePrefab(framePrefab, scene);
+                instance.name = "TeamScoreBarFrameUI";
+                placed++;
+                changed = true;
+            }
+
+            if (changed)
+            {
+                EditorSceneManager.MarkSceneDirty(scene);
+                EditorSceneManager.SaveScene(scene);
+                Debug.Log($"[チーム得点バー] フレーム版にしました: {path}");
+            }
+            else
+            {
+                Debug.Log($"[チーム得点バー] もうフレーム版です: {path}");
+            }
         }
 
         // 元のシーンに戻す
@@ -200,7 +215,7 @@ public static class TeamScoreBarUISetup
             EditorSceneManager.OpenScene(previousScene, OpenSceneMode.Single);
         }
 
-        Debug.Log($"[チーム得点バー] ステージへの配置が終わりました（新しく置いた数: {placed}）");
+        Debug.Log($"[チーム得点バー] 全ステージへの配置が終わりました（フレーム版を置いた数: {placed}／今までの版を外した数: {replaced}）");
     }
 
     /// <summary>部品を組み立てて、プレハブとして保存する。失敗したら null。</summary>
