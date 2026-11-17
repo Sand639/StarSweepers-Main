@@ -1,5 +1,6 @@
 using TMPro;
 using UnityEngine;
+using UnityEngine.Serialization;
 using UnityEngine.UI;
 
 /// <summary>
@@ -9,6 +10,24 @@ using UnityEngine.UI;
 [RequireComponent(typeof(TeamScoreBarUI))]
 public sealed class TeamScoreFlameEffect : MonoBehaviour
 {
+    [Header("表示")]
+    [Tooltip("ただの色の帯を出すか（炎の層があるときだけ効く）。再生中に切り替えてよい")]
+    [SerializeField] private bool showSolid = true;
+
+    [Tooltip("炎を出すか。再生中に切り替えてよい")]
+    [FormerlySerializedAs("fireEnabled")]
+    [SerializeField] private bool showFire = true;
+
+    [Tooltip("炎の不透明度（0＝見えない、1＝そのまま）")]
+    [SerializeField, Range(0f, 1f)] private float fireOpacity = 1f;
+
+    [Header("炎")]
+    [Tooltip("帯ごとの炎だけの Image（左から順）。空なら帯の Image そのものを炎にする（今までの版）")]
+    [SerializeField] private Image[] fireImages = new Image[TeamScoreBarUI.MaxTeams];
+
+    [Tooltip("炎のマテリアル。空なら Image にもともと付いているマテリアルを使う")]
+    [SerializeField] private Material fireMaterial;
+
     [Header("得点が入った瞬間")]
     [Tooltip("炎が燃え上がってから元に戻るまでの秒数")]
     [SerializeField, Min(0.05f)] private float boostSeconds = 1.0f;
@@ -33,6 +52,9 @@ public sealed class TeamScoreFlameEffect : MonoBehaviour
 
     private static readonly int BoostId = Shader.PropertyToID("_Boost");
 
+    /// <summary>炎だけの層を持っているか（フレーム版）。</summary>
+    private bool HasFireLayer => FireImageOf(0) != null;
+
     private void Awake()
     {
         bar = GetComponent<TeamScoreBarUI>();
@@ -42,12 +64,13 @@ public sealed class TeamScoreFlameEffect : MonoBehaviour
 
         for (int slot = 0; slot < TeamScoreBarUI.MaxTeams; slot++)
         {
-            // 元のマテリアルを直接書き換えると、全部の帯が同じ動きになるので帯ごとに複製する
-            Image segment = bar.SegmentOfSlot(slot);
-            if (segment != null && segment.material != null)
+            // 炎を描く Image（炎の層があればそちら、無ければ帯そのもの）のマテリアルを帯ごとに複製する
+            Image target = HasFireLayer ? FireImageOf(slot) : bar.SegmentOfSlot(slot);
+            Material source = fireMaterial != null ? fireMaterial : target != null ? target.material : null;
+            if (target != null && source != null)
             {
-                materials[slot] = new Material(segment.material);
-                segment.material = materials[slot];
+                materials[slot] = new Material(source);
+                target.material = materials[slot];
             }
 
             TMP_Text label = bar.ScoreTextOfSlot(slot);
@@ -98,7 +121,7 @@ public sealed class TeamScoreFlameEffect : MonoBehaviour
         punch[team] = 1f;
     }
 
-    // 得点バーが Update で帯と数字を決めたあとに、燃え上がりの強さと数字の大きさを入れる
+    // 得点バーが Update で帯と数字を決めたあとに、炎と数字の大きさを合わせる
     private void LateUpdate()
     {
         float dt = Time.unscaledDeltaTime;
@@ -107,25 +130,121 @@ public sealed class TeamScoreFlameEffect : MonoBehaviour
         {
             boost[team] = Mathf.Max(0f, boost[team] - dt / boostSeconds);
             punch[team] = Mathf.Max(0f, punch[team] - dt / punchSeconds);
+        }
 
-            int slot = bar.SlotOfTeam(team);
-            if (slot < 0)
+        for (int slot = 0; slot < TeamScoreBarUI.MaxTeams; slot++)
+        {
+            int team = TeamAtSlot(slot);
+
+            if (HasFireLayer)
             {
-                continue;
+                ApplyLayered(slot, team);
             }
+            else
+            {
+                ApplySingle(slot, team);
+            }
+
+            // 数字の文字の大きさ（ポンと大きくして戻す）
+            TMP_Text label = bar.ScoreTextOfSlot(slot);
+            if (team >= 0 && label != null && baseFontSizes[slot] > 0f)
+            {
+                label.fontSize = baseFontSizes[slot] * (1f + punchScale * EaseOut(punch[team]));
+            }
+        }
+    }
+
+    /// <summary>炎の層があるとき：色の帯と炎を別々に出し、炎を帯と同じ横幅に合わせる。</summary>
+    private void ApplyLayered(int slot, int team)
+    {
+        Image segment = bar.SegmentOfSlot(slot);
+        Image fire = FireImageOf(slot);
+        bool used = team >= 0 && segment != null && segment.gameObject.activeSelf;
+
+        if (segment != null)
+        {
+            segment.enabled = showSolid;
+        }
+
+        if (fire == null)
+        {
+            return;
+        }
+
+        bool fireShown = used && showFire && fireOpacity > 0f;
+        if (fire.gameObject.activeSelf != fireShown)
+        {
+            fire.gameObject.SetActive(fireShown);
+        }
+
+        if (!fireShown)
+        {
+            return;
+        }
+
+        // 横は帯と同じ割合（炎の層の四角の中で）、縦は炎の層いっぱい
+        RectTransform rect = fire.rectTransform;
+        rect.anchorMin = new Vector2(segment.rectTransform.anchorMin.x, 0f);
+        rect.anchorMax = new Vector2(segment.rectTransform.anchorMax.x, 1f);
+        rect.offsetMin = Vector2.zero;
+        rect.offsetMax = Vector2.zero;
+
+        Color color = bar.TeamColorOf(team);
+        color.a = fireOpacity;
+        fire.color = color;
+
+        if (materials[slot] != null)
+        {
+            materials[slot].SetFloat(BoostId, EaseOut(boost[team]));
+        }
+    }
+
+    /// <summary>炎の層が無いとき（今までの版）：帯の Image に炎のマテリアルを付ける・外す。</summary>
+    private void ApplySingle(int slot, int team)
+    {
+        Image segment = bar.SegmentOfSlot(slot);
+        if (segment == null || team < 0)
+        {
+            return;
+        }
+
+        Material wanted = showFire ? materials[slot] : null;
+        if (segment.material != (wanted != null ? wanted : segment.defaultMaterial))
+        {
+            segment.material = wanted;
+        }
+
+        if (showFire)
+        {
+            Color color = segment.color;
+            color.a = fireOpacity;
+            segment.color = color;
 
             if (materials[slot] != null)
             {
                 materials[slot].SetFloat(BoostId, EaseOut(boost[team]));
             }
+        }
+    }
 
-            // 数字の文字の大きさ（ポンと大きくして戻す）
-            TMP_Text label = bar.ScoreTextOfSlot(slot);
-            if (label != null && baseFontSizes[slot] > 0f)
+    /// <summary>左から slot 番目の炎だけの Image。無ければ null。</summary>
+    private Image FireImageOf(int slot)
+    {
+        return fireImages != null && slot >= 0 && slot < fireImages.Length ? fireImages[slot] : null;
+    }
+
+    /// <summary>左から slot 番目の帯に出ているチーム。無ければ -1。</summary>
+    private int TeamAtSlot(int slot)
+    {
+        for (int team = 0; team < bar.TeamCount; team++)
+        {
+            if (bar.SlotOfTeam(team) == slot)
             {
-                label.fontSize = baseFontSizes[slot] * (1f + punchScale * EaseOut(punch[team]));
+                return team;
             }
         }
+
+        return -1;
     }
 
     /// <summary>1→0 へ減る値を、はじめは大きいまま・終わりで素早く消えるように曲げる。</summary>
