@@ -26,7 +26,7 @@
 | t が 1 になった（ホスト） | 印を外し、大きさを元に戻してから、ゴールの `Collect`（`Absorbed` も出す）。`Collect` → `SpaceJunkRound.ServerCollect` → 数えたら `FlashClientRpc`（得点の光る演出）→ `HookableObject.Vanish`（全員の画面から消える）。戻した大きさは、同じフレームで見えなくなる |
 | t が 1 になった（参加者） | 小さいまま、ホストが消すのを待つ。消されたら（`Vanish` で印が外れる）大きさを戻して係を外す。3秒たっても消されなければ、元に戻す |
 | 吸い込み中に、ほかの理由で `Vanish` された（爆発など） | `Vanish` が印を外すので、係はそれに気づいて大きさを戻して外れる。**得点にはしない** |
-| 渦の係の `Update` → `DrawAt(Time.time)` | ゴールごとに「出ている量」（0〜1）を Appear Seconds で増減し、円の板（`_Part`＝0）と、すり鉢（`_Part`＝1。高さは Funnel Height×出ている量）・らせんの帯（`_Part`＝2。すり鉢と同じ大きさ）・かけら（`_Part`＝3。大きさはそのまま m で、位置はシェーダーが決める）を `Graphics.RenderMesh` で描く。すり鉢から先は `_Funnel`（底の割合・曲がり具合・渦の半径・高さ）も渡す。閉ざされたゴールには描かない。試合のゴールは、見た目（`IntroVisual`）の MeshRenderer が全部切られている間（始まりの演出でゴールが飛んでいる間）は出ている量を 0 へ |
+| 渦の係の `Update` → `DrawAt(Time.time)` | ゴールごとに「出ている量」（0〜1）を Appear Seconds で増減し、円の板（`_Part`＝0。**Show Floor Vortex がオンのときだけ**。2026/11/17 からオフ）と、すり鉢（`_Part`＝1。高さは Funnel Height×出ている量）・らせんの帯（`_Part`＝2。すり鉢と同じ大きさ）・かけら（`_Part`＝3。大きさはそのまま m で、位置はシェーダーが決める）を `Graphics.RenderMesh` で描く。すり鉢から先は `_Funnel`（底の割合・曲がり具合・渦の半径・高さ）も渡す。閉ざされたゴールには描かない。試合のゴールは、見た目（`IntroVisual`）の MeshRenderer が全部切られている間（始まりの演出でゴールが飛んでいる間）は出ている量を 0 へ |
 
 ### 時計（`SpaceJunkVortexAbsorb.ClockOf`）
 
@@ -78,6 +78,7 @@
 | `vortexMaterial`・`fill`・`lift`・`appearSeconds`・`brightness` | `SpaceJunkGoalVortex.cs` | 見た目（インスペクター） |
 | `funnelHeight`・`funnelBottom`・`funnelCurve` | `SpaceJunkGoalVortex.cs` | すり鉢の形（インスペクター）。`funnelMesh`・`funnelMeshShape` は作った形と、そのときの値 |
 | `useTeamColor`・`neutralColor` | `SpaceJunkGoalVortex.cs` | 明るい所の色（チームの色か、灰色か） |
+| `showFloorVortex` | `SpaceJunkGoalVortex.cs` | 床の平らな渦巻き模様を描くか（見た目だけ。判定の円柱には関係ない） |
 | `ribbonCount`・`ribbonTurns`・`ribbonWidth`・`debrisCount` | `SpaceJunkGoalVortex.cs` | らせんの帯とかけら（インスペクター）。`ribbonMesh`・`debrisMesh` は作った形 |
 | `absorbSeconds`・`spinTurns`・`selfSpinDegrees`・`endScale`・`sinkDepth` | `SpaceJunkGoalVortex.cs` | 吸い込みの動き（インスペクター。吸い込まれる係が読む） |
 | `pullAcceleration`・`depthBelowFloor` | `SpaceJunkGoalVortex.cs` | 引き寄せと、円柱の下の端（インスペクター） |
@@ -102,3 +103,4 @@
 | 2026/11/17 | Claude Code（依頼：大槻 海斗） | 新規作成 |
 | 2026/11/17 | Claude Code（依頼：大槻 海斗） | すり鉢（立体の渦）の形・描き方と、吸い込みの高さをすり鉢の面に沿わせたことを書き足した |
 | 2026/11/17 | Claude Code（依頼：大槻 海斗） | 黒と灰色・光らせない描き方、らせんの帯、黒いかけら、チームの色の切り替え（Use Team Color）を書き足した |
+| 2026/11/17 | Claude Code（依頼：大槻 海斗） | 床の平らな渦を描くかの切り替え（Show Floor Vortex。いまはオフ）を書き足した |

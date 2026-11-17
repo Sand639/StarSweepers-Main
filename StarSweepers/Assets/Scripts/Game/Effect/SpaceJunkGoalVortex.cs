@@ -34,6 +34,9 @@ public class SpaceJunkGoalVortex : MonoBehaviour
     [Tooltip("チームの色を使わないときの、明るい所の色（灰色）")]
     [SerializeField] private Color neutralColor = new Color(0.78f, 0.78f, 0.8f);
 
+    [Tooltip("床に平らな渦巻き模様（すり鉢の底の2Dの渦）を描くか。2026/11/17 に大槻さんの「消しちゃって大丈夫」でオフにした（判定の円柱には関係ない）")]
+    [SerializeField] private bool showFloorVortex = false;
+
     [Header("すり鉢（床の渦の上に立つ、半透明の立体の渦）")]
     [Tooltip("すり鉢の高さ（m）。物資を吸い込む円柱より高くはならない。0 ならすり鉢を出さない")]
     [SerializeField] private float funnelHeight = 1.6f;
@@ -403,11 +406,14 @@ public class SpaceJunkGoalVortex : MonoBehaviour
             block.SetFloat(VortexTimeId, now);
             block.SetFloat(AppearId, amount);
             block.SetFloat(BrightnessId, brightness);
-            block.SetFloat(PartId, 0f);
             float diameter = area.Radius * 2f;
             Vector3 floorPoint = area.Center + Vector3.up * lift;
-            Graphics.RenderMesh(renderParams, discMesh, 0,
-                Matrix4x4.TRS(floorPoint, Quaternion.identity, new Vector3(diameter, 1f, diameter)));
+            if (showFloorVortex)
+            {
+                block.SetFloat(PartId, 0f);
+                Graphics.RenderMesh(renderParams, discMesh, 0,
+                    Matrix4x4.TRS(floorPoint, Quaternion.identity, new Vector3(diameter, 1f, diameter)));
+            }
 
             // すり鉢の壁・らせんの帯・かけら（出てくるときは、高さも下から伸びる）
             float height = FunnelHeightOf(area) * amount;
