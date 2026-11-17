@@ -63,8 +63,8 @@ public sealed class LobbyTestDeparture : MonoBehaviour
             float elapsed = (float)(manager.ServerTime.Time - session.TestBoardingTime);
             float progress = Mathf.Clamp01((elapsed - BoardingPause) / FlightSeconds);
             float travel = progress * progress;
-            blueDeck.transform.position = blueStart + new Vector3(2f, 6f, 14f) * travel;
-            redDeck.transform.position = redStart + new Vector3(-2f, 6f, 14f) * travel;
+            blueDeck.transform.position = blueStart + FlightOffset(travel, outerSide: 1f, turnDepth: 2f);
+            redDeck.transform.position = redStart + FlightOffset(travel, outerSide: -1f, turnDepth: -3f);
         }
 
         RemoveUnusedMarks(session);
@@ -109,6 +109,18 @@ public sealed class LobbyTestDeparture : MonoBehaviour
     }
 
     private BoxCollider Deck(int team) => team == 0 ? blueDeck : redDeck;
+
+    private static Vector3 FlightOffset(float t, float outerSide, float turnDepth)
+    {
+        // いったん外へふくらみ、反対側の手前へ抜ける。
+        Vector3 outerTurn = new Vector3(10f * outerSide, 0.5f, turnDepth);
+        Vector3 crossingTurn = new Vector3(7f * outerSide, 2f, -9f);
+        Vector3 exit = new Vector3(-17f * outerSide, 3f, -20f);
+        float remaining = 1f - t;
+        return 3f * remaining * remaining * t * outerTurn +
+               3f * remaining * t * t * crossingTurn +
+               t * t * t * exit;
+    }
 
     private static bool IsOverDeck(FishingNetPlayer player, BoxCollider deck)
     {
