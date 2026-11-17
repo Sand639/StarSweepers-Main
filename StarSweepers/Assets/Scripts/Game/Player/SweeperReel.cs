@@ -51,7 +51,7 @@ using UnityEngine;
 ///
 /// **クリティカルプルは距離で取る**（大槻さんの指定）。Critical Near〜Critical Far の距離で押すと、
 /// 今までどおりのクリティカルプル（強さは掛けない。エフェクトも同じ）。合図（縮んでくる輪・金色のフチ）は、物資がその距離を通る時間に合わせて出す。
-/// **物資は一定の速さ（Distance Reel Speed）で寄ってくる**（Reel Seconds の「何秒で着く」は使わない。大槻さんの指定）。
+/// **物資は一定の速さ（Distance Reel Speed）で、光線の形（しなっていれば曲線）にそって寄ってくる**（Reel Seconds の「何秒で着く」は使わない。大槻さんの指定）。
 /// 押さずに手前まで来たときは、今までどおり前へ投げる（強さは掛けない）。重い物は今までどおり引きずるだけ。
 ///
 /// ### クリティカルのエフェクト（仮。2026/11/4）
@@ -754,8 +754,15 @@ public class SweeperReel : MonoBehaviour
 
         // 距離：手前の止める位置（Stop Distance）まで
         float nextDistance = distance + (stopDistance - distance) * share;
+        Vector3 next = player + nextDirection * nextDistance;
 
-        Vector3 rest = player + nextDirection * nextDistance - body.position;
+        // 距離で変わる操作：物資だけ、光線の形（しなっていれば曲線）にそって手元へ進める（2026/11/17・大槻さんの指定）
+        if (distanceMode && TryStepAlongBeam(player, out Vector3 alongBeam))
+        {
+            next = alongBeam;
+        }
+
+        Vector3 rest = next - body.position;
         rest.y = 0f;
         Vector3 velocity = CapSpeed(rest / Time.fixedDeltaTime);
         reelVelocity = velocity;
@@ -767,6 +774,63 @@ public class SweeperReel : MonoBehaviour
         }
 
         SetDragVelocity(velocity);
+    }
+
+    /// <summary>
+    /// **距離で変わる操作：物資を、光線の形にそって手元のほうへ1ステップぶん進めた位置**（2026/11/17・大槻さんの指定）。
+    /// 光線の形（<see cref="SweeperShooter.GetBeamPath"/>。しなっていれば見た目と同じ曲線）を、物資の側から手元へ
+    /// Distance Reel Speed × 時間 だけたどり、そのぶん物資をずらす。まっすぐ引いているときは、手元へまっすぐ近づく。
+    /// プレイヤーの中心から Stop Distance より手前には来ない。光線の形が取れないときは false（いつもの寄せ方にする）。
+    /// 動くのは物資だけで、割合（前へ投げる・引っ張る・クリティカル）は、これまでどおりプレイヤーと物資のまっすぐの距離で決める。
+    /// </summary>
+    private bool TryStepAlongBeam(Vector3 player, out Vector3 next)
+    {
+        next = body.position;
+        int count = shooter != null ? shooter.GetBeamPath(beamPath) : 0;
+        if (count < 2)
+        {
+            return false;
+        }
+
+        // 物資の側（最後の点）から手元（最初の点）へ、決まった長さだけたどる
+        float step = distanceReelSpeed * Time.fixedDeltaTime;
+        Vector3 tip = beamPath[count - 1];
+        Vector3 point = tip;
+        for (int i = count - 1; i > 0; i--)
+        {
+            Vector3 from = beamPath[i];
+            Vector3 to = beamPath[i - 1];
+            float length = FlatLength(from, to);
+            if (length >= step)
+            {
+                point = Vector3.Lerp(from, to, step / Mathf.Max(length, 0.0001f));
+                break;
+            }
+
+            step -= length;
+            point = to;
+        }
+
+        Vector3 moved = point - tip;
+        moved.y = 0f;
+        next = body.position + moved;
+
+        // 止める位置（Stop Distance）より手前には来ない
+        Vector3 offset = next - player;
+        offset.y = 0f;
+        if (offset.magnitude < stopDistance)
+        {
+            Vector3 direction = offset.sqrMagnitude > 0.0001f ? offset.normalized : Flat(transform.forward);
+            next = player + direction * stopDistance;
+        }
+
+        return true;
+    }
+
+    /// <summary>2点の、真上から見た距離。</summary>
+    private static float FlatLength(Vector3 a, Vector3 b)
+    {
+        return Vector2.Distance(new Vector2(a.x, a.z), new Vector2(b.x, b.z));
     }
 
     /// <summary>
