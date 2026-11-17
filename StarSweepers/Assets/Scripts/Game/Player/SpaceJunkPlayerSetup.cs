@@ -164,10 +164,28 @@ public partial class SpaceJunkPlayerSetup : MonoBehaviour
         hookLine = GetComponentInChildren<HookLine>(true);
         input = PlayerInputSource.Get(this);
 
+        baseScale = transform.localScale;
+
         if (IsInLobbyScene())
         {
             lobbyVisualsHidden = true;
             SetLobbyRenderersVisible(false);
+        }
+    }
+
+    /// <summary>ロビーでのプレイヤーの大きさの倍率（Hans さん了承済み・2026/11/17）。</summary>
+    private const float LobbyScaleMultiplier = 1.1f;
+
+    /// <summary>元の大きさ（ロビー以外ではこれに戻す）。</summary>
+    private Vector3 baseScale = Vector3.one;
+
+    /// <summary>ロビーにいる間だけ、プレイヤーを1.1倍にする。</summary>
+    private void ApplyLobbyScale()
+    {
+        Vector3 target = IsInLobbyScene() ? baseScale * LobbyScaleMultiplier : baseScale;
+        if (transform.localScale != target)
+        {
+            transform.localScale = target;
         }
     }
 
@@ -179,6 +197,8 @@ public partial class SpaceJunkPlayerSetup : MonoBehaviour
     {
         // チームの色は、**自分のぶんも他の人のぶんも**塗る（誰が味方か分かるように）
         ApplyTeamColor();
+
+        ApplyLobbyScale();
 
         // 頭の上の名前のタグも、**全員のぶん**に付ける
         EnsureNameplate();
