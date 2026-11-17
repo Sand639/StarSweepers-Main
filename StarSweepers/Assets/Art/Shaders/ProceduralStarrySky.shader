@@ -17,7 +17,7 @@ Shader "StarSweepers/ProceduralStarrySky"
         _StarSize ("Star Size (星の大きさ)", Range(0.01, 0.15)) = 0.05
         _Brightness ("Brightness (星の明るさ)", Range(0, 10)) = 2
         _BrightnessCurve ("Brightness Curve (大きいほど暗い星が増え、明るい星がまれになる)", Range(1, 12)) = 4
-        _ColorAmount ("Color Amount (星の色の濃さ。0=白だけ、1=現実の星くらい、2以上=はっきり)", Range(0, 3)) = 1.6
+        _ColorAmount ("Color Amount (星の色の濃さ。0=白だけ、1=現実の星くらい、2以上=はっきり)", Range(0, 3)) = 0.8
         _Glow ("Glow (明るい星のまわりのにじみ)", Range(0, 1)) = 0.3
         _TwinkleMin ("Twinkle Min (瞬きでいちばん暗くなるときの明るさ。いちばん明るいときが1。1で瞬かない)", Range(0, 1)) = 0.2
         _TwinkleSpeed ("Twinkle Speed (瞬きの速さ)", Range(0, 10)) = 2.5

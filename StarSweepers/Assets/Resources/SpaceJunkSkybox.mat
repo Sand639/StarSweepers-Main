@@ -28,7 +28,7 @@ Material:
     - _BigDensity: 20
     - _Brightness: 2
     - _BrightnessCurve: 4
-    - _ColorAmount: 1.6
+    - _ColorAmount: 0.8
     - _Density: 90
     - _Exposure: 1
     - _Glow: 0.3
