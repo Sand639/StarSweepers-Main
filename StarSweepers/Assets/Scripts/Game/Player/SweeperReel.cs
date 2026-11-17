@@ -36,16 +36,16 @@ using UnityEngine;
 /// ### 距離で変わる操作（設定「光線の操作：距離で変わる」。2026/11/17・大槻さんの案）
 ///
 /// ポーズ画面の設定で選んだ人だけ（ボットはいつも今までどおり）。引き寄せはいつもどおりで、
-/// **途中で押した瞬間の距離**（届く長さ <see cref="SweeperShooter.MaxReach"/> の割合）で、飛ばし方と強さが決まる。
+/// **途中で押した瞬間の距離**（その1発が何にも当たらなければ伸びる長さ <see cref="SweeperShooter.ShotReach"/> を 100% とした割合）で、飛ばし方と強さが決まる。
 ///
 /// | 押した瞬間の距離 | どうなる |
 /// | --- | --- |
 /// | 0〜20%（Throw Zone End まで） | **前へ投げる**（いつもの前へ投げる速さ × 投げる強さ）。体のそばで強さ 1 → 20% で 0 |
 /// | 20〜29%（Critical Near まで） | **引っ張る**＝いつもの後ろへの投げの速さ × 引っ張る強さ。20% で 0 → 29% で 1 |
 /// | 29〜32%（Critical Far まで） | **クリティカルプル**（今までどおり。強さは掛けない） |
-/// | 32〜100% | **引っ張る**。32% で 1 → 届くいちばん遠い所（100%）で 0 |
+/// | 32〜100% | **引っ張る**。32% で 1 → 伸びる長さいっぱい（100%）で 0 |
 ///
-/// （大槻さんの指定：投げ 0〜20・引っ張り 20〜28・クリティカルプル 29〜31・引っ張り 32〜100。数字はビームの最大距離に対する % ）
+/// （大槻さんの指定：投げ 0〜20・引っ張り 20〜28・クリティカルプル 29〜31・引っ張り 32〜100。数字は、その1発で何にも当たらなければビームが伸びる長さに対する %。物資に当たった距離ではない）
 ///
 /// **クリティカルプルは距離で取る**（大槻さんの指定）。Critical Near〜Critical Far の距離で押すと、
 /// 今までどおりのクリティカルプル（強さは掛けない。エフェクトも同じ）。合図（縮んでくる輪・金色のフチ）は、物資がその距離を通る時間に合わせて出す。
@@ -180,15 +180,15 @@ public class SweeperReel : MonoBehaviour
     [SerializeField] private float heavyStopDistance = 2f;
 
     [Header("距離で変わる操作（設定「光線の操作：距離で変わる」のときだけ。2026/11/17）")]
-    [Tooltip("押した瞬間、物資が届く長さ（Max Reach）のこの割合より近ければ前へ投げる（体のそばで強さ 1 → ここで 0）。遠ければ引っ張る")]
+    [Tooltip("押した瞬間、物資がこの割合（その1発が何にも当たらなければ伸びる長さを 1 とする）より近ければ前へ投げる（体のそばで強さ 1 → ここで 0）。遠ければ引っ張る")]
     [Range(0f, 1f)]
     [SerializeField] private float throwZoneEnd = 0.2f;
 
-    [Tooltip("クリティカルプルを取れる距離の、近いほうの端（届く長さの割合）。Throw Zone End からここまでは、引っ張る強さが 0 → 1 に増える")]
+    [Tooltip("クリティカルプルを取れる距離の、近いほうの端（その1発が伸びる長さの割合）。Throw Zone End からここまでは、引っ張る強さが 0 → 1 に増える")]
     [Range(0f, 1f)]
     [SerializeField] private float criticalNear = 0.29f;
 
-    [Tooltip("クリティカルプルを取れる距離の、遠いほうの端（届く長さの割合）。ここから届くいちばん遠い所までは、引っ張る強さが 1 → 0 に減る。Critical Near と同じにするとクリティカルなし")]
+    [Tooltip("クリティカルプルを取れる距離の、遠いほうの端（その1発が伸びる長さの割合）。ここから伸びる長さいっぱいまでは、引っ張る強さが 1 → 0 に減る。Critical Near と同じにするとクリティカルなし")]
     [Range(0f, 1f)]
     [SerializeField] private float criticalFar = 0.32f;
 
@@ -511,10 +511,16 @@ public class SweeperReel : MonoBehaviour
         Finish(critical ? "クリティカル" : "後ろ", critical, false);
     }
 
+    /// <summary>
+    /// 距離で変わる操作の 100%：**その1発が何にも当たらなければ伸びる長さ**（撃った瞬間の溜めの長さ。大槻さんの指定）。
+    /// 物資に当たった距離ではなく、溜めた長さで決まる（短く溜めて撃てば、同じ距離でも割合は大きくなる）。
+    /// </summary>
+    private float BeamReach => Mathf.Max(0.1f, shooter != null ? shooter.ShotReach : 12f);
+
     /// <summary>距離で変わる操作で、いま物資がクリティカルプルを取れる距離（Critical Near〜Critical Far）にいるか。</summary>
     private bool InCriticalBand()
     {
-        float ratio = FlatDistanceToPlayer() / Mathf.Max(0.1f, shooter != null ? shooter.MaxReach : 12f);
+        float ratio = FlatDistanceToPlayer() / BeamReach;
         return ratio >= criticalNear && ratio < criticalFar;
     }
 
@@ -525,7 +531,7 @@ public class SweeperReel : MonoBehaviour
     /// </summary>
     private void EstimateCriticalWindow()
     {
-        float reach = Mathf.Max(0.1f, shooter != null ? shooter.MaxReach : 12f);
+        float reach = BeamReach;
         float far = criticalFar * reach;
         float near = Mathf.Max(stopDistance, criticalNear * reach);
         float span = reelStartDistance - stopDistance;
@@ -545,7 +551,7 @@ public class SweeperReel : MonoBehaviour
 
     /// <summary>
     /// **距離で変わる操作で押された**（大槻さんの図。2026/11/17）。クリティカルの距離なら今までどおりのクリティカルプル。それ以外は、押した瞬間の距離で、前へ投げるか引っ張る（後ろへ）かを決め、
-    /// いつもの飛ぶ速さ（向きと大きさ）に強さ（0〜1）を掛けて飛ばす。距離は届く長さ（Max Reach）の割合で見る。
+    /// いつもの飛ぶ速さ（向きと大きさ）に強さ（0〜1）を掛けて飛ばす。距離は、その1発が何にも当たらなければ伸びる長さ（<see cref="BeamReach"/>）の割合で見る。
     /// 投げる強さ：体のそばで 1、Throw Zone End で 0。引っ張る強さ：Throw Zone End で 0 → Critical Near で 1、Critical Far で 1 → 届くいちばん遠い所で 0（どれもまっすぐ）。
     /// </summary>
     private void PressByDistance()
@@ -558,8 +564,7 @@ public class SweeperReel : MonoBehaviour
             return;
         }
 
-        float reach = shooter != null ? shooter.MaxReach : 12f;
-        float ratio = Mathf.Clamp01(FlatDistanceToPlayer() / Mathf.Max(0.1f, reach));
+        float ratio = Mathf.Clamp01(FlatDistanceToPlayer() / BeamReach);
 
         if (ratio < throwZoneEnd)
         {

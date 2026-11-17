@@ -155,6 +155,9 @@ public class SweeperShooter : MonoBehaviour
     /// <summary>いちばん長く伸ばしたときの長さ（プレイヤーの中心から m）。ボットが撃つ場所を決めるのに使う。</summary>
     public float MaxReach => Mathf.Max(minReach, maxReach);
 
+    /// <summary>いまの1発が、何にも当たらなければ伸びる長さ（撃った瞬間の溜めの長さ。プレイヤーの中心から m）。距離で変わる操作の 100% に使う。</summary>
+    public float ShotReach => targetDistance;
+
     /// <summary>光線の先の、当たりを見る球の半径（m）。</summary>
     public float HitRadius => hitRadius;
 
