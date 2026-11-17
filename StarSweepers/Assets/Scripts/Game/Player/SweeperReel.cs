@@ -33,6 +33,17 @@ using UnityEngine;
 /// 1回で動かせる距離（Heavy Drag Distance ÷ 重さ）を引いたら、**その場に置いて離す**。途中で押しても、その場で離す。
 /// クリティカルの合図は出ない。何回も撃って、少しずつゴールまで運ぶ遊び方になる。
 ///
+/// ### 距離で変わる操作（設定「光線の操作：距離で変わる」。2026/11/17・大槻さんの案）
+///
+/// ポーズ画面の設定で選んだ人だけ（ボットはいつも今までどおり）。当たった瞬間の距離を、届く長さ（<see cref="SweeperShooter.MaxReach"/>）の割合で見て決める。
+///
+/// | 当たった距離 | どうなる |
+/// | --- | --- |
+/// | Throw Zone End より近い | **すぐ後ろへ投げる。** 近いほど遠くへ飛ぶ（Distance Throw Min〜Max） |
+/// | それより遠い | **引き寄せて離す**（投げない）。引ける距離は Pull Peak でいちばん長く、そこから近くても遠くても短くなる（Distance Pull Min〜Max） |
+///
+/// クリティカル・前へ投げるのは無い。重い物は今までどおり引きずるだけ。
+///
 /// ### クリティカルのエフェクト（仮。2026/11/4）
 ///
 /// プレハブ（Critical Cue Prefab / Critical Hit Prefab）が空のときは、仮のエフェクトを出す。どれを出すかはインスペクターで選べる（組み合わせてもよい）。
@@ -161,6 +172,35 @@ public class SweeperReel : MonoBehaviour
     [Min(0.3f)]
     [SerializeField] private float heavyStopDistance = 2f;
 
+    [Header("距離で変わる操作（設定「光線の操作：距離で変わる」のときだけ。2026/11/17）")]
+    [Tooltip("届く長さ（Max Reach）のうち、この割合より近くで当たったら投げる。それより遠ければ引っ張る")]
+    [Range(0f, 1f)]
+    [SerializeField] private float throwZoneEnd = 0.32f;
+
+    [Tooltip("引っ張る強さがいちばん強くなる所（届く長さの割合）。Throw Zone End より遠くする")]
+    [Range(0f, 1f)]
+    [SerializeField] private float pullPeak = 0.43f;
+
+    [Tooltip("投げるとき、後ろのどこに落とすか（m）。投げられるぎりぎりの遠さで当たったとき")]
+    [Min(0f)]
+    [SerializeField] private float distanceThrowMin = 3f;
+
+    [Tooltip("投げるとき、後ろのどこに落とすか（m）。体のすぐそばで当たったとき")]
+    [Min(0f)]
+    [SerializeField] private float distanceThrowMax = 11f;
+
+    [Tooltip("引っ張るとき、1回で引き寄せる距離（m）。強さがいちばん弱いとき（届くぎりぎり・投げとの境目）")]
+    [Min(0f)]
+    [SerializeField] private float distancePullMin = 0.5f;
+
+    [Tooltip("引っ張るとき、1回で引き寄せる距離（m）。強さがいちばん強いとき（Pull Peak）")]
+    [Min(0f)]
+    [SerializeField] private float distancePullMax = 5f;
+
+    [Tooltip("引っ張るときの速さ（m/秒）")]
+    [Min(0.1f)]
+    [SerializeField] private float distancePullSpeed = 8f;
+
     [Header("クリティカルプル")]
     [Tooltip("当たってから、クリティカルの受付が始まるまでの秒数（Reel Seconds より短くする）")]
     [Min(0f)]
@@ -259,6 +299,25 @@ public class SweeperReel : MonoBehaviour
     /// <summary>重い物が回り込む速さの上限を、ふつうの物（Max Swing Speed）の何倍にするか（そこからさらに重さで割る）。</summary>
     private const float HeavySwingShare = 0.25f;
 
+    /// <summary>距離で変わる操作で、当たったときに決まったこと（今までの操作では None）。</summary>
+    private enum DistanceAction
+    {
+        None,
+        Throw,
+        Pull
+    }
+
+    private DistanceAction distanceAction;
+
+    /// <summary>距離で決まった強さ（0〜1）。</summary>
+    private float distanceStrength;
+
+    /// <summary>距離で変わる操作で引っ張るとき、この1回であと何m引き寄せるか。</summary>
+    private float pullRemaining;
+
+    /// <summary>この体の入力（ボットか、光線の操作の設定を見るのに使う）。</summary>
+    private PlayerInputSource input;
+
     /// <summary>自分の参加番号を持つ通信上のプレイヤー（オフラインの検証シーンでは null）。</summary>
     private FishingNetPlayer netPlayer;
 
@@ -321,7 +380,7 @@ public class SweeperReel : MonoBehaviour
     public float Elapsed => IsActive && !waitingForClaim ? Time.time - startTime : 0f;
 
     /// <summary>いまクリティカルの受付中か（重い物を引きずっている間は、いつも false）。</summary>
-    public bool InCriticalWindow => IsActive && !waitingForClaim && !heavy && Elapsed >= criticalStart && Elapsed <= criticalStart + criticalLength;
+    public bool InCriticalWindow => IsActive && !waitingForClaim && !heavy && distanceAction == DistanceAction.None && Elapsed >= criticalStart && Elapsed <= criticalStart + criticalLength;
 
     /// <summary>いま重い物を引きずっているか。</summary>
     public bool IsHeavyDrag => IsActive && heavy;
@@ -384,6 +443,7 @@ public class SweeperReel : MonoBehaviour
         playerCollider = GetComponent<Collider>();
         shooter = GetComponent<SweeperShooter>();
         netPlayer = GetComponent<FishingNetPlayer>();
+        input = PlayerInputSource.Get(this);
     }
 
     /// <summary>巻き取りを始める。物資の Rigidbody の物理はそのまま使う（床の上を引きずる）。</summary>
@@ -410,6 +470,13 @@ public class SweeperReel : MonoBehaviour
         heavy = HeavyHookable.TryGetWeight(target, out heavyWeight);
         heavyWeight = Mathf.Max(0.1f, heavyWeight);
         heavyRemaining = heavy ? Mathf.Max(heavyDragDistance / heavyWeight, heavyDragMinDistance) : 0f;
+
+        // 距離で変わる操作なら、当たった距離で投げか引っ張りかを決める（オンラインでは、認められた瞬間に決め直す）
+        distanceAction = DistanceAction.None;
+        if (!heavy && input != null && input.BeamOperation == BeamOperationType.DistanceStrength)
+        {
+            DecideDistanceAction();
+        }
 
         // オンラインなら、ホストに引っ掛けを頼む。認められるまでは引かない
         FishingNetSupply netSupply = target.GetComponent<FishingNetSupply>();
@@ -445,6 +512,13 @@ public class SweeperReel : MonoBehaviour
             return;
         }
 
+        // 距離で変わる操作で引っ張っている途中も、押したらその場に置いて離す
+        if (distanceAction == DistanceAction.Pull)
+        {
+            ReleasePull();
+            return;
+        }
+
         bool critical = InCriticalWindow;
         ThrowBack(critical);
         Finish(critical ? "クリティカル" : "後ろ", critical, false);
@@ -475,6 +549,24 @@ public class SweeperReel : MonoBehaviour
 
         if (supply != null && !UpdateOnlineClaim())
         {
+            return;
+        }
+
+        // 距離で変わる操作：近ければすぐ投げる。引っ張るときは、引き終わったら離す（クリティカルの合図も、前へ投げるのも無い）
+        if (distanceAction == DistanceAction.Throw)
+        {
+            ThrowBack(Mathf.Lerp(distanceThrowMin, distanceThrowMax, distanceStrength),
+                Mathf.Lerp(backArcHeight, criticalArcHeight, distanceStrength), false);
+            Finish("近くで投げた", false, false);
+            return;
+        }
+
+        if (distanceAction == DistanceAction.Pull)
+        {
+            if (pullRemaining <= 0f)
+            {
+                ReleasePull();
+            }
             return;
         }
 
@@ -516,6 +608,10 @@ public class SweeperReel : MonoBehaviour
                 waitingForClaim = false;
                 startTime = Time.time;
                 reelStartDistance = FlatDistanceToPlayer();
+                if (distanceAction != DistanceAction.None)
+                {
+                    DecideDistanceAction();
+                }
                 body.WakeUp();
                 return true;
             }
@@ -567,6 +663,18 @@ public class SweeperReel : MonoBehaviour
         if (heavy)
         {
             DragHeavy(player, toward, distance);
+            return;
+        }
+
+        // 距離で変わる操作：投げるときは引かない（Update ですぐ投げる）。引っ張るときは決まった距離だけ引き寄せる
+        if (distanceAction == DistanceAction.Throw)
+        {
+            return;
+        }
+
+        if (distanceAction == DistanceAction.Pull)
+        {
+            pullRemaining = DragBy(player, toward, distance, distancePullSpeed, stopDistance, maxSwingSpeed, pullRemaining);
             return;
         }
 
@@ -836,21 +944,31 @@ public class SweeperReel : MonoBehaviour
     /// </summary>
     private void DragHeavy(Vector3 player, Vector3 toward, float distance)
     {
-        float dt = Time.fixedDeltaTime;
-        float room = Mathf.Max(0f, distance - heavyStopDistance);
-        float step = Mathf.Min(heavyDragSpeed / heavyWeight * dt, heavyRemaining, room);
+        heavyRemaining = DragBy(player, toward, distance, heavyDragSpeed / heavyWeight, heavyStopDistance,
+            maxSwingSpeed * HeavySwingShare / heavyWeight, heavyRemaining);
+    }
 
-        heavyRemaining -= step;
+    /// <summary>
+    /// **決まった速さで、決まった距離だけ手前へ引きずる**（1ステップぶん）。重い物と、距離で変わる操作の引っ張りで使う。
+    /// <paramref name="stopAt"/> まで来たら残りを 0 にする。**戻り値は、あと何m引けるか。**
+    /// </summary>
+    private float DragBy(Vector3 player, Vector3 toward, float distance, float speed, float stopAt, float swingSpeed, float remaining)
+    {
+        float dt = Time.fixedDeltaTime;
+        float room = Mathf.Max(0f, distance - stopAt);
+        float step = Mathf.Min(speed * dt, remaining, room);
+
+        remaining -= step;
         if (room <= 0.01f)
         {
-            heavyRemaining = 0f;
+            remaining = 0f;
         }
 
         Vector3 nextDirection = toward;
-        if (maxSwingSpeed > 0f && shooter != null && shooter.TryGetBendDirection(out Vector3 bendDirection))
+        if (swingSpeed > 0f && shooter != null && shooter.TryGetBendDirection(out Vector3 bendDirection))
         {
             float swing = Vector3.SignedAngle(toward, bendDirection, Vector3.up);
-            float limit = maxSwingSpeed * HeavySwingShare / heavyWeight * dt;
+            float limit = swingSpeed * dt;
             nextDirection = Quaternion.AngleAxis(Mathf.Clamp(swing, -limit, limit), Vector3.up) * toward;
         }
 
@@ -862,10 +980,11 @@ public class SweeperReel : MonoBehaviour
         if (body.isKinematic)
         {
             body.MovePosition(body.position + velocity * dt);
-            return;
+            return remaining;
         }
 
         SetDragVelocity(velocity);
+        return remaining;
     }
 
     /// <summary>
@@ -878,6 +997,39 @@ public class SweeperReel : MonoBehaviour
         Finish("引きずった", false, false);
     }
 
+    /// <summary>距離で変わる操作で引っ張り終わった（または途中で押した）。投げずに、その場に置いて離す。</summary>
+    private void ReleasePull()
+    {
+        DropInPlace();
+        Finish("引っ張った", false, false);
+    }
+
+    /// <summary>
+    /// **距離で変わる操作：当たった距離で、投げか引っ張りかと、その強さを決める**（大槻さんの図。2026/11/17）。
+    /// 距離は届く長さ（Max Reach）の割合で見る。
+    /// 投げる強さ：体のそばで 1、Throw Zone End で 0（まっすぐ減る）。
+    /// 引っ張る強さ：Throw Zone End で 0 → Pull Peak で 1 → 届くぎりぎり（1）で 0（どちらもまっすぐ）。
+    /// </summary>
+    private void DecideDistanceAction()
+    {
+        float reach = shooter != null ? shooter.MaxReach : 12f;
+        float ratio = Mathf.Clamp01(reelStartDistance / Mathf.Max(0.1f, reach));
+
+        if (ratio < throwZoneEnd)
+        {
+            distanceAction = DistanceAction.Throw;
+            distanceStrength = 1f - ratio / throwZoneEnd;
+            pullRemaining = 0f;
+            return;
+        }
+
+        distanceAction = DistanceAction.Pull;
+        distanceStrength = ratio < pullPeak
+            ? Mathf.InverseLerp(throwZoneEnd, pullPeak, ratio)
+            : Mathf.InverseLerp(1f, pullPeak, ratio);
+        pullRemaining = Mathf.Lerp(distancePullMin, distancePullMax, distanceStrength);
+    }
+
     /// <summary>
     /// 押した瞬間の位置から、プレイヤーの頭を越える放物線で後ろへ投げる。
     /// 飛ぶ向きは「体の真後ろ」と「物資がいま動いている向き」を <see cref="throwFollowMotion"/> の割合で混ぜたもの（2026/11/4）。
@@ -885,13 +1037,16 @@ public class SweeperReel : MonoBehaviour
     /// </summary>
     private void ThrowBack(bool critical)
     {
+        ThrowBack(critical ? criticalBackDistance : backDistance, critical ? criticalArcHeight : backArcHeight, critical);
+    }
+
+    /// <summary>後ろへ投げる（落とす距離と放物線の高さを指定する。距離で変わる操作でも使う）。</summary>
+    private void ThrowBack(float distance, float arcHeight, bool critical)
+    {
         if (body == null)
         {
             return;
         }
-
-        float distance = critical ? criticalBackDistance : backDistance;
-        float arcHeight = critical ? criticalArcHeight : backArcHeight;
 
         Vector3 from = body.position;
         Vector3 direction = ThrowBackDirection();
@@ -1080,6 +1235,8 @@ public class SweeperReel : MonoBehaviour
         waitingForClaim = false;
         heavy = false;
         heavyRemaining = 0f;
+        distanceAction = DistanceAction.None;
+        pullRemaining = 0f;
         hasLastStep = false;
         strain = 0f;
         pierceTime = 0f;
