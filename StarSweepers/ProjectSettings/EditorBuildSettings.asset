@@ -50,6 +50,9 @@ EditorBuildSettings:
   - enabled: 1
     path: Assets/Scenes/Stage/STAGE_GlassChecker2.unity
     guid: 6fd0481a1e01df841ba020145382c88f
+  - enabled: 1
+    path: Assets/Scenes/Stage/STAGE_Train2.unity
+    guid: 6faa9be24b06b1f4fa993baf4a3abc49
   m_configObjects:
     com.unity.input.settings.actions: {fileID: -944628639613478452, guid: 052faaac586de48259a63d0c4782560b, type: 3}
   m_UseUCBPForAssetBundles: 0

@@ -97,8 +97,8 @@ MonoBehaviour:
       weight: 1
     debugForceEvent: 0
     debrisSetOrdered: 0
-    debrisSetMinSize: 4
-    debrisSetMaxSize: 6
+    debrisSetMinSize: 3
+    debrisSetMaxSize: 3
     debrisSetGoal: 3
     debrisSetBonus: 10
     highValueBonus: 2

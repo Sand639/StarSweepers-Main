@@ -1,0 +1,393 @@
+using System.Collections.Generic;
+using System.IO;
+using System.Linq;
+using Unity.Netcode;
+using Unity.Netcode.Transports.UTP;
+using UnityEditor;
+using UnityEditor.SceneManagement;
+using UnityEngine;
+using UnityEngine.SceneManagement;
+
+/// <summary>
+/// 【一時的な確認用。Assets に置いたままコミットしない】デブリセット（お題の数・そろえたときの得点・画面の枠）を、画面なしの Unity の本物の試合で確かめる。
+/// 使い方：このファイルを Assets/Scripts/Game/UI/Editor/TempDebrisSetThreeProbe.cs としてコピー → Unity.exe -batchmode -projectPath … -executeMethod TempDebrisSetThreeProbe.Run -probeOut 出力フォルダ -logFile …（-quit・-nographics なし。約2分）
+/// ログの [DSPROBE] PASS/FAIL を見る。PNG は出力フォルダに debrisset_*.png。終わったら .cs と .meta を消す。
+/// 確かめる値（お題3個など）は 2026/11/12 の設定に合わせてある。設定を変えたら Check の行も直す。
+/// Reimport：worktree に複製した Library でスクリプトが Missing にならないよう、Scripts を読み込み直す（複製した直後に1回だけ。終わってから Run を別に起動する）。
+/// Run：タイトル → ホスト＋ボット3人 → デブリセットを強制 → お題3個と、3個入れたときの得点を確かめ、画面を撮る。
+/// </summary>
+[InitializeOnLoad]
+public static class TempDebrisSetThreeProbe
+{
+    private const string Flag = "TempDebrisSetThreeProbe.Active";
+    private const string OutKey = "TempDebrisSetThreeProbe.Out";
+    private const string StepKey = "TempDebrisSetThreeProbe.Step";
+    private const string TimeKey = "TempDebrisSetThreeProbe.T";
+    private const string StartKey = "TempDebrisSetThreeProbe.Start";
+    private const string FailKey = "TempDebrisSetThreeProbe.Fail";
+    private const string TeamKey = "TempDebrisSetThreeProbe.Team";
+    private const ushort Port = 17994;
+
+    static TempDebrisSetThreeProbe()
+    {
+        if (SessionState.GetBool(Flag, false))
+        {
+            EditorApplication.update += Tick;
+        }
+    }
+
+    // ------------------------------------------------------------
+    // 1回目：読み込み直し
+    // ------------------------------------------------------------
+    public static void Reimport()
+    {
+        AssetDatabase.ImportAsset("Assets/Scripts", ImportAssetOptions.ImportRecursive | ImportAssetOptions.ForceUpdate);
+        AssetDatabase.ImportAsset("Assets/Prefabs/System/SpaceJunkSession.prefab", ImportAssetOptions.ForceUpdate);
+        Debug.Log("[DSPROBE] reimport done");
+        EditorApplication.Exit(0);
+    }
+
+    // ------------------------------------------------------------
+    // 2回目：試合で確かめる
+    // ------------------------------------------------------------
+    public static void Run()
+    {
+        string[] args = System.Environment.GetCommandLineArgs();
+        string outDir = ".";
+        for (int i = 0; i < args.Length - 1; i++)
+        {
+            if (args[i] == "-probeOut") outDir = args[i + 1];
+        }
+
+        SessionState.SetBool(Flag, true);
+        SessionState.SetString(OutKey, outDir);
+        SessionState.SetInt(StepKey, 0);
+        SessionState.SetInt(FailKey, 0);
+        SessionState.SetFloat(TimeKey, 0f);
+        SessionState.SetFloat(StartKey, 0f);
+        EditorSceneManager.OpenScene("Assets/Scenes/MainLoop/TitleScene.unity");
+        EditorApplication.update += Tick;
+        EditorApplication.EnterPlaymode();
+    }
+
+    private static float Now => (float)EditorApplication.timeSinceStartup;
+
+    private static void Next(int step)
+    {
+        SessionState.SetInt(StepKey, step);
+        SessionState.SetFloat(TimeKey, Now);
+        Debug.Log($"[DSPROBE] step -> {step}（シーン：{SceneManager.GetActiveScene().name}）");
+    }
+
+    private static void Check(bool ok, string what)
+    {
+        Debug.Log($"[DSPROBE] {(ok ? "PASS" : "FAIL")} {what}");
+        if (!ok) SessionState.SetInt(FailKey, SessionState.GetInt(FailKey, 0) + 1);
+    }
+
+    private static void Tick()
+    {
+        if (!EditorApplication.isPlaying)
+        {
+            return;
+        }
+
+        Application.runInBackground = true;
+        if (EditorApplication.isPaused)
+        {
+            EditorApplication.isPaused = false;
+        }
+        EditorApplication.QueuePlayerLoopUpdate();
+
+        if (SessionState.GetFloat(TimeKey, 0f) <= 0f)
+        {
+            SessionState.SetFloat(TimeKey, Now);
+            SessionState.SetFloat(StartKey, Now);
+            return;
+        }
+
+        int step = SessionState.GetInt(StepKey, 0);
+        float waited = Now - SessionState.GetFloat(TimeKey, 0f);
+
+        if (Now - SessionState.GetFloat(StartKey, 0f) > 240f)
+        {
+            Debug.Log("[DSPROBE] 時間切れ");
+            Check(false, "時間内に終わらなかった");
+            Finish();
+            return;
+        }
+
+        try
+        {
+            TickHost(step, waited);
+        }
+        catch (System.Exception e)
+        {
+            Debug.LogError("[DSPROBE] 例外：" + e);
+            Check(false, "確認の道具の中で例外");
+            Finish();
+        }
+    }
+
+    private static string SetText(SpaceJunkRound round, int team)
+    {
+        int size = round.SetSizeOf(team);
+        var names = new List<string>();
+        for (int n = 0; n < size; n++)
+        {
+            names.Add(SpaceJunkMaterials.Name(SpaceJunkMaterials.FromIndex(round.SetItemAt(team, n))));
+        }
+        return $"{SpaceJunkTeams.TeamName(team)}：{size}個 [{string.Join("・", names)}] 入れた {round.SetDoneOf(team)}/{round.SetGoalOf(team)} そろえた回数 {round.SetsCompletedOf(team)} 点 {round.ScoreOf(team)}";
+    }
+
+    private static void TickHost(int step, float waited)
+    {
+        SpaceJunkRound round = SpaceJunkRound.Current;
+        int teamCount = SpaceJunkSession.Current != null ? SpaceJunkSession.Current.TeamCount : 2;
+
+        switch (step)
+        {
+            case 0:
+                if (waited < 3f) return;
+                NetworkManager.Singleton.GetComponent<UnityTransport>().SetConnectionData("127.0.0.1", Port, "127.0.0.1");
+                Debug.Log($"[DSPROBE] StartHost={NetworkManager.Singleton.StartHost()}");
+                Next(1);
+                break;
+
+            case 1: // ロビー：2チーム・STAGE_Simple・ボット3人・デブリセットを強制（実行中の値だけ。保存しない）
+                if (waited < 5f || SpaceJunkSession.Current == null) return;
+                SpaceJunkSession.Current.ServerSetTeamCount(2);
+                SpaceJunkSession.Current.ServerSetFixedMap("STAGE_Simple", false);
+                SpaceJunkSession.Current.ServerSetBotCount(3);
+                SpaceJunkEventSettings ev = SpaceJunkSession.Current.Events;
+                Debug.Log($"[DSPROBE] 実行中の設定 min={ev.debrisSetMinSize} max={ev.debrisSetMaxSize} goal={ev.debrisSetGoal} bonus={ev.debrisSetBonus} start={ev.startSeconds}");
+                Check(ev.debrisSetMinSize == 3 && ev.debrisSetMaxSize == 3 && ev.debrisSetGoal == 3, "進行役の設定がお題3個・3個でそろう");
+                ev.debugForceEvent = SpaceJunkEventKind.DebrisSet;
+                Next(2);
+                break;
+
+            case 2:
+                if (waited < 6f) return;
+                SpaceJunkSession.Current.ServerStartMatch();
+                Next(3);
+                break;
+
+            case 3: // デブリセットが始まるのを待つ（START から約20秒）
+                if (round == null) return;
+                if (round.Phase == SpaceJunkRoundPhase.Playing && round.ActiveEvent == SpaceJunkEventKind.None && Mathf.FloorToInt(waited) % 5 == 0 && waited % 1f < 0.02f)
+                {
+                    Debug.Log($"[DSPROBE] イベントまで {round.SecondsUntilEvent:F1} 秒");
+                }
+                if (round.ActiveEvent != SpaceJunkEventKind.DebrisSet || !round.IsEventRunning)
+                {
+                    if (waited > 90f) { Check(false, "デブリセットが始まらない"); Finish(); }
+                    return;
+                }
+                Debug.Log($"[DSPROBE] デブリセット開始：名前「{round.EventName}」説明「{round.EventDescription}」");
+                Check(round.EventDescription.Contains("全部"), "始まったときの説明が「全部入れると」になっている");
+                for (int team = 0; team < teamCount; team++)
+                {
+                    Debug.Log($"[DSPROBE] お題 {SetText(round, team)}");
+                    Check(round.SetSizeOf(team) == 3, $"{SpaceJunkTeams.TeamName(team)} のお題が3個");
+                    Check(round.SetGoalOf(team) == 3, $"{SpaceJunkTeams.TeamName(team)} のそろえる数が3個");
+                }
+                Next(4);
+                break;
+
+            case 4: // スロットが回っている途中
+                if (waited < 0.45f) return;
+                Capture(round, "1_spin");
+                Next(5);
+                break;
+
+            case 5: // 止まったあと
+                if (waited < 1.2f) return;
+                Capture(round, "2_stopped");
+                Next(6);
+                break;
+
+            case 6: // 人のいるチームで、お題の1個目と2個目を入れる
+            {
+                int team = -1;
+                for (int t = 0; t < teamCount; t++)
+                {
+                    if (SpaceJunkSession.Current.HasPlayers(t)) { team = t; break; }
+                }
+                Check(team >= 0, "人のいるチームがある");
+                if (team < 0) { Finish(); return; }
+                SessionState.SetInt(TeamKey, team);
+
+                Debug.Log($"[DSPROBE] 入れる前 {SetText(round, team)}");
+                int remain = round.SetGoalOf(team) - round.SetDoneOf(team);
+                // ボットが先に入れていたら、残り1個まで入れる
+                List<int> need = NeedKinds(round, team);
+                int score = round.ScoreOf(team);
+                int completed = round.SetsCompletedOf(team);
+                for (int i = 0; i < need.Count - 1; i++)
+                {
+                    int before = round.ScoreOf(team);
+                    round.ServerCollect(team, SpaceJunkMaterials.FromIndex(need[i]));
+                    Check(round.ScoreOf(team) == before + 1, $"お題の物資（{i + 1}個目）は1点だけ（{before}→{round.ScoreOf(team)}）");
+                }
+                Check(round.SetsCompletedOf(team) == completed, "残り1個のうちは、そろったことにならない");
+                Check(round.SetDoneOf(team) == round.SetGoalOf(team) - 1, $"入れた数が {round.SetGoalOf(team) - 1}/{round.SetGoalOf(team)}（実際 {round.SetDoneOf(team)}）");
+                Debug.Log($"[DSPROBE] 2個入れた {SetText(round, team)}（ボットが先に入れていた数 {3 - remain}）");
+
+                // お題に無い種類（あれば）を入れても進まない
+                int outside = OutsideKind(round, team);
+                if (outside >= 0)
+                {
+                    int before = round.ScoreOf(team);
+                    int done = round.SetDoneOf(team);
+                    round.ServerCollect(team, SpaceJunkMaterials.FromIndex(outside));
+                    Check(round.ScoreOf(team) == before + 1 && round.SetDoneOf(team) == done, $"お題に無い物資（{SpaceJunkMaterials.Name(SpaceJunkMaterials.FromIndex(outside))}）はふつうの1点だけで、進まない");
+                }
+                Next(7);
+                break;
+            }
+
+            case 7: // チェックが2つ付いた画面
+                if (waited < 0.5f) return;
+                Capture(round, "3_two_checked");
+                Next(8);
+                break;
+
+            case 8: // 3個目を入れる
+            {
+                int team = SessionState.GetInt(TeamKey, 0);
+                Debug.Log($"[DSPROBE] 3個目の前 {SetText(round, team)}");
+                List<int> need = NeedKinds(round, team);
+                int completed = round.SetsCompletedOf(team);
+                int bonus = round.SetBonusOf(team);
+                for (int i = 0; i < need.Count; i++)
+                {
+                    int before = round.ScoreOf(team);
+                    round.ServerCollect(team, SpaceJunkMaterials.FromIndex(need[i]));
+                    bool last = i == need.Count - 1;
+                    Check(round.ScoreOf(team) == before + 1 + (last ? bonus : 0),
+                        last ? $"最後の1個でそろって 1点＋ボーナス{bonus}点（{before}→{round.ScoreOf(team)}）" : $"途中の1個は1点（{before}→{round.ScoreOf(team)}）");
+                }
+                Check(round.SetsCompletedOf(team) == completed + 1, $"そろえた回数が1増えた（{completed}→{round.SetsCompletedOf(team)}）");
+                Check(round.SetSizeOf(team) == 3 && round.SetDoneOf(team) == 0, "次のお題も3個で、0から集め直し");
+                Debug.Log($"[DSPROBE] そろえたあと {SetText(round, team)}");
+                Next(9);
+                break;
+            }
+
+            case 9:
+                if (waited < 0.45f) return;
+                Capture(round, "4_next_spin");
+                Next(10);
+                break;
+
+            case 10: // しばらくボットに遊ばせて、例外が出ないかを見る
+                if (waited < 20f) return;
+                for (int team = 0; team < teamCount; team++)
+                {
+                    Debug.Log($"[DSPROBE] 最後 {SetText(round, team)}");
+                }
+                Capture(round, "5_later");
+                Finish();
+                break;
+        }
+    }
+
+    /// <summary>お題をそろえるのにまだ要る種類（左から）。</summary>
+    private static List<int> NeedKinds(SpaceJunkRound round, int team)
+    {
+        var need = new List<int>();
+        var taken = new Dictionary<int, int>();
+        for (int k = 0; k < SpaceJunkMaterials.Count; k++)
+        {
+            taken[k] = round.SetProgressOf(team, SpaceJunkMaterials.FromIndex(k));
+        }
+        int size = round.SetSizeOf(team);
+        for (int n = 0; n < size; n++)
+        {
+            int kind = round.SetItemAt(team, n);
+            if (round.SetOrdered ? n >= round.SetStepOf(team) : taken[kind]-- <= 0)
+            {
+                need.Add(kind);
+            }
+        }
+        return need;
+    }
+
+    /// <summary>このマップで出る種類のうち、お題に1個も無い種類。無ければ -1。</summary>
+    private static int OutsideKind(SpaceJunkRound round, int team)
+    {
+        for (int k = 0; k < SpaceJunkMaterials.Count; k++)
+        {
+            if (!SpaceJunkMaterials.IsUsed(SpaceJunkMaterials.FromIndex(k))) continue;
+            if (round.SetRequiredOf(team, SpaceJunkMaterials.FromIndex(k)) == 0) return k;
+        }
+        return -1;
+    }
+
+    private static void Capture(SpaceJunkRound round, string label)
+    {
+        Debug.Log($"[DSPROBE] 撮影 {label}：DebrisSetUI.IsShowing={DebrisSetUI.IsShowing} イベントから {round.SecondsSinceEventStarted:F2} 秒");
+        var ui = DebrisSetUI.Instance;
+        if (ui != null)
+        {
+            foreach (Transform panel in ui.transform.Find("Content"))
+            {
+                if (!panel.gameObject.activeSelf) continue;
+                var slots = new List<string>();
+                foreach (Transform slot in panel)
+                {
+                    if (!slot.gameObject.activeSelf) continue;
+                    Transform check = slot.GetComponentsInChildren<Transform>(true).FirstOrDefault(t => t.name.Contains("Check"));
+                    slots.Add($"{slot.name}{(check != null && check.gameObject.activeInHierarchy ? "✓" : "")}");
+                }
+                Debug.Log($"[DSPROBE]   {panel.name} 幅={((RectTransform)panel).rect.width:F0} マス {slots.Count} 個 [{string.Join(" ", slots)}]");
+            }
+        }
+
+        const int w = 1280, h = 720;
+        RenderTexture rt = new RenderTexture(w, h, 24);
+        Camera top = Camera.allCameras.OrderBy(c => c.depth).LastOrDefault();
+        var changed = new List<Canvas>();
+        foreach (Canvas canvas in Object.FindObjectsByType<Canvas>(FindObjectsSortMode.None))
+        {
+            if (canvas.isRootCanvas && canvas.renderMode == RenderMode.ScreenSpaceOverlay && top != null)
+            {
+                canvas.renderMode = RenderMode.ScreenSpaceCamera;
+                canvas.worldCamera = top;
+                canvas.planeDistance = top.nearClipPlane + 0.05f;
+                changed.Add(canvas);
+            }
+        }
+
+        foreach (Camera c in Camera.allCameras.OrderBy(c => c.depth))
+        {
+            RenderTexture old = c.targetTexture;
+            c.targetTexture = rt;
+            Canvas.ForceUpdateCanvases();
+            c.Render();
+            c.targetTexture = old;
+        }
+
+        foreach (Canvas canvas in changed)
+        {
+            canvas.renderMode = RenderMode.ScreenSpaceOverlay;
+        }
+
+        RenderTexture.active = rt;
+        Texture2D tex = new Texture2D(w, h, TextureFormat.RGB24, false);
+        tex.ReadPixels(new Rect(0, 0, w, h), 0, 0);
+        tex.Apply();
+        RenderTexture.active = null;
+        File.WriteAllBytes(Path.Combine(SessionState.GetString(OutKey, "."), $"debrisset_{label}.png"), tex.EncodeToPNG());
+        Object.DestroyImmediate(tex);
+        rt.Release();
+    }
+
+    private static void Finish()
+    {
+        int fails = SessionState.GetInt(FailKey, 0);
+        SessionState.SetBool(Flag, false);
+        Debug.Log($"[DSPROBE] finish（FAIL {fails} 件）");
+        EditorApplication.Exit(fails == 0 ? 0 : 1);
+    }
+}

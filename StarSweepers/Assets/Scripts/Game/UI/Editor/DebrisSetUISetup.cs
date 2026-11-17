@@ -28,6 +28,9 @@ public static class DebrisSetUISetup
     private const float CheckSize = 30f;
     private static readonly Vector2 CheckOffset = new Vector2(-6f, 8f);
 
+    // プレハブを開いたときに見本として出すマスの数（ゲーム中はお題の数に合わせる。お題の初期値の3個に合わせた）
+    private const int PreviewSlots = 3;
+
     // 枠の置き場所（左上の枠は画面の左上から、右上の枠は画面の右上から）
     private const float PanelSide = 90f;
     private const float PanelTop = 190f;
@@ -143,7 +146,7 @@ public static class DebrisSetUISetup
         panel.anchorMax = corner;
         panel.pivot = corner; // 物資の数が変わると、右の枠は左へ、左の枠は右へ伸びる
         panel.anchoredPosition = new Vector2(right ? -PanelSide : PanelSide, -top);
-        panel.sizeDelta = new Vector2(PaddingX * 2 + SlotSize * 5 + SlotSpacing * 4, PaddingY * 2 + SlotSize);
+        panel.sizeDelta = new Vector2(PaddingX * 2 + SlotSize * PreviewSlots + SlotSpacing * (PreviewSlots - 1), PaddingY * 2 + SlotSize);
 
         Image frame = AddImage(panel, frameSprite);
         frame.type = Image.Type.Sliced;
@@ -170,7 +173,7 @@ public static class DebrisSetUISetup
         {
             RectTransform slot = CreateRect($"Slot{n}", panel);
             slot.sizeDelta = new Vector2(SlotSize, SlotSize);
-            slot.gameObject.SetActive(n < 5); // プレハブを開いたときの見本は5個（ゲーム中はお題の数に合わせる）
+            slot.gameObject.SetActive(n < PreviewSlots);
 
             // 流れる物資を、マスの形で切り抜く
             RectTransform reel = CreateRect("Reel", slot);
