@@ -12,7 +12,7 @@ using UnityEngine.SceneManagement;
 public class SpaceJunkGoalVortex : MonoBehaviour
 {
     [Header("見た目")]
-    [Tooltip("渦の見た目（Art/Materials/GoalVortex。腕の数・回る速さ・ふちの光はマテリアルで変える）")]
+    [Tooltip("渦の見た目（Art/Materials/GoalVortex。腕の数・回る速さ・壁や帯の濃さ・かけらの大きさと速さはマテリアルで変える）")]
     [SerializeField] private Material vortexMaterial;
 
     [Tooltip("渦の半径＝ゴールの床の短い辺の半分×これ（1 で床いっぱい）")]
@@ -25,8 +25,14 @@ public class SpaceJunkGoalVortex : MonoBehaviour
     [Tooltip("ゴールが着地してから、渦が出きるまでの秒数")]
     [SerializeField] private float appearSeconds = 0.6f;
 
-    [Tooltip("ふちの光の明るさ")]
+    [Tooltip("明るい所（灰色の筋・ふち・帯）の明るさ")]
     [SerializeField] private float brightness = 1f;
+
+    [Tooltip("ふちや帯の明るい所を、チームの色にするか（オフなら灰色。2026/11/17 に「黒と灰色で一回チームの色なしで」となったので、いまはオフ）")]
+    [SerializeField] private bool useTeamColor = false;
+
+    [Tooltip("チームの色を使わないときの、明るい所の色（灰色）")]
+    [SerializeField] private Color neutralColor = new Color(0.78f, 0.78f, 0.8f);
 
     [Header("すり鉢（床の渦の上に立つ、半透明の立体の渦）")]
     [Tooltip("すり鉢の高さ（m）。物資を吸い込む円柱より高くはならない。0 ならすり鉢を出さない")]
@@ -39,6 +45,22 @@ public class SpaceJunkGoalVortex : MonoBehaviour
     [Tooltip("すり鉢の形の曲がり具合（1 でまっすぐな円すい。大きいほど底が細く深い）")]
     [Range(1f, 4f)]
     [SerializeField] private float funnelCurve = 1.8f;
+
+    [Header("らせんの帯・かけら")]
+    [Tooltip("すり鉢に巻きつく、らせんの帯の数（帯ごとに違う速さで回る）")]
+    [Range(0, 12)]
+    [SerializeField] private int ribbonCount = 6;
+
+    [Tooltip("帯が、上から下までに何周巻きつくか（目安。帯ごとに少しずつ違う）")]
+    [SerializeField] private float ribbonTurns = 1.3f;
+
+    [Tooltip("帯の幅（すり鉢の高さに対する割合）")]
+    [Range(0.01f, 0.3f)]
+    [SerializeField] private float ribbonWidth = 0.13f;
+
+    [Tooltip("らせんを描いて底へ吸い込まれていく、黒いかけらの数（大きさ・速さはマテリアルで変える）")]
+    [Range(0, 64)]
+    [SerializeField] private int debrisCount = 14;
 
     [Header("吸い込み")]
     [Tooltip("渦の円柱に入ってから、中心で消えて得点になるまでの秒数")]
@@ -108,12 +130,17 @@ public class SpaceJunkGoalVortex : MonoBehaviour
     private static Mesh discMesh;
     private Mesh funnelMesh;
     private Vector2 funnelMeshShape;
+    private Mesh ribbonMesh;
+    private Vector4 ribbonMeshShape;
+    private Mesh debrisMesh;
+    private int debrisMeshCount = -1;
 
     private static readonly int ColorId = Shader.PropertyToID("_Color");
     private static readonly int VortexTimeId = Shader.PropertyToID("_VortexTime");
     private static readonly int AppearId = Shader.PropertyToID("_Appear");
     private static readonly int BrightnessId = Shader.PropertyToID("_Brightness");
     private static readonly int PartId = Shader.PropertyToID("_Part");
+    private static readonly int FunnelId = Shader.PropertyToID("_Funnel");
 
     /// <summary>そのシーンの渦（無ければ null）。</summary>
     public static SpaceJunkGoalVortex In(Scene scene)
@@ -338,6 +365,22 @@ public class SpaceJunkGoalVortex : MonoBehaviour
             funnelMeshShape = new Vector2(funnelBottom, funnelCurve);
             funnelMesh = CreateFunnelMesh(funnelBottom, funnelCurve);
         }
+
+        Vector4 ribbonShape = new Vector4(funnelBottom, funnelCurve, ribbonCount + ribbonTurns * 100f, ribbonWidth);
+        if (ribbonMesh == null || ribbonMeshShape != ribbonShape)
+        {
+            DestroyMesh(ribbonMesh);
+            ribbonMeshShape = ribbonShape;
+            ribbonMesh = CreateRibbonMesh(funnelBottom, funnelCurve, ribbonCount, ribbonTurns, ribbonWidth);
+        }
+
+        if (debrisMesh == null || debrisMeshCount != debrisCount)
+        {
+            DestroyMesh(debrisMesh);
+            debrisMeshCount = debrisCount;
+            debrisMesh = CreateDebrisMesh(debrisCount);
+        }
+
         block ??= new MaterialPropertyBlock();
         RenderParams renderParams = new RenderParams(vortexMaterial)
         {
@@ -366,13 +409,26 @@ public class SpaceJunkGoalVortex : MonoBehaviour
             Graphics.RenderMesh(renderParams, discMesh, 0,
                 Matrix4x4.TRS(floorPoint, Quaternion.identity, new Vector3(diameter, 1f, diameter)));
 
-            // すり鉢の壁（出てくるときは、高さも下から伸びる）
+            // すり鉢の壁・らせんの帯・かけら（出てくるときは、高さも下から伸びる）
             float height = FunnelHeightOf(area) * amount;
             if (height > 0.01f)
             {
+                block.SetVector(FunnelId, new Vector4(funnelBottom, funnelCurve, area.Radius, height));
+                Matrix4x4 funnelMatrix = Matrix4x4.TRS(floorPoint, Quaternion.identity, new Vector3(area.Radius, height, area.Radius));
                 block.SetFloat(PartId, 1f);
-                Graphics.RenderMesh(renderParams, funnelMesh, 0,
-                    Matrix4x4.TRS(floorPoint, Quaternion.identity, new Vector3(area.Radius, height, area.Radius)));
+                Graphics.RenderMesh(renderParams, funnelMesh, 0, funnelMatrix);
+
+                if (ribbonCount > 0)
+                {
+                    block.SetFloat(PartId, 2f);
+                    Graphics.RenderMesh(renderParams, ribbonMesh, 0, funnelMatrix);
+                }
+
+                if (debrisCount > 0)
+                {
+                    block.SetFloat(PartId, 3f);
+                    Graphics.RenderMesh(renderParams, debrisMesh, 0, Matrix4x4.TRS(floorPoint, Quaternion.identity, Vector3.one));
+                }
             }
         }
     }
@@ -397,7 +453,7 @@ public class SpaceJunkGoalVortex : MonoBehaviour
         {
             if (goal != null && goal.gameObject.scene == scene && !goal.IsClosed)
             {
-                views.Add(new GoalView { Goal = goal, Color = SpaceJunkTeams.TeamColor(goal.OwnerTeam), Shown = IsVisualShown(goal) });
+                views.Add(new GoalView { Goal = goal, Color = useTeamColor ? SpaceJunkTeams.TeamColor(goal.OwnerTeam) : neutralColor, Shown = IsVisualShown(goal) });
             }
         }
 
@@ -405,7 +461,7 @@ public class SpaceJunkGoalVortex : MonoBehaviour
         {
             if (goal != null && goal.gameObject.scene == scene)
             {
-                views.Add(new GoalView { Goal = goal, Color = goal.BaseColor, Shown = true });
+                views.Add(new GoalView { Goal = goal, Color = useTeamColor ? goal.BaseColor : neutralColor, Shown = true });
             }
         }
 
@@ -439,6 +495,109 @@ public class SpaceJunkGoalVortex : MonoBehaviour
     private void OnDestroy()
     {
         DestroyMesh(funnelMesh);
+        DestroyMesh(ribbonMesh);
+        DestroyMesh(debrisMesh);
+    }
+
+    /// <summary>
+    /// らせんの帯（すり鉢と同じ大きさの形の中。上のふちの半径 1・高さ 1）。帯ごとに、上の端から下の端へ、上から見て左回りに巻きつく。
+    /// UV の x は長さ方向（0＝上の端）、y は幅方向。2つ目の UV の x は回る速さ（回転/秒）、y は帯の乱数。乱数は毎回同じ（どのPCでも同じ）。
+    /// </summary>
+    private static Mesh CreateRibbonMesh(float bottom, float curve, int count, float turns, float width)
+    {
+        const int segments = 72;
+        var random = new System.Random(2027);
+        var vertices = new List<Vector3>();
+        var uvs = new List<Vector2>();
+        var seeds = new List<Vector2>();
+        var triangles = new List<int>();
+
+        for (int k = 0; k < count; k++)
+        {
+            float vTop = Mathf.Lerp(0.75f, 1f, (float)random.NextDouble());
+            float vBottom = Mathf.Lerp(0.02f, 0.3f, (float)random.NextDouble());
+            float myTurns = turns * Mathf.Lerp(0.75f, 1.3f, (float)random.NextDouble());
+            float start = (float)random.NextDouble() * Mathf.PI * 2f;
+            float outside = Mathf.Lerp(1.02f, 1.14f, (float)random.NextDouble());
+            float half = width * Mathf.Lerp(0.6f, 1.4f, (float)random.NextDouble()) * 0.5f;
+            Vector2 seed = new Vector2(Mathf.Lerp(0.12f, 0.6f, (float)random.NextDouble()), (float)random.NextDouble());
+
+            int first = vertices.Count;
+            for (int i = 0; i <= segments; i++)
+            {
+                float along = i / (float)segments;
+                float v = Mathf.Lerp(vTop, vBottom, along);
+                float angle = start + myTurns * Mathf.PI * 2f * along;
+                for (int side = 0; side < 2; side++)
+                {
+                    float sv = Mathf.Clamp01(v + (side == 0 ? -half : half));
+                    float radius = (bottom + (1f - bottom) * Mathf.Pow(sv, curve)) * outside;
+                    vertices.Add(new Vector3(Mathf.Cos(angle) * radius, sv, Mathf.Sin(angle) * radius));
+                    uvs.Add(new Vector2(along, side));
+                    seeds.Add(seed);
+                }
+            }
+
+            for (int i = 0; i < segments; i++)
+            {
+                int a = first + i * 2;
+                triangles.AddRange(new[] { a, a + 2, a + 1, a + 1, a + 2, a + 3 });
+            }
+        }
+
+        Mesh mesh = new Mesh { name = "GoalVortexRibbons" };
+        mesh.SetVertices(vertices);
+        mesh.SetUVs(0, uvs);
+        mesh.SetUVs(1, seeds);
+        mesh.SetTriangles(triangles, 0);
+        mesh.RecalculateNormals();
+        // シェーダーで回すので、回っても入る大きさの箱にしておく
+        mesh.bounds = new Bounds(new Vector3(0f, 0.5f, 0f), new Vector3(2.6f, 1.2f, 2.6f));
+        return mesh;
+    }
+
+    /// <summary>
+    /// 黒いかけら（count 個の、少しずついびつな三角すい。大きさ 1 前後、真ん中が原点）。
+    /// 動き（らせんを描いて底へ下りる・くるくる回る）はシェーダーが決める。2つ目の UV がかけらごとの乱数。
+    /// </summary>
+    private static Mesh CreateDebrisMesh(int count)
+    {
+        var random = new System.Random(4096);
+        Vector3[] corners = { new Vector3(1f, 1f, 1f), new Vector3(-1f, -1f, 1f), new Vector3(-1f, 1f, -1f), new Vector3(1f, -1f, -1f) };
+        int[,] faces = { { 0, 1, 2 }, { 0, 3, 1 }, { 0, 2, 3 }, { 1, 3, 2 } };
+        var vertices = new List<Vector3>();
+        var normals = new List<Vector3>();
+        var seeds = new List<Vector2>();
+        var triangles = new List<int>();
+
+        for (int k = 0; k < count; k++)
+        {
+            Vector3 stretch = new Vector3(Mathf.Lerp(0.5f, 1.2f, (float)random.NextDouble()),
+                Mathf.Lerp(0.3f, 0.9f, (float)random.NextDouble()), Mathf.Lerp(0.5f, 1.2f, (float)random.NextDouble())) * 0.5f;
+            Vector2 seed = new Vector2((float)random.NextDouble(), (float)random.NextDouble());
+            for (int f = 0; f < 4; f++)
+            {
+                Vector3 a = Vector3.Scale(corners[faces[f, 0]], stretch);
+                Vector3 b = Vector3.Scale(corners[faces[f, 1]], stretch);
+                Vector3 c = Vector3.Scale(corners[faces[f, 2]], stretch);
+                Vector3 normal = Vector3.Cross(b - a, c - a).normalized;
+                if (Vector3.Dot(normal, a + b + c) < 0f) normal = -normal;
+                int start = vertices.Count;
+                vertices.Add(a); vertices.Add(b); vertices.Add(c);
+                normals.Add(normal); normals.Add(normal); normals.Add(normal);
+                seeds.Add(seed); seeds.Add(seed); seeds.Add(seed);
+                triangles.Add(start); triangles.Add(start + 1); triangles.Add(start + 2);
+            }
+        }
+
+        Mesh mesh = new Mesh { name = "GoalVortexDebris" };
+        mesh.SetVertices(vertices);
+        mesh.SetNormals(normals);
+        mesh.SetUVs(1, seeds);
+        mesh.SetTriangles(triangles, 0);
+        // 位置はシェーダーで渦のまわりへ動かすので、渦が入る大きさの箱にしておく
+        mesh.bounds = new Bounds(new Vector3(0f, 3f, 0f), new Vector3(10f, 8f, 10f));
+        return mesh;
     }
 
     private static void DestroyMesh(Mesh mesh)

@@ -10,7 +10,7 @@
 
 ## 何をするスクリプトか
 
-- **渦の係（`SpaceJunkGoalVortex`）**：同じシーンの全部のゴール（試合のゴール `SpaceJunkGoal` と、ロビーの練習用ゴール `SpaceJunkLobbyGoal`）の床に黒い渦を、その上に半透明のすり鉢（立体の渦）を描く。ホストからは、ゴールの中の物資について「渦の円柱に入っていれば吸い込みを始める／外なら渦のほうへ引き寄せる」を受け持つ。
+- **渦の係（`SpaceJunkGoalVortex`）**：同じシーンの全部のゴール（試合のゴール `SpaceJunkGoal` と、ロビーの練習用ゴール `SpaceJunkLobbyGoal`）の床に黒い渦を、その上に半透明のすり鉢（立体の渦）・らせんの帯・黒いかけらを描く（どれも黒と灰色。Use Team Color がオンなら明るい所がチームの色）。ホストからは、ゴールの中の物資について「渦の円柱に入っていれば吸い込みを始める／外なら渦のほうへ引き寄せる」を受け持つ。
 - **吸い込まれる係（`SpaceJunkVortexAbsorb`）**：吸い込み中の物資1つの動き。ホスト（1人用ならそのPC）は位置・回転・大きさを、参加者のPCは大きさだけを動かす。時間が来たら、ホストがゴールに知らせる（ゴールが点を数えて物資を消す）。
 
 ## 流れ
@@ -26,7 +26,7 @@
 | t が 1 になった（ホスト） | 印を外し、大きさを元に戻してから、ゴールの `Collect`（`Absorbed` も出す）。`Collect` → `SpaceJunkRound.ServerCollect` → 数えたら `FlashClientRpc`（得点の光る演出）→ `HookableObject.Vanish`（全員の画面から消える）。戻した大きさは、同じフレームで見えなくなる |
 | t が 1 になった（参加者） | 小さいまま、ホストが消すのを待つ。消されたら（`Vanish` で印が外れる）大きさを戻して係を外す。3秒たっても消されなければ、元に戻す |
 | 吸い込み中に、ほかの理由で `Vanish` された（爆発など） | `Vanish` が印を外すので、係はそれに気づいて大きさを戻して外れる。**得点にはしない** |
-| 渦の係の `Update` → `DrawAt(Time.time)` | ゴールごとに「出ている量」（0〜1）を Appear Seconds で増減し、円の板（`_Part`＝0）と、すり鉢（`_Part`＝1。高さは Funnel Height×出ている量）を `Graphics.RenderMesh` で描く。閉ざされたゴールには描かない。試合のゴールは、見た目（`IntroVisual`）の MeshRenderer が全部切られている間（始まりの演出でゴールが飛んでいる間）は出ている量を 0 へ |
+| 渦の係の `Update` → `DrawAt(Time.time)` | ゴールごとに「出ている量」（0〜1）を Appear Seconds で増減し、円の板（`_Part`＝0）と、すり鉢（`_Part`＝1。高さは Funnel Height×出ている量）・らせんの帯（`_Part`＝2。すり鉢と同じ大きさ）・かけら（`_Part`＝3。大きさはそのまま m で、位置はシェーダーが決める）を `Graphics.RenderMesh` で描く。すり鉢から先は `_Funnel`（底の割合・曲がり具合・渦の半径・高さ）も渡す。閉ざされたゴールには描かない。試合のゴールは、見た目（`IntroVisual`）の MeshRenderer が全部切られている間（始まりの演出でゴールが飛んでいる間）は出ている量を 0 へ |
 
 ### 時計（`SpaceJunkVortexAbsorb.ClockOf`）
 
@@ -47,9 +47,18 @@
 
 上のふちの半径 1・高さ 1・底の半径 Funnel Bottom の筒（上も下も開いている）を、周り 48・高さ 14 に分けて作る。高さ v での半径は `底＋(1−底)×v^Funnel Curve`（下ほど細く、上ほど外へ開く）。Funnel Bottom・Funnel Curve を変えたら作り直す。描くときに（渦の半径, 高さ, 渦の半径）倍にする。高さは `FunnelHeightOf`（Funnel Height と円柱の高さの小さいほう）。
 
+### らせんの帯とかけらの形（`CreateRibbonMesh`・`CreateDebrisMesh`）
+
+- 帯：Ribbon Count 本。帯ごとに、上の端（高さ 0.75〜1）から下の端（0.02〜0.3）へ、上から見て左回りに Ribbon Turns 周前後巻きつく細い帯。すり鉢の面より少し外（1.02〜1.14 倍）。2つ目の UV の x が回る速さ（0.12〜0.6 回転/秒）、y が帯の乱数。乱数の種は決まっているので、どのPCでも同じ形。
+- かけら：Debris Count 個の、少しずついびつな三角すい（面ごとに向き＝法線を持つ）。2つ目の UV がかけらごとの乱数2つ。
+
 ### 見た目（`GoalVortex.shader`）
 
-`_Part` が 0 なら床の渦、1 ならすり鉢の壁を描く。
+`_Part` で描く部品を分ける（0＝床の渦、1＝すり鉢の壁、2＝らせんの帯、3＝かけら）。**光らせない**：色は `_Color`（灰色かチームの色）×1 未満で、アルファを掛けて出す（色を足して明るくしない）。
+
+**らせんの帯**：頂点を、帯ごとの速さで真ん中の軸のまわりに回す。濃さは、長さの両端と幅の両側で消え、長さ方向に流れる縞と細かいまだらで「かすれ」を出す。帯の乱数で、黒い帯（0.08）と灰色の帯（0.7）に分ける。
+
+**かけら**：かけらごとに、進み具合（時刻×Debris Speed＋乱数の端数）で、すり鉢のふちから底へ、らせん（角度は進み具合の2乗で速くなる）を描いて下りる。下りるほど小さくなり、出てすぐと底に着く直前は消える。自分もくるくる回る。色は面の向きで、黒（0.04）〜暗い灰色（0.38）。
 
 **すり鉢の壁**：形の中の位置の y が高さ v（0〜1）。角度×Arms − v×Funnel Twist − 時刻の回転×1.5 の縞で、筋が上から見て左回りに回りながら下へ流れる。濃さは下ほど濃く・縞の上ほど濃く、上のふちへ向かって消える（×Funnel Opacity×Darkness）。上のふちと縞のふちに、ごく薄くチームの色。
 
@@ -68,6 +77,8 @@
 | --- | --- | --- |
 | `vortexMaterial`・`fill`・`lift`・`appearSeconds`・`brightness` | `SpaceJunkGoalVortex.cs` | 見た目（インスペクター） |
 | `funnelHeight`・`funnelBottom`・`funnelCurve` | `SpaceJunkGoalVortex.cs` | すり鉢の形（インスペクター）。`funnelMesh`・`funnelMeshShape` は作った形と、そのときの値 |
+| `useTeamColor`・`neutralColor` | `SpaceJunkGoalVortex.cs` | 明るい所の色（チームの色か、灰色か） |
+| `ribbonCount`・`ribbonTurns`・`ribbonWidth`・`debrisCount` | `SpaceJunkGoalVortex.cs` | らせんの帯とかけら（インスペクター）。`ribbonMesh`・`debrisMesh` は作った形 |
 | `absorbSeconds`・`spinTurns`・`selfSpinDegrees`・`endScale`・`sinkDepth` | `SpaceJunkGoalVortex.cs` | 吸い込みの動き（インスペクター。吸い込まれる係が読む） |
 | `pullAcceleration`・`depthBelowFloor` | `SpaceJunkGoalVortex.cs` | 引き寄せと、円柱の下の端（インスペクター） |
 | `areas`・`appear`・`visuals`・`lastPull` | `SpaceJunkGoalVortex.cs` | ゴールごとの円柱・出ている量・見た目の Renderer、物資ごとの最後に引き寄せた時刻 |
@@ -90,3 +101,4 @@
 | --- | --- | --- |
 | 2026/11/17 | Claude Code（依頼：大槻 海斗） | 新規作成 |
 | 2026/11/17 | Claude Code（依頼：大槻 海斗） | すり鉢（立体の渦）の形・描き方と、吸い込みの高さをすり鉢の面に沿わせたことを書き足した |
+| 2026/11/17 | Claude Code（依頼：大槻 海斗） | 黒と灰色・光らせない描き方、らせんの帯、黒いかけら、チームの色の切り替え（Use Team Color）を書き足した |
