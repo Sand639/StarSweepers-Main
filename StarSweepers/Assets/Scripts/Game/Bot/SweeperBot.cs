@@ -339,6 +339,9 @@ public partial class SweeperBot : MonoBehaviour
                 {
                     PointAt(target.transform.position);
                 }
+
+                // 鞭の光線（撃ち方 Whip。2026/11/17）は押している間だけ出るので、出ている間は押し続ける
+                hold = shooter.IsWhipping;
                 break;
         }
 

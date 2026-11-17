@@ -15,9 +15,20 @@ using UnityEngine.InputSystem;
 /// 光線の見た目は液体のビーム（<see cref="LiquidBeam"/>）。何もつかんでいない間は薄いチームの色、つかんだら濃くなる。
 /// **巻き取り中に向きを変えると、光線が釣り糸のようにしなる**（手元からは体の向きに少し遅れて出て、物資へ曲がってつながる。2026/11/4）。
 /// 撃った瞬間に <see cref="SweeperAnimation.PlayShoot"/>（A_SHOOT → A_AIM_01）を呼ぶ。
+///
+/// **撃ち方は2つから選べる**（<see cref="shotStyle"/>。2026/11/17・小野田さんの変更案）。
+/// Whip（初期値）：溜めずに、押した瞬間に狙った向きへ光線が出て、最長 1 秒出し続けられる。向きを変えると**鞭のようにしなり**、
+/// 光線のどこかが物資に触れたらつかむ。Aim：上の表のとおり（溜めて長さを決めてから撃つ）。詳しくは `Documents/機能ドキュメント/鞭のように曲がる光線.md`。
 /// </summary>
 public class SweeperShooter : MonoBehaviour
 {
+    /// <summary>撃ち方（2026/11/17）。</summary>
+    public enum ShotStyle
+    {
+        Aim,  // 今まで：押して溜めて長さを決め、離すとまっすぐ伸びる
+        Whip  // 変更案：押すとすぐ出て、最長 1 秒出し続ける。向きを変えると鞭のようにしなる
+    }
+
     /// <summary>光線の段階。オンラインでは、ほかの人の画面にこれを配って同じ見た目を出す（<see cref="SweeperNetSync"/>）。</summary>
     public enum ShotPhase
     {
@@ -41,6 +52,34 @@ public class SweeperShooter : MonoBehaviour
 
     [Tooltip("光線の見た目（Assets/Prefabs/Effect/LiquidBeam.prefab）。空でも動く")]
     [SerializeField] private LiquidBeam beamPrefab;
+
+    [Header("撃ち方（2026/11/17 の変更案）")]
+    [Tooltip("Whip：押すとすぐ狙った向きへ光線が出て、最長 Whip Seconds 秒出し続けられる。向きを変えると鞭のようにしなり、どこかが物資に触れたらつかむ。\nAim：今までどおり、押して溜めて長さを決め、離すとまっすぐ伸びる")]
+    [SerializeField] private ShotStyle shotStyle = ShotStyle.Whip;
+
+    [Header("鞭の光線（撃ち方が Whip のとき）")]
+    [Tooltip("光線を出し続けられる秒数")]
+    [Min(0.1f)]
+    [SerializeField] private float whipSeconds = 1f;
+
+    [Tooltip("ON：離したらそこで光線が戻り始める（押している間だけ出る。最長 Whip Seconds 秒）。OFF：1回押せば Whip Seconds 秒出る")]
+    [SerializeField] private bool whipHoldToKeep = true;
+
+    [Tooltip("光線の先が体の向きに追いつく速さ（ばねの硬さ。大きいほどすぐ追いつき、小さいほど遅れて大きくしなる）")]
+    [Min(0.5f)]
+    [SerializeField] private float whipStiffness = 7f;
+
+    [Tooltip("しなりの止まりやすさ（1 で行き過ぎない、小さいほど体の向きを行き過ぎてからビヨンと戻る）")]
+    [Range(0.1f, 1.5f)]
+    [SerializeField] private float whipDamping = 0.35f;
+
+    [Tooltip("光線の先が、体の向きから遅れられる最大の角度（度）。大きすぎると光線が輪になる")]
+    [Range(0f, 150f)]
+    [SerializeField] private float maxWhipAngle = 120f;
+
+    [Tooltip("光線を出している間に歩ける速さ（ふだんの速さに掛ける割合）。0 で歩けない（向きは変えられる）")]
+    [Range(0f, 1f)]
+    [SerializeField] private float whipMoveScale = 0f;
 
     [Header("伸ばせる長さ（プレイヤーの中心から m）")]
     [Tooltip("押した瞬間の長さ")]
@@ -143,6 +182,29 @@ public class SweeperShooter : MonoBehaviour
     /// <summary>最後に見た、プレイヤーの中心から物資への向き（真上から見た角度・度）。</summary>
     private float bendTipYaw;
 
+    // 鞭の光線（2026/11/17）：いま出ている光線が鞭か、出してからの秒数、光線の先の向き（真上から見た角度・度）とその回る速さ
+    private bool whipShot;
+    private float whipTime;
+    private float whipTipYaw;
+    private float whipTipYawSpeed;
+
+    /// <summary>鞭の当たりを見る点の数（手元〜先）。多いほど細かく見るが重くなる。</summary>
+    private const int WhipSamples = 16;
+
+    private readonly Vector3[] whipPoints = new Vector3[WhipSamples + 1];
+    private readonly Vector3[] whipLastPoints = new Vector3[WhipSamples + 1];
+    private bool whipHasLastPoints;
+
+    /// <summary>いまの撃ち方。</summary>
+    public ShotStyle Style
+    {
+        get => shotStyle;
+        set => shotStyle = value;
+    }
+
+    /// <summary>鞭の光線を出している最中か（ボットは、この間ボタンを押し続ける）。</summary>
+    public bool IsWhipping => whipShot && phase == ShotPhase.Extending;
+
     /// <summary>押して狙っている最中か。</summary>
     public bool IsCharging => phase == ShotPhase.Charging;
 
@@ -170,7 +232,9 @@ public class SweeperShooter : MonoBehaviour
     /// <summary>光線の先の位置（巻き取り中は物資の引っ掛けた所）。</summary>
     public Vector3 BeamTip => phase == ShotPhase.Reeling && reel != null && reel.Item != null
         ? reel.Item.AnchorPoint
-        : launchOrigin + launchDirection * Mathf.Max(0f, traveled);
+        : whipShot
+            ? WhipOrigin + YawToDirection(whipTipYaw) * Mathf.Max(0f, traveled)
+            : launchOrigin + launchDirection * Mathf.Max(0f, traveled);
 
     /// <summary>巻き取っている物資。巻き取っていなければ null。</summary>
     public HookableObject ReelItem => phase == ShotPhase.Reeling && reel != null ? reel.Item : null;
@@ -339,7 +403,14 @@ public class SweeperShooter : MonoBehaviour
             case ShotPhase.Idle:
                 if (pressed && !stunned)
                 {
-                    BeginCharge();
+                    if (shotStyle == ShotStyle.Whip)
+                    {
+                        BeginWhip();
+                    }
+                    else
+                    {
+                        BeginCharge();
+                    }
                 }
                 break;
 
@@ -348,10 +419,21 @@ public class SweeperShooter : MonoBehaviour
                 break;
 
             case ShotPhase.Extending:
-                UpdateExtend();
+                if (whipShot)
+                {
+                    UpdateWhip(released, stunned);
+                }
+                else
+                {
+                    UpdateExtend();
+                }
                 break;
 
             case ShotPhase.Retracting:
+                if (whipShot)
+                {
+                    UpdateWhipSpring(Time.deltaTime);
+                }
                 traveled -= retractSpeed * Time.deltaTime;
                 if (traveled <= 0f)
                 {
@@ -403,10 +485,14 @@ public class SweeperShooter : MonoBehaviour
         FollowBeam(BeamTip);
     }
 
-    /// <summary>光線を手元から <paramref name="tip"/> まで描く。巻き取り中は、しなりの向きに曲げる。</summary>
+    /// <summary>光線を手元から <paramref name="tip"/> まで描く。巻き取り中は、しなりの向きに曲げる。鞭の光線は、体の向きに出て先へ曲がる。</summary>
     private void FollowBeam(Vector3 tip)
     {
-        if (bendActive)
+        if (whipShot && phase != ShotPhase.Reeling)
+        {
+            FollowWhip(tip);
+        }
+        else if (bendActive)
         {
             // まっすぐの光線（手元→物資。下り坂の傾きを含む）を、物資への向きとしなりの向きの差だけ横に回した向きに出す。
             // 傾きはそのまま残すので、向きを変えていなければ差が 0 で、上下にも曲がらない
@@ -522,7 +608,15 @@ public class SweeperShooter : MonoBehaviour
 
         if (beam != null && newPhase != ShotPhase.Idle && !(remoteSnapped && newPhase == ShotPhase.Reeling))
         {
-            FollowBeam(shownTip);
+            // 鞭の光線は、届いた光線の先と、この体の向き（通信で届く）から同じ曲がり方を描く
+            if (shotStyle == ShotStyle.Whip && newPhase != ShotPhase.Reeling)
+            {
+                FollowWhip(shownTip);
+            }
+            else
+            {
+                FollowBeam(shownTip);
+            }
         }
     }
 
@@ -582,6 +676,7 @@ public class SweeperShooter : MonoBehaviour
 
     private void BeginCharge()
     {
+        whipShot = false;
         phase = ShotPhase.Charging;
         charge = 0f;
         if (mover != null) mover.FaceAim = true;
@@ -612,6 +707,7 @@ public class SweeperShooter : MonoBehaviour
     private void Fire()
     {
         aimArea?.Hide();
+        whipShot = false;
 
         launchDirection = aim != null ? aim.Direction : transform.forward;
         launchDirection.y = 0f;
@@ -663,23 +759,243 @@ public class SweeperShooter : MonoBehaviour
         }
     }
 
+    // ------------------------------------------------------------
+    // 鞭の光線（2026/11/17・小野田さんの変更案）
+    // ------------------------------------------------------------
+
+    /// <summary>鞭の光線の根元（体の中心の、当たりを見る高さ）。光線の先は、ここから <see cref="whipTipYaw"/> の向きへ traveled だけ離れた所。</summary>
+    private Vector3 WhipOrigin => transform.position + Vector3.up * castHeight;
+
+    /// <summary>体の向き（水平・長さ1）。</summary>
+    private Vector3 BodyForward
+    {
+        get
+        {
+            Vector3 forward = transform.forward;
+            forward.y = 0f;
+            return forward.sqrMagnitude > 0.0001f ? forward.normalized : Vector3.forward;
+        }
+    }
+
+    /// <summary>押した瞬間：狙った向きへ、溜めずにすぐ光線を出し始める。</summary>
+    private void BeginWhip()
+    {
+        Vector3 direction = aim != null ? aim.Direction : BodyForward;
+        direction.y = 0f;
+        direction = direction.sqrMagnitude > 0.0001f ? direction.normalized : BodyForward;
+
+        // ふだんは歩く向きを向いているので、狙った向きへすぐ出るように体を回してしまう
+        transform.rotation = Quaternion.LookRotation(direction, Vector3.up);
+
+        whipShot = true;
+        whipTime = 0f;
+        whipTipYaw = DirectionToYaw(direction);
+        whipTipYawSpeed = 0f;
+        whipHasLastPoints = false;
+        launchDirection = direction;
+        traveled = 0f;
+        charge = 0f;
+        phase = ShotPhase.Extending;
+
+        if (mover != null)
+        {
+            mover.FaceAim = true;
+            mover.MoveLocked = whipMoveScale <= 0f;
+            mover.MoveSpeedScale = whipMoveScale;
+        }
+
+        beam?.SetColor(IdleColor);
+        animationPlayer?.PlayShoot();
+    }
+
+    /// <summary>出している間：先を伸ばし、しならせ、光線のどこかが物資に触れたらつかむ。時間が来たら（離したら）戻り始める。</summary>
+    private void UpdateWhip(bool released, bool stunned)
+    {
+        float deltaTime = Time.deltaTime;
+        whipTime += deltaTime;
+        UpdateWhipSpring(deltaTime);
+        traveled = Mathf.Min(MaxReach, traveled + extendSpeed * deltaTime);
+
+        if (TryWhipHit(out HookableObject hookable))
+        {
+            GrabByWhip(hookable);
+            return;
+        }
+
+        if (stunned || whipTime >= whipSeconds || (whipHoldToKeep && released))
+        {
+            phase = ShotPhase.Retracting;
+        }
+    }
+
+    /// <summary>
+    /// 光線の先の向きを1フレームぶん進める。根元は体の向きに出て、先は体の向きへ、ばね（<see cref="whipStiffness"/>・<see cref="whipDamping"/>）で遅れて付いていく。
+    /// 巻き取り中のしなり（<see cref="UpdateBend"/>）と同じ考え方で、こちらは「先」が遅れる。
+    /// </summary>
+    private void UpdateWhipSpring(float deltaTime)
+    {
+        if (deltaTime <= 0f)
+        {
+            return;
+        }
+
+        // 処理が一瞬止まったとき（大きな deltaTime）に、ばねが暴れないようにする
+        deltaTime = Mathf.Min(deltaTime, 0.05f);
+
+        float bodyYaw = DirectionToYaw(BodyForward);
+        float omega = whipStiffness;
+        float gap = Mathf.DeltaAngle(whipTipYaw, bodyYaw);
+        float accel = omega * omega * gap - 2f * whipDamping * omega * whipTipYawSpeed;
+        whipTipYawSpeed += accel * deltaTime;
+        whipTipYaw += whipTipYawSpeed * deltaTime;
+
+        // 遅れすぎ（光線が輪になる）を防ぐ。さらに離れていく向きの勢いだけ消す
+        float lag = Mathf.DeltaAngle(bodyYaw, whipTipYaw);
+        if (Mathf.Abs(lag) > maxWhipAngle)
+        {
+            whipTipYaw = bodyYaw + Mathf.Sign(lag) * maxWhipAngle;
+            if (Mathf.Sign(whipTipYawSpeed) == Mathf.Sign(lag))
+            {
+                whipTipYawSpeed = 0f;
+            }
+        }
+    }
+
+    /// <summary>当たりを見るための、光線の形の点の並び（根元 → 先。見た目と同じ曲線を、当たりを見る高さで）。</summary>
+    private void BuildWhipPoints(Vector3[] points)
+    {
+        Vector3 forward = BodyForward;
+        Vector3 start = WhipOrigin + forward * handForward;
+        Vector3 tip = WhipOrigin + YawToDirection(whipTipYaw) * traveled;
+        Vector3 toTip = tip - start;
+        float length = toTip.magnitude;
+
+        // LiquidBeam.Follow と同じ曲線（2次ベジェ）。真ん中の目印を、根元から体の向きへずらす
+        Vector3 middle = length > 0.001f
+            ? start + toTip * 0.5f + (forward - toTip / length) * (length * 0.5f * bendStrength)
+            : start;
+
+        int last = points.Length - 1;
+        for (int i = 0; i <= last; i++)
+        {
+            float t = i / (float)last;
+            float u = 1f - t;
+            points[i] = u * u * start + 2f * u * t * middle + t * t * tip;
+        }
+    }
+
+    /// <summary>
+    /// 光線のどこかが物資に触れたか。光線の形に沿って根元から順に見て、壁に当たったらそこで光線を短くする（壁の向こうは見ない）。
+    /// 速く振ったときに物資を飛び越さないよう、点ごとに「前のフレームの位置 → いまの位置」も見る（こちらは物資だけ）。
+    /// </summary>
+    private bool TryWhipHit(out HookableObject hookable)
+    {
+        hookable = null;
+        BuildWhipPoints(whipPoints);
+        bool hasLast = whipHasLastPoints;
+        bool found = false;
+
+        for (int i = 1; i <= WhipSamples && !found; i++)
+        {
+            // 光線の形に沿って
+            Vector3 from = whipPoints[i - 1];
+            Vector3 along = whipPoints[i] - from;
+            float length = along.magnitude;
+            if (length > 0.0001f &&
+                TryHitSegment(from, along / length, length, stopAtWalls, out RaycastHit hit, out HookableObject touched))
+            {
+                if (touched != null)
+                {
+                    hookable = touched;
+                    found = true;
+                    break;
+                }
+
+                // 壁：光線の先を、当たった所の手前までにする（次のフレームでまた伸びようとして、また止まる）
+                Vector3 stop = from + along / length * hit.distance - WhipOrigin;
+                stop.y = 0f;
+                traveled = Mathf.Min(traveled, stop.magnitude);
+                break;
+            }
+
+            // 前のフレームからの動きに沿って（物資だけ。壁はすり抜ける）
+            if (hasLast)
+            {
+                Vector3 moved = whipPoints[i] - whipLastPoints[i];
+                float distance = moved.magnitude;
+                if (distance > 0.01f &&
+                    TryHitSegment(whipLastPoints[i], moved / distance, distance, false, out _, out HookableObject swept) &&
+                    swept != null)
+                {
+                    hookable = swept;
+                    found = true;
+                }
+            }
+        }
+
+        System.Array.Copy(whipPoints, whipLastPoints, whipPoints.Length);
+        whipHasLastPoints = true;
+        return found;
+    }
+
+    /// <summary>鞭で物資をつかんだ：曲がったまま巻き取りへ移る（しなりの続きから始め、物資は前の側へ回り込んでくる）。</summary>
+    private void GrabByWhip(HookableObject hookable)
+    {
+        phase = ShotPhase.Reeling;
+
+        bendActive = true;
+        bendYaw = DirectionToYaw(BodyForward);
+        bendYawSpeed = 0f;
+
+        reel.Begin(hookable);
+        beam?.ChangeColorFromTip(teamColor);
+        PlayWrap(hookable);
+    }
+
+    /// <summary>鞭の光線を描く。根元からは体の向きに出て、先 <paramref name="tip"/> へ曲がってつながる。</summary>
+    private void FollowWhip(Vector3 tip)
+    {
+        Vector3 hand = HandPosition;
+        Vector3 toTip = tip - hand;
+        Vector3 flat = toTip;
+        flat.y = 0f;
+
+        if (flat.sqrMagnitude < 0.0001f || bendStrength <= 0f)
+        {
+            beam.Follow(hand, tip);
+            return;
+        }
+
+        // まっすぐの光線（手元→先。下り坂の傾きを含む）を、先への向きと体の向きの差だけ横に回した向きに出す（巻き取り中のしなりと同じ）
+        float turn = Mathf.DeltaAngle(DirectionToYaw(flat), DirectionToYaw(BodyForward));
+        Vector3 startDirection = Quaternion.AngleAxis(turn, Vector3.up) * toTip;
+        beam.Follow(hand, tip, startDirection, bendStrength);
+    }
+
     /// <summary>
     /// 光線の先が <paramref name="from"/> から <paramref name="to"/> まで進む間に、何かに当たるか。
     /// 物資（まだ誰も引っ掛けていない物）に当たれば <paramref name="hookable"/> に入る。
     /// </summary>
     private bool TryHit(float from, float to, out RaycastHit nearest, out HookableObject hookable)
     {
+        return TryHitSegment(launchOrigin + launchDirection * from, launchDirection, to - from, stopAtWalls, out nearest, out hookable);
+    }
+
+    /// <summary>
+    /// <paramref name="start"/> から <paramref name="direction"/> へ <paramref name="distance"/> だけ、当たりを見る球を動かして、いちばん手前の当たりを探す。
+    /// 物資（まだ誰も引っ掛けていない物）なら <paramref name="hookable"/> に入る。<paramref name="walls"/> が false なら、壁はすり抜ける。
+    /// </summary>
+    private bool TryHitSegment(Vector3 start, Vector3 direction, float distance, bool walls, out RaycastHit nearest, out HookableObject hookable)
+    {
         nearest = default;
         hookable = null;
 
-        float distance = to - from;
         if (distance <= 0f)
         {
             return false;
         }
 
-        Vector3 start = launchOrigin + launchDirection * from;
-        RaycastHit[] hits = Physics.SphereCastAll(start, hitRadius, launchDirection, distance, hitMask, QueryTriggerInteraction.Ignore);
+        RaycastHit[] hits = Physics.SphereCastAll(start, hitRadius, direction, distance, hitMask, QueryTriggerInteraction.Ignore);
 
         bool found = false;
         foreach (RaycastHit hit in hits)
@@ -694,7 +1010,7 @@ public class SweeperShooter : MonoBehaviour
             HookableObject candidate = hit.collider.GetComponentInParent<HookableObject>();
 
             bool usable = candidate != null && !candidate.IsHooked && !candidate.IsVanished && reel.CanHook(candidate);
-            if (!usable && (!stopAtWalls || candidate != null || hit.distance <= 0f))
+            if (!usable && (!walls || candidate != null || hit.distance <= 0f))
             {
                 // 引っ掛けられない物資（誰かが引いている。オンラインではほかの人が引いている物も）はすり抜ける。壁で止まらない設定のときも同じ
                 continue;
@@ -717,6 +1033,8 @@ public class SweeperShooter : MonoBehaviour
         phase = ShotPhase.Idle;
         traveled = 0f;
         charge = 0f;
+        whipShot = false;
+        whipHasLastPoints = false;
 
         if (mover != null)
         {
