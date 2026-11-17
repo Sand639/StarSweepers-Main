@@ -490,7 +490,20 @@ public partial class SpaceJunkSession : NetworkBehaviour
             return;
         }
 
-        UpdateLobbyStartCountdown();
+        LobbyTestDeparture departure = LobbyTestDeparture.Current;
+        if (departure != null)
+        {
+            UpdateLobbyTestDeparture(departure);
+        }
+        else
+        {
+            if (TestBoardingTime > 0 || testReadyPlayers.Count > 0)
+            {
+                testBoardingTime.Value = 0;
+                testReadyPlayers.Clear();
+            }
+            UpdateLobbyStartCountdown();
+        }
 
         // ホストのPC：席の一覧とつながっている人を、一定の間隔で比べる
         slotCheckTimer += Time.unscaledDeltaTime;

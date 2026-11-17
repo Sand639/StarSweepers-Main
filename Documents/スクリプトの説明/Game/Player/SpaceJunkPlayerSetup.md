@@ -19,7 +19,7 @@
 | `SpaceJunkPlayerSetup.LobbyReveal.cs` | ロビーで体を隠す・見せる |
 | `SpaceJunkPlayerSetup.Placement.cs` | シーンが切り替わったときの置き直し |
 | `SpaceJunkPlayerSetup.Respawn.cs` | 復活時間 |
-| `SpaceJunkPlayerSetup.Spawn.cs` | 出てくる場所を決める |
+| `SpaceJunkPlayerSetup.Spawn.cs` | 出てくる場所を決める。検証用ロビーでは出発する輸送機にプレイヤーを乗せる |
 
 ## 変数の置き場所
 
@@ -45,3 +45,4 @@
 | 2026/11/6 | Claude Code | 新規作成（大槻さんの依頼）。長いスクリプトを機能ごとのファイルに分けたので、分け方を書いた |
 | 2026/11/7 | Claude Code | 「変数の置き場所」を足し、ずれやすい行数の列を表から消した（大槻さんの依頼。AIが読んで気づいた弱点の修正） |
 | 2026/11/12 | Claude Code | レーダーを Show Radar（初期値オフ）がオンのときだけ付けるようにしたことを書いた（大槻さんの依頼で一旦出さないため） |
+| 2026/11/17 | Codex | 検証ロビーで輸送機に乗る処理を追記 |

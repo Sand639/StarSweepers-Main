@@ -15,7 +15,7 @@ public partial class SpaceJunkSession
     /// <summary>チーム数を変える。**減らしたときは、はみ出した人を拾い直す。**</summary>
     public void ServerSetTeamCount(int value)
     {
-        if (!IsServer)
+        if (!IsServer || LobbyTestDeparture.Current != null)
         {
             return;
         }
@@ -34,7 +34,8 @@ public partial class SpaceJunkSession
     /// <summary>その人を、指定したチームへ移す。</summary>
     public void ServerSetTeamOf(ulong clientId, int team)
     {
-        if (!IsServer || !SpaceJunkTeams.IsValidTeam(team, TeamCount))
+        if (!IsServer || (LobbyTestDeparture.Current != null && TestBoardingTime > 0) ||
+            !SpaceJunkTeams.IsValidTeam(team, TeamCount))
         {
             return;
         }
@@ -59,7 +60,7 @@ public partial class SpaceJunkSession
     /// <summary>いまのチーム数で、全員をランダムに割り振り直す。</summary>
     public void ServerRandomAssign()
     {
-        if (!IsServer)
+        if (!IsServer || (LobbyTestDeparture.Current != null && TestBoardingTime > 0))
         {
             return;
         }

@@ -130,7 +130,8 @@ public class SpaceJunkLobbyUI : MonoBehaviour
     private void SyncLocalPlayerCount()
     {
         SpaceJunkSession session = SpaceJunkSession.Current;
-        if (session == null || !session.IsSpawned || session.State != SpaceJunkMatchState.Lobby)
+        if (session == null || !session.IsSpawned || session.State != SpaceJunkMatchState.Lobby ||
+            LobbyTestDeparture.Current?.IsBoarding == true)
         {
             return;
         }
@@ -162,7 +163,8 @@ public class SpaceJunkLobbyUI : MonoBehaviour
     {
         SpaceJunkSession session = SpaceJunkSession.Current;
         if (session == null || !session.IsSpawned || session.State != SpaceJunkMatchState.Lobby ||
-            SpaceJunkRound.Current != null || SpaceJunkLobbyScreen.IsSettingsOpen || TitleScreen.IsVisible)
+            SpaceJunkRound.Current != null || SpaceJunkLobbyScreen.IsSettingsOpen || TitleScreen.IsVisible ||
+            LobbyTestDeparture.Current?.IsBoarding == true)
         {
             return;
         }
@@ -288,7 +290,10 @@ public class SpaceJunkLobbyUI : MonoBehaviour
     /// <summary>ロビーのシーンに画面が無ければ、プレハブから出す。</summary>
     private static void EnsureScreen(Scene scene)
     {
-        if (scene.name != TitleScreen.LobbySceneName || FindFirstObjectByType<SpaceJunkLobbyScreen>() != null)
+        LobbyTestDeparture departure = LobbyTestDeparture.Current;
+        bool isLobby = scene.name == TitleScreen.LobbySceneName ||
+                       (departure != null && departure.gameObject.scene == scene);
+        if (!isLobby || FindFirstObjectByType<SpaceJunkLobbyScreen>() != null)
         {
             return;
         }
