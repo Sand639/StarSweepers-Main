@@ -112,10 +112,10 @@ public sealed class LobbyTestDeparture : MonoBehaviour
 
     private static Vector3 FlightOffset(float t, float outerSide, float turnDepth)
     {
-        // いったん外へふくらみ、反対側の手前へ抜ける。
+        // いったん外へふくらみ、交差しながらカメラに寄って画面外へ抜ける。
         Vector3 outerTurn = new Vector3(10f * outerSide, 0.5f, turnDepth);
-        Vector3 crossingTurn = new Vector3(7f * outerSide, 2f, -9f);
-        Vector3 exit = new Vector3(-17f * outerSide, 3f, -20f);
+        Vector3 crossingTurn = new Vector3(7f * outerSide, 2f, -11.5f);
+        Vector3 exit = new Vector3(-17f * outerSide, 3.4f, -21.5f);
         float remaining = 1f - t;
         return 3f * remaining * remaining * t * outerTurn +
                3f * remaining * t * t * crossingTurn +
