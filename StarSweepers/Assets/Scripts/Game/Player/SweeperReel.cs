@@ -45,6 +45,8 @@ using UnityEngine;
 /// | 29〜32%（Critical Far まで） | **クリティカルプル**（今までどおり。強さは掛けない） |
 /// | 32〜100% | **引っ張る**。32% で 1 → ビームの長さの上限（100%）で 0 |
 ///
+/// 「0」と書いた所の強さは、Throw Min Strength（前へ投げる）・Pull Min Strength（引っ張る）で上げられる（初期値は 0）。
+///
 /// （大槻さんの指定：投げ 0〜20・引っ張り 20〜28・クリティカルプル 29〜31・引っ張り 32〜100。数字は、ビームの長さの上限（12m）に対する %。物資に当たった距離・溜めた長さではない）
 ///
 /// **クリティカルプルは距離で取る**（大槻さんの指定）。Critical Near〜Critical Far の距離で押すと、
@@ -191,6 +193,14 @@ public class SweeperReel : MonoBehaviour
     [Tooltip("クリティカルプルを取れる距離の、遠いほうの端（ビームの長さの上限に対する割合）。ここから上限までは、引っ張る強さが 1 → 0 に減る。Critical Near と同じにするとクリティカルなし")]
     [Range(0f, 1f)]
     [SerializeField] private float criticalFar = 0.32f;
+
+    [Tooltip("前へ投げる強さの最小値（0〜1）。いちばん弱い所（Throw Zone End）で押したときの強さ。体のそばでは 1")]
+    [Range(0f, 1f)]
+    [SerializeField] private float throwMinStrength = 0f;
+
+    [Tooltip("引っ張る強さの最小値（0〜1）。いちばん弱い所（Throw Zone End と、ビームの長さの上限）で押したときの強さ。クリティカルのそばでは 1")]
+    [Range(0f, 1f)]
+    [SerializeField] private float pullMinStrength = 0f;
 
     [Header("クリティカルプル")]
     [Tooltip("当たってから、クリティカルの受付が始まるまでの秒数（Reel Seconds より短くする）")]
@@ -552,7 +562,8 @@ public class SweeperReel : MonoBehaviour
     /// <summary>
     /// **距離で変わる操作で押された**（大槻さんの図。2026/11/17）。クリティカルの距離なら今までどおりのクリティカルプル。それ以外は、押した瞬間の距離で、前へ投げるか引っ張る（後ろへ）かを決め、
     /// いつもの飛ぶ速さ（向きと大きさ）に強さ（0〜1）を掛けて飛ばす。距離は、ビームの長さの上限（<see cref="BeamReach"/>）の割合で見る。
-    /// 投げる強さ：体のそばで 1、Throw Zone End で 0。引っ張る強さ：Throw Zone End で 0 → Critical Near で 1、Critical Far で 1 → 届くいちばん遠い所で 0（どれもまっすぐ）。
+    /// 投げる強さ：体のそばで 1、Throw Zone End で Throw Min Strength。引っ張る強さ：Throw Zone End で Pull Min Strength → Critical Near で 1、
+    /// Critical Far で 1 → ビームの長さの上限で Pull Min Strength（どれもまっすぐ）。最小値の初期値は 0。
     /// </summary>
     private void PressByDistance()
     {
@@ -568,15 +579,15 @@ public class SweeperReel : MonoBehaviour
 
         if (ratio < throwZoneEnd)
         {
-            float throwStrength = 1f - ratio / throwZoneEnd;
+            float throwStrength = Mathf.Lerp(throwMinStrength, 1f, 1f - ratio / throwZoneEnd);
             ThrowForward(throwStrength);
             Finish($"前（強さ {throwStrength:F2}）", false, false);
             return;
         }
 
-        float pullStrength = ratio < criticalNear
+        float pullStrength = Mathf.Lerp(pullMinStrength, 1f, ratio < criticalNear
             ? Mathf.InverseLerp(throwZoneEnd, criticalNear, ratio)
-            : Mathf.InverseLerp(1f, criticalFar, ratio);
+            : Mathf.InverseLerp(1f, criticalFar, ratio));
         ThrowBack(false, pullStrength);
         Finish($"後ろ（強さ {pullStrength:F2}）", false, false);
     }
