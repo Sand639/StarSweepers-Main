@@ -114,8 +114,8 @@ public sealed class LobbyTestDeparture : MonoBehaviour
     {
         // いったん外へふくらみ、交差しながらカメラに寄って画面外へ抜ける。
         Vector3 outerTurn = new Vector3(10f * outerSide, 0.5f, turnDepth);
-        Vector3 crossingTurn = new Vector3(7f * outerSide, 4.2f, -11.5f);
-        Vector3 exit = new Vector3(-17f * outerSide, 6.2f, -21.5f);
+        Vector3 crossingTurn = new Vector3(7f * outerSide, 5.7f, -11.5f);
+        Vector3 exit = new Vector3(-17f * outerSide, 9.2f, -21.5f);
         float remaining = 1f - t;
         return 3f * remaining * remaining * t * outerTurn +
                3f * remaining * t * t * crossingTurn +
