@@ -48,13 +48,45 @@
 
 | メニュー | すること |
 | --- | --- |
-| `Tools > StarSweepers > チーム得点バーの検証シーンを作る` | プレハブを作り直し、`Scenes/Test/TeamScoreBarUITest.unity` を作り直す（Test Mode オン） |
-| `Tools > StarSweepers > チーム得点バーのプレハブを更新` | プレハブだけ作り直す |
-| `Tools > StarSweepers > チーム得点バーをステージに置く` | `StageScenePaths` のステージを順に開き、まだ無ければプレハブのまま置いて保存する。**ステージのほかの物には触らない**。何度実行してもよい |
+| `Tools > StarSweepers > チーム得点バーの検証シーンを作る` | フレーム版のプレハブが**無ければ**作り（**今までの版のプレハブには触らない**。ステージが使っているため）、`Scenes/Test/TeamScoreBarUITest.unity` を作り直す（フレーム版の「色＋炎」＝上、「色だけ」＝下。どちらも Test Mode オン） |
+| `Tools > StarSweepers > チーム得点バーのプレハブを更新` | 今までの版のプレハブだけ作り直す |
+| `Tools > StarSweepers > チーム得点バー（フレーム版）のプレハブを作り直す` | フレーム版のプレハブを作り直す（**手で直した FillArea などは消える**） |
+| `Tools > StarSweepers > チーム得点バー（フレーム版）にデジタル数字のフォントを付ける` | `EnsureDsegFont` で DSEG の ttf から TextMeshPro のフォントを作り（無ければ）、`LoadPrefabContents` でフレーム版のプレハブを開いて、`RoundText`・`TimeText` のフォントだけを替えて保存する（ほかは触らない） |
+| `Tools > StarSweepers > チーム得点バー（フレーム版）に炎の層を足す` | `AddFireLayer` で、今あるフレーム版のプレハブに `Frame/FireArea`（FillArea と同じ四角・マスク無し）と `Fire0〜3` を足し、色の帯から炎のマテリアルを外す。**すでに FireArea があれば何もしない**。炎のマテリアルはあればそのまま使う（調整した値は消えない） |
 
-- プレハブは毎回組み立て直すので、プレハブを手で直した部分は消える
+### DSEG のフォント（`EnsureDsegFont`）
+
+- 元の ttf：`Assets/TextMesh Pro/Fonts/DSEG14Classic-Bold.ttf`（ROUND。14セグなので英字が出る）・`DSEG7Classic-Bold.ttf`（時間。7セグ）
+- 作るフォント：同じ場所の `DSEG14ClassicBoldSDF.asset`・`DSEG7ClassicBoldSDF.asset`。90pt・SDF・**1024×1024**。数字・大文字の英字・空白・`:.-` を焼き込んでから**静的**にする（ビルドで ttf を読みに行かない）。**512 だと半分ほどしか入らず、残りの字が別のフォント（LiberationSans）で出た**
+- 足りない文字は、作るときに `入らなかった文字` の警告がログに出る。焼き込む文字を増やすなら `DsegCharacters` に足し、`.asset` を消してメニューを実行し直す
+- DSEG の空白は細いので、板の文字は `wordSpacing = 60`（「ROUND」と「01」の間）。字間（characterSpacing）は 0、太字の指定はしない（もともと Bold の字なので）
+| `Tools > StarSweepers > チーム得点バーをステージに置く` | `StageScenePaths` のステージを順に開き、まだ無ければ**今までの版**のプレハブのまま置いて保存する。**ステージのほかの物には触らない**。何度実行してもよい |
+
+- 今までの版のプレハブは毎回組み立て直すので、プレハブを手で直した部分は消える。**フレーム版は、無いときだけ作る**（手で直す前提のため）
 - マテリアル（`TeamScoreBarFire.mat`・`TeamScoreNumber.mat`）と丸の画像は、**無いときだけ作る**（インスペクターで調整した値を残すため）。ただし炎のマテリアルの `_BarRatio` は帯の高さで決まる値なので、毎回入れ直す
 - 帯の Image は、帯の高さより上へ `FireRise`（44）だけ高くしてある（炎の舌が立ちのぼる所）。得点の数字は、その 44 を除いた帯の高さの中に置く
+
+### フレーム版（`TeamScoreBarFrameUI.prefab`）の組み立て
+
+| 部品 | 中身 |
+| --- | --- |
+| `Content/Frame` | 枠の画像と同じ縦横比（幅 900）。画面の上の真ん中。`occupiedArea` に入れてあるので、ステージに置いたときは枠の下の端までが「使っている範囲」になる |
+| `Frame/FillArea` | 得点の枠の内側（画像のピクセル x 126〜2043・y 263〜487 を、アンカーの割合で置く）。**RectMask2D** 付きで、炎がこの四角の外に出ない。**大きさは手で変えてよい** |
+| `FillArea/Segments/Segment0〜3` | ただの色の帯。FillArea いっぱい。マテリアル無し（2026/11/12 から。炎は下の FireArea） |
+| `Frame/FireArea` | 炎だけの層。FillArea のすぐ後（フレームの画像より奥）。**マスク無し**で、作ったときは FillArea と同じ四角。**手で広げて枠からはみ出させてよい** |
+| `FireArea/Fire0〜3` | 帯ごとの炎（`TeamScoreBarFireFrame.mat`。Bar Ratio 0.5）。横の位置・幅は `TeamScoreFlameEffect` が毎フレーム色の帯に合わせる |
+| `Frame/FrameImage` | 枠の画像。帯より後（手前）に描くので、帯のはみ出しを隠す |
+| `Frame/RoundText`・`Frame/TimeText` | 上の板・下の板の暗い部分に合わせた文字（Auto Size。板の大きさに合わせて縮む） |
+
+画像の中のピクセルの位置は、`TeamScoreBarUISetup` の `FillPixels`・`RoundPixels`・`TimePixels`（枠の画像を測った値）。画像を差し替えて位置が変わったら、ここを直して `フレーム版のプレハブを作り直す` を実行する。
+
+### 2026/11/12 に足した欄
+
+| 欄 | 中身 |
+| --- | --- |
+| Round Text / Round Format | ラウンドの番号の文字と書き方（`ROUND {0:00}` → `ROUND 01`）。番号は `SpaceJunkSession.CurrentRound`、ラウンドが無いときは Test Round |
+| Time Style / Seconds Digits | 残り時間の書き方。`MinutesSeconds`＝`1:23`（今までの版）、`Seconds`＝秒だけを決めた桁数で（3桁なら `035`。フレーム版） |
+| Occupied Area | 画面の上で使っている範囲（`OccupiedScreenHeight` を測る相手）。空なら時間の文字の親（今までの版の丸） |
 
 ## 気をつけること
 
@@ -68,3 +100,6 @@
 | 日付 | 変更者 | 内容 |
 | --- | --- | --- |
 | 2026/11/11 | Claude Code（依頼：ソウホイチョン） | 新規作成（旧リポジトリから移したときに、コードの長いコメントをここへ移した） |
+| 2026/11/12 | Claude Code（依頼：ソウホイチョン） | フレーム版（新しいデザイン案）の組み立てと、足した欄（ラウンドの文字・時間の書き方・使っている範囲）、メニューの変更を書いた |
+| 2026/11/12 | Claude Code（依頼：ソウホイチョン） | DSEG のフォントの作り方と、フォントを付けるメニューを書いた |
+| 2026/11/12 | Claude Code（依頼：ソウホイチョン） | フレーム版の炎の層（FireArea）と、それを足すメニューを書いた |
