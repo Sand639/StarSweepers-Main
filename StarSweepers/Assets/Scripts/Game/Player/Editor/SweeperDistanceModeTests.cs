@@ -46,6 +46,71 @@ public class SweeperDistanceModeTests
         yield return new ExitPlayMode();
     }
 
+    /// <summary>押さなければ、一定の速さ（6m/秒）で寄ってきて、手前に着いたら前へ投げる。9m 先なら (9 − 1.4) ÷ 6 ≒ 1.3 秒。</summary>
+    [UnityTest]
+    public IEnumerator NoPress_ComesAtConstantSpeedThenForward()
+    {
+        yield return new EnterPlayMode();
+        yield return RunNoPress();
+        yield return new ExitPlayMode();
+    }
+
+    private static IEnumerator RunNoPress()
+    {
+        GameObject prefab = AssetDatabase.LoadAssetAtPath<GameObject>(PlayerPrefabPath);
+        BeamOperationType before = GameSettings.BeamOperation;
+        GameSettings.BeamOperation = BeamOperationType.DistanceStrength;
+
+        GameObject ground = GameObject.CreatePrimitive(PrimitiveType.Plane);
+        ground.transform.localScale = new Vector3(10f, 1f, 10f);
+        GameObject player = Object.Instantiate(prefab, Vector3.zero, Quaternion.identity);
+        GameObject box = GameObject.CreatePrimitive(PrimitiveType.Cube);
+        try
+        {
+            player.GetComponent<SweeperMover>().enabled = false;
+            player.transform.rotation = Quaternion.identity;
+            box.transform.position = new Vector3(0f, 0.5f, 9f);
+            box.AddComponent<Rigidbody>().linearDamping = 0.4f;
+            box.AddComponent<HookableObject>();
+            yield return Wait(0.5f);
+
+            SweeperShooter shooter = player.GetComponent<SweeperShooter>();
+            SweeperReel reel = player.GetComponent<SweeperReel>();
+            Invoke(shooter, "BeginCharge");
+            SetField(shooter, "charge", 1f);
+            yield return NextFrame();
+            Invoke(shooter, "Fire");
+
+            float deadline = Time.realtimeSinceStartup + 5f;
+            while (!reel.IsActive && Time.realtimeSinceStartup < deadline)
+            {
+                yield return NextFrame();
+            }
+            Assert.That(reel.IsActive, Is.True, "光線が箱に当たらなかった");
+
+            float started = Time.time;
+            deadline = Time.realtimeSinceStartup + 6f;
+            while (reel.IsActive && Time.realtimeSinceStartup < deadline)
+            {
+                yield return NextFrame();
+            }
+            float took = Time.time - started;
+            Debug.Log($"[SweeperDistanceModeTests] 押さなかった：結果={reel.LastResult} 着くまで={took:F2}秒");
+
+            Assert.That(reel.LastResult, Is.EqualTo("前"));
+            Assert.That(took, Is.InRange(1.0f, 1.7f), "一定の速さ（6m/秒）で寄ってきていない");
+        }
+        finally
+        {
+            GameSettings.BeamOperation = before;
+            Object.Destroy(player);
+            Object.Destroy(box);
+            Object.Destroy(ground);
+        }
+
+        yield return null;
+    }
+
     [UnityTest]
     public IEnumerator CriticalPress_KeepsNormalCritical()
     {

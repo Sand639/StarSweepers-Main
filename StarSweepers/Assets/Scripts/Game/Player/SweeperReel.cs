@@ -51,7 +51,8 @@ using UnityEngine;
 ///
 /// **クリティカルプルは距離で取る**（大槻さんの指定）。Critical Near〜Critical Far の距離で押すと、
 /// 今までどおりのクリティカルプル（強さは掛けない。エフェクトも同じ）。合図（縮んでくる輪・金色のフチ）は、物資がその距離を通る時間に合わせて出す。
-/// 押さずに最後まで来たときは、今までどおり前へ投げる（強さは掛けない）。重い物は今までどおり引きずるだけ。
+/// **物資は一定の速さ（Distance Reel Speed）で寄ってくる**（Reel Seconds の「何秒で着く」は使わない。大槻さんの指定）。
+/// 押さずに手前まで来たときは、今までどおり前へ投げる（強さは掛けない）。重い物は今までどおり引きずるだけ。
 ///
 /// ### クリティカルのエフェクト（仮。2026/11/4）
 ///
@@ -201,6 +202,10 @@ public class SweeperReel : MonoBehaviour
     [Tooltip("引っ張る強さの最小値（0〜1）。いちばん弱い所（Throw Zone End と、ビームの長さの上限）で押したときの強さ。クリティカルのそばでは 1")]
     [Range(0f, 1f)]
     [SerializeField] private float pullMinStrength = 0f;
+
+    [Tooltip("物資が寄ってくる速さ（m/秒）。この操作では、距離に関係なくいつもこの速さで近づき（Reel Seconds は使わない）、手前（Stop Distance）に着いたら前へ投げる")]
+    [Min(0.1f)]
+    [SerializeField] private float distanceReelSpeed = 6f;
 
     [Header("クリティカルプル")]
     [Tooltip("当たってから、クリティカルの受付が始まるまでの秒数（Reel Seconds より短くする）")]
@@ -536,7 +541,7 @@ public class SweeperReel : MonoBehaviour
 
     /// <summary>
     /// 距離で変わる操作で、物資がクリティカルの距離を通る時間を見積もり、合図の時間（<see cref="windowStart"/>・<see cref="windowLength"/>）に入れる。
-    /// 引き寄せは、距離が Reel Seconds かけて Stop Distance までまっすぐ減っていくので、その途中のどこで通るかで計算できる。
+    /// この操作では物資が一定の速さ（Distance Reel Speed）で寄ってくるので、「距離の差 ÷ 速さ」で計算できる。
     /// 初めからクリティカルの距離より近いときは、合図を出さない。
     /// </summary>
     private void EstimateCriticalWindow()
@@ -553,8 +558,8 @@ public class SweeperReel : MonoBehaviour
             return;
         }
 
-        float start = reelSeconds * Mathf.Max(0f, reelStartDistance - far) / span;
-        float end = reelSeconds * (reelStartDistance - near) / span;
+        float start = Mathf.Max(0f, reelStartDistance - far) / distanceReelSpeed;
+        float end = (reelStartDistance - near) / distanceReelSpeed;
         windowStart = start;
         windowLength = Mathf.Max(0.01f, end - start);
     }
@@ -636,11 +641,21 @@ public class SweeperReel : MonoBehaviour
             PlayEffect(Effect.CriticalCue);
         }
 
-        if (Elapsed >= reelSeconds)
+        if (distanceMode ? ArrivedAtStop() : Elapsed >= reelSeconds)
         {
             ThrowForward();
             Finish("前", false, false);
         }
+    }
+
+    /// <summary>
+    /// 距離で変わる操作で、物資が手前（Stop Distance）に着いたか。着いたら前へ投げる（大槻さんの指定）。
+    /// 壁に引っかかって着けないときも、着くはずの時間を 1 秒過ぎたら着いたことにする（いつまでも終わらないように）。
+    /// </summary>
+    private bool ArrivedAtStop()
+    {
+        float expected = Mathf.Max(0f, reelStartDistance - stopDistance) / distanceReelSpeed;
+        return FlatDistanceToPlayer() <= stopDistance + 0.05f || Elapsed >= expected + 1f;
     }
 
     /// <summary>
@@ -719,6 +734,13 @@ public class SweeperReel : MonoBehaviour
         // 残りの時間のうち、この1ステップの割合＝距離に関係なく、決まった時間で着く
         float remaining = Mathf.Max(Time.fixedDeltaTime, startTime + reelSeconds - Time.time);
         float share = Mathf.Min(1f, Time.fixedDeltaTime / remaining);
+
+        // 距離で変わる操作：残りの道のりのうち、この1ステップで進む割合＝いつも同じ速さで近づく（2026/11/17・大槻さんの指定）
+        if (distanceMode)
+        {
+            float room = distance - stopDistance;
+            share = room > 0.001f ? Mathf.Min(1f, distanceReelSpeed * Time.fixedDeltaTime / room) : 1f;
+        }
 
         // 向き：光線がしなっていれば、手元から光線が出ている向きの側へ回り込む（2026/11/4）。
         // 向きを変えていなければ、しなりの向き＝物資への向きなので、今までどおりまっすぐ引く
