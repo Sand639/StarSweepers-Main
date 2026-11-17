@@ -56,9 +56,10 @@ public class GoalAbsorb : MonoBehaviour
     /// <summary>
     /// 物資の吸い込みを始める。位置を動かすのはホスト（1人用ならそのPC）だけで、参加者のPCは小さくするだけ
     /// （位置と回転はホストから NetworkTransform で届く）。startTime は <see cref="ClockOf"/> の時刻。
+    /// pillarMotion が true なら光の柱の動き（上へ運んで光って消える）、false なら渦の吸い込み（ホストが決めて参加者へ送る）。
     /// </summary>
     public static GoalAbsorb Begin(HookableObject item, GoalEffect.Area area, float startTime, float seconds,
-        Action<HookableObject> onFinished)
+        bool pillarMotion, Action<HookableObject> onFinished)
     {
         if (item == null || item.GetComponent<GoalAbsorb>() != null)
         {
@@ -66,7 +67,7 @@ public class GoalAbsorb : MonoBehaviour
         }
 
         GoalAbsorb absorb = item.gameObject.AddComponent<GoalAbsorb>();
-        absorb.Setup(item, area, startTime, seconds, onFinished);
+        absorb.Setup(item, area, startTime, seconds, pillarMotion, onFinished);
         return absorb;
     }
 
@@ -83,7 +84,8 @@ public class GoalAbsorb : MonoBehaviour
         return network != null && network.IsSpawned ? network.NetworkManager : null;
     }
 
-    private void Setup(HookableObject target, GoalEffect.Area vortexArea, float start, float duration, Action<HookableObject> finishedCallback)
+    private void Setup(HookableObject target, GoalEffect.Area vortexArea, float start, float duration, bool pillarMotion,
+        Action<HookableObject> finishedCallback)
     {
         item = target;
         manager = ManagerOf(target);
@@ -102,8 +104,8 @@ public class GoalAbsorb : MonoBehaviour
         startAngle = Mathf.Atan2(offset.z, offset.x);
         startY = transform.position.y;
         startPosition = transform.position;
-        // 参加者のPCには円柱の大きさが届かない（位置はホストが動かす）ので、見た目の種類だけで決める
-        pillar = settings != null && settings.Style == GoalEffectStyle.Pillar;
+        // どちらの動きかは、ホストが吸い込みを始めたときに決めた物（参加者のPCへは通信で届く）
+        pillar = pillarMotion;
 
         Renderer look = GetComponentInChildren<Renderer>();
         if (look != null)

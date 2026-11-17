@@ -77,7 +77,16 @@ public class GoalEffectTests
     public IEnumerator Online_Pillar_ItemIsCarriedToCenterAndRises()
     {
         yield return new EnterPlayMode();
-        yield return RunOnline(GoalEffectStyle.Pillar);
+        yield return RunOnline(GoalEffectStyle.Pillar, GoalAbsorbMotion.MatchStyle);
+        yield return new ExitPlayMode();
+    }
+
+    /// <summary>光の柱の見た目のまま「渦の吸い込み」を選ぶと、ホストと参加者の両方で、回りながら小さくなって消える。</summary>
+    [UnityTest]
+    public IEnumerator Online_PillarLook_WithVortexMotion_ItemShrinks()
+    {
+        yield return new EnterPlayMode();
+        yield return RunOnline(GoalEffectStyle.Pillar, GoalAbsorbMotion.Vortex);
         yield return new ExitPlayMode();
     }
 
@@ -85,8 +94,9 @@ public class GoalEffectTests
     /// 中身。**再生を始めてから呼ぶ別の関数にしてある**（同じ関数の中でラムダに渡す値を作ると、
     /// 再生の切り替えのときに入れ物が消えて NullReferenceException になるため。SweeperOnlineTests と同じ）。
     /// </summary>
-    private static IEnumerator RunOnline(GoalEffectStyle style)
+    private static IEnumerator RunOnline(GoalEffectStyle style, GoalAbsorbMotion motion = GoalAbsorbMotion.MatchStyle)
     {
+        bool pillarMotion = motion == GoalAbsorbMotion.Pillar || (motion == GoalAbsorbMotion.MatchStyle && style == GoalEffectStyle.Pillar);
         GameObject supplyPrefab = AssetDatabase.LoadAssetAtPath<GameObject>(SupplyPrefabPath);
         Assert.That(supplyPrefab, Is.Not.Null);
 
@@ -95,6 +105,7 @@ public class GoalEffectTests
         var vortexObject = new GameObject("VortexUnderTest");
         GoalEffect vortex = vortexObject.AddComponent<GoalEffect>();
         vortex.Style = style;
+        vortex.AbsorbMotion = motion;
         GameObject goalObject = null;
         int absorbedEvents = 0;
         System.Action<Component> onAbsorbed = _ => absorbedEvents++;
@@ -140,6 +151,7 @@ public class GoalEffectTests
             Assert.That(clientItem, Is.Not.Null, "参加者のPCで吸い込みが始まる前に消えた");
             Assert.That(clientItem.GetComponent<HookableObject>().IsAbsorbing, Is.True, "参加者のPCでも吸い込み中の印が付く");
             Assert.That(clientItem.GetComponent<Collider>().enabled, Is.False, "参加者のPCでも当たり判定が消える");
+            bool clientWasPillar = clientItem.GetComponent<GoalAbsorb>().IsPillar;
 
             // 消えるまで、参加者のPCでの大きさと、ホストでの中心からの距離を見ておく
             float minClientScale = 1f;
@@ -166,7 +178,8 @@ public class GoalEffectTests
 
             Assert.That(hostItem == null, Is.True, "ホストで物資が消えていない");
             Assert.That(clientItem == null, Is.True, "参加者のPCで物資が消えていない");
-            if (style == GoalEffectStyle.Pillar)
+            Assert.That(clientWasPillar, Is.EqualTo(pillarMotion), "参加者のPCの動きが、ホストが選んだ動きとちがう");
+            if (pillarMotion)
             {
                 // 光の柱：大きさはそのまま、真ん中へ一直線に運んで（光の柱の上 1.5m）、そこからゆっくり上げて（0.6m）消える
                 Assert.That(minClientScale, Is.GreaterThan(0.95f), "光の柱のときは、大きさを変えない");

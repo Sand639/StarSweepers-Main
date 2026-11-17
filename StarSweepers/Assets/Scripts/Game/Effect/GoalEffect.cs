@@ -11,6 +11,14 @@ public enum GoalEffectStyle
     [InspectorName("光の柱")] Pillar,
 }
 
+/// <summary>ゴールに入った物資の動き（インスペクターのプルダウン。見た目とは別に選べる）。</summary>
+public enum GoalAbsorbMotion
+{
+    [InspectorName("見た目に合わせる")] MatchStyle,
+    [InspectorName("渦の吸い込み（回って中心へ）")] Vortex,
+    [InspectorName("光の柱（上へ運んで光って消える）")] Pillar,
+}
+
 /// <summary>
 /// ゴールに常に出ている演出（渦か光の柱）。円柱の判定に入った物資を、小さくしながら吸い込む（吸い込み終わったら得点）。
 /// 1つのシーンに1つ置けば、そのシーンの全部のゴールに出る。
@@ -21,6 +29,9 @@ public class GoalEffect : MonoBehaviour
     [Header("種類")]
     [Tooltip("ゴールの演出の見た目。渦＝黒い立体の渦（物資は回りながら真ん中へ吸い込まれる）／光の柱＝光る筒（物資は上へ浮かんで消える）。判定と得点は同じ")]
     [SerializeField] private GoalEffectStyle style = GoalEffectStyle.Vortex;
+
+    [Tooltip("ゴールに入った物資の動き。見た目に合わせる＝渦なら渦の吸い込み、光の柱なら光の柱の動き。見た目とちがう動きも選べる（試合中に変えたら、次に入った物資から）")]
+    [SerializeField] private GoalAbsorbMotion absorbMotion = GoalAbsorbMotion.MatchStyle;
 
     [Header("渦の見た目")]
     [Tooltip("渦の見た目（Art/Materials/GoalVortex。腕の数・回る速さ・壁や帯の濃さ・かけらの大きさと速さはマテリアルで変える）")]
@@ -164,7 +175,18 @@ public class GoalEffect : MonoBehaviour
     public float PillarRiseDistance => pillarRiseDistance;
 
     /// <summary>いまの見た目の種類での、吸い込みの長さ（秒）。光の柱なら「運ぶ＋上げる」の秒数。</summary>
-    public float CurrentAbsorbSeconds => style == GoalEffectStyle.Pillar ? PillarMoveSeconds + PillarRiseSeconds : absorbSeconds;
+    public float CurrentAbsorbSeconds => UsesPillarMotion ? PillarMoveSeconds + PillarRiseSeconds : absorbSeconds;
+
+    /// <summary>物資の動きのプルダウン（テストからも切り替えられる）。</summary>
+    public GoalAbsorbMotion AbsorbMotion
+    {
+        get => absorbMotion;
+        set => absorbMotion = value;
+    }
+
+    /// <summary>いま吸い込みを始めると、光の柱の動き（上へ運んで光って消える）になるか。false なら渦の吸い込み。</summary>
+    public bool UsesPillarMotion => absorbMotion == GoalAbsorbMotion.Pillar ||
+                                    (absorbMotion == GoalAbsorbMotion.MatchStyle && style == GoalEffectStyle.Pillar);
 
     /// <summary>消えた瞬間の光1つ分。</summary>
     private struct Flash
@@ -319,15 +341,17 @@ public class GoalEffect : MonoBehaviour
         {
             float start = GoalAbsorb.ClockOf(item);
             float seconds = CurrentAbsorbSeconds;
-            GoalAbsorb.Begin(item, area, start, seconds, done =>
+            bool pillarMotion = UsesPillarMotion;
+            GoalAbsorb.Begin(item, area, start, seconds, pillarMotion, done =>
             {
                 Absorbed?.Invoke(goal);
                 onAbsorbed?.Invoke(done);
             });
 
+            // 参加者のPCへも、どちらの動きかを送る（参加者のPCでプルダウンの値がちがっても、ホストと同じ動きになるように）
             if (supply != null && supply.IsSpawned)
             {
-                supply.ServerBeginAbsorb(start, seconds);
+                supply.ServerBeginAbsorb(start, seconds, pillarMotion);
             }
 
             AbsorbCount++;
