@@ -4,8 +4,9 @@ using UnityEngine.SceneManagement;
 /// <summary>
 /// **宇宙ごみのマップ（ゲームのシーン）の背景を、星空にする。**（2026/10/28・大槻さん）
 ///
-/// 星空は `Assets/Art/Sprites/Skybox_StarrySky.png`（横 2：縦 1 の星空の画像）を、
-/// 空全体にぐるっと貼る素材（`Assets/Resources/SpaceJunkSkybox.mat`。Skybox/Panoramic）にしたもの。
+/// 星空は `Assets/Resources/SpaceJunkSkybox.mat`。2026/11/17 から、画像ではなく計算で星を描くシェーダー
+/// （`StarSweepers/ProceduralStarrySky`。星ごとに色・大きさ・瞬きが違う）を使っている。説明は Documents/機能ドキュメント/計算で作る星空の背景.md
+/// （それまでは Hans さんの星空の画像 `Assets/Art/Sprites/Skybox_StarrySky.png` を空全体に貼っていた）
 ///
 /// **ラウンドの進行役（<see cref="SpaceJunkRound"/>）がいるシーンが表に出たら、そのシーンの空（RenderSettings.skybox）をこの素材に替える。**
 /// マップのシーンのファイルは書き換えない（13 個のマップを1つずつ直さずに済み、ほかの人のシーンの作業ともぶつからないため）。

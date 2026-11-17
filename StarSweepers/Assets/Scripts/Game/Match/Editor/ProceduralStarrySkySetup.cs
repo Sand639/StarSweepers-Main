@@ -6,12 +6,12 @@ using UnityEngine.Rendering;
 /// <summary>
 /// 計算で作る星空の背景（シェーダー StarSweepers/ProceduralStarrySky）の検証シーンを作るメニュー（エディタ専用）。
 /// 説明は Documents/機能ドキュメント/計算で作る星空の背景.md
-/// 試合のマップの空はまだ替えていない（今は <see cref="SpaceJunkSkybox"/> が Hans さんの星空の画像を出している）。
+/// マテリアルは試合のマップの空と同じもの（<see cref="SpaceJunkSkybox"/> が名前で読み込む）。検証シーンで数値を変えると、試合の空も変わる。
 /// </summary>
 public static class ProceduralStarrySkySetup
 {
     private const string ShaderName = "StarSweepers/ProceduralStarrySky";
-    public const string MaterialPath = "Assets/Art/Materials/ProceduralStarrySky.mat";
+    public const string MaterialPath = "Assets/Resources/SpaceJunkSkybox.mat";
     public const string ScenePath = "Assets/Scenes/Test/ProceduralStarrySkyTest.unity";
 
     /// <summary>空をこの星空にして、大きさの見本の床を置いた検証シーンを作る（マテリアルが無ければ作る）。</summary>
@@ -72,7 +72,7 @@ public static class ProceduralStarrySkySetup
             return null;
         }
 
-        material = new Material(shader) { name = "ProceduralStarrySky" };
+        material = new Material(shader) { name = "SpaceJunkSkybox" };
         AssetDatabase.CreateAsset(material, MaterialPath);
         return material;
     }
