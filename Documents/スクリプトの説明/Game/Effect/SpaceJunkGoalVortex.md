@@ -10,7 +10,7 @@
 
 ## 何をするスクリプトか
 
-- **渦の係（`SpaceJunkGoalVortex`）**：同じシーンの全部のゴール（試合のゴール `SpaceJunkGoal` と、ロビーの練習用ゴール `SpaceJunkLobbyGoal`）の床に、黒い渦を描く。ホストからは、ゴールの中の物資について「渦の円柱に入っていれば吸い込みを始める／外なら渦のほうへ引き寄せる」を受け持つ。
+- **渦の係（`SpaceJunkGoalVortex`）**：同じシーンの全部のゴール（試合のゴール `SpaceJunkGoal` と、ロビーの練習用ゴール `SpaceJunkLobbyGoal`）の床に黒い渦を、その上に半透明のすり鉢（立体の渦）を描く。ホストからは、ゴールの中の物資について「渦の円柱に入っていれば吸い込みを始める／外なら渦のほうへ引き寄せる」を受け持つ。
 - **吸い込まれる係（`SpaceJunkVortexAbsorb`）**：吸い込み中の物資1つの動き。ホスト（1人用ならそのPC）は位置・回転・大きさを、参加者のPCは大きさだけを動かす。時間が来たら、ホストがゴールに知らせる（ゴールが点を数えて物資を消す）。
 
 ## 流れ
@@ -22,11 +22,11 @@
 | `Pull` | 渦の真ん中への水平の向きに、Pull Acceleration の加速度を加える。物資は当たり判定が複数あると1回の物理の更新で何度も呼ばれるので、`Time.fixedTime` で1回だけにする |
 | `SpaceJunkVortexAbsorb.Begin`（ホスト） | 物資に係を付け、`HookableObject.SetAbsorbing(true)`、当たり判定を全部切り、物理を止める（Kinematic）。始めの位置を、渦の真ん中からの半径・角度・高さで覚える |
 | `BeginAbsorbClientRpc`（参加者のPC） | 同じく係を付ける（位置は動かさないので、真ん中の位置は渡さない）。印を付け、当たり判定を切る |
-| 係の `Update` | 進み具合 t＝（いまの時計 − 始めの時刻）÷ Absorb Seconds。大きさは `Lerp(1, End Scale, t^1.6)` 倍。ホストは半径を `1 − smoothstep(t)` 倍に縮め、角度を `Spin Turns × 2π × t²` 進め（上から見て左回り）、高さを渦の床の少し上へ寄せてから最後に Sink Depth だけ沈める。自分の回転は `−Self Spin Degrees × t²`（上から見て左回り） |
+| 係の `Update` | 進み具合 t＝（いまの時計 − 始めの時刻）÷ Absorb Seconds。大きさは `Lerp(1, End Scale, t^1.6)` 倍。ホストは半径を `1 − smoothstep(t)` 倍に縮め、角度を `Spin Turns × 2π × t²` 進め（上から見て左回り）、高さを「いまの半径でのすり鉢の面の高さ＋0.2m（`FunnelSurfaceY`）」と「始めの高さ」の低いほうへ寄せてから、最後に Sink Depth だけ沈める（すり鉢の面に沿って下りて見える）。自分の回転は `−Self Spin Degrees × t²`（上から見て左回り） |
 | t が 1 になった（ホスト） | 印を外し、大きさを元に戻してから、ゴールの `Collect`（`Absorbed` も出す）。`Collect` → `SpaceJunkRound.ServerCollect` → 数えたら `FlashClientRpc`（得点の光る演出）→ `HookableObject.Vanish`（全員の画面から消える）。戻した大きさは、同じフレームで見えなくなる |
 | t が 1 になった（参加者） | 小さいまま、ホストが消すのを待つ。消されたら（`Vanish` で印が外れる）大きさを戻して係を外す。3秒たっても消されなければ、元に戻す |
 | 吸い込み中に、ほかの理由で `Vanish` された（爆発など） | `Vanish` が印を外すので、係はそれに気づいて大きさを戻して外れる。**得点にはしない** |
-| 渦の係の `Update` → `DrawAt(Time.time)` | ゴールごとに「出ている量」（0〜1）を Appear Seconds で増減し、円の板を `Graphics.RenderMesh` で描く。閉ざされたゴールには描かない。試合のゴールは、見た目（`IntroVisual`）の MeshRenderer が全部切られている間（始まりの演出でゴールが飛んでいる間）は出ている量を 0 へ |
+| 渦の係の `Update` → `DrawAt(Time.time)` | ゴールごとに「出ている量」（0〜1）を Appear Seconds で増減し、円の板（`_Part`＝0）と、すり鉢（`_Part`＝1。高さは Funnel Height×出ている量）を `Graphics.RenderMesh` で描く。閉ざされたゴールには描かない。試合のゴールは、見た目（`IntroVisual`）の MeshRenderer が全部切られている間（始まりの演出でゴールが飛んでいる間）は出ている量を 0 へ |
 
 ### 時計（`SpaceJunkVortexAbsorb.ClockOf`）
 
@@ -43,9 +43,17 @@
 
 エディタでプレハブ（の置かれたシーンの物）を選ぶと、円柱が紫の線で見える（`OnDrawGizmosSelected`）。
 
+### すり鉢の形（`CreateFunnelMesh`）
+
+上のふちの半径 1・高さ 1・底の半径 Funnel Bottom の筒（上も下も開いている）を、周り 48・高さ 14 に分けて作る。高さ v での半径は `底＋(1−底)×v^Funnel Curve`（下ほど細く、上ほど外へ開く）。Funnel Bottom・Funnel Curve を変えたら作り直す。描くときに（渦の半径, 高さ, 渦の半径）倍にする。高さは `FunnelHeightOf`（Funnel Height と円柱の高さの小さいほう）。
+
 ### 見た目（`GoalVortex.shader`）
 
-床に寝かせた正方形の板の中に、円を描く。UV は真ん中が 0、ふちが ±1。
+`_Part` が 0 なら床の渦、1 ならすり鉢の壁を描く。
+
+**すり鉢の壁**：形の中の位置の y が高さ v（0〜1）。角度×Arms − v×Funnel Twist − 時刻の回転×1.5 の縞で、筋が上から見て左回りに回りながら下へ流れる。濃さは下ほど濃く・縞の上ほど濃く、上のふちへ向かって消える（×Funnel Opacity×Darkness）。上のふちと縞のふちに、ごく薄くチームの色。
+
+**床の渦**：床に寝かせた正方形の板の中に、円を描く。UV は真ん中が 0、ふちが ±1。
 
 - 渦の腕：対数の渦巻き（角度×Arms − Twist×log(半径)×2 − 時刻の回転）。時間とともに、上から見て左回りに回りながら、模様が真ん中へ流れ込む。
 - 黒さ（アルファ）：腕の上ほど・真ん中ほど濃い。ふちの近くは少し薄くして床につなぐ。
@@ -59,12 +67,13 @@
 | 変数 | ファイル | 意味 |
 | --- | --- | --- |
 | `vortexMaterial`・`fill`・`lift`・`appearSeconds`・`brightness` | `SpaceJunkGoalVortex.cs` | 見た目（インスペクター） |
+| `funnelHeight`・`funnelBottom`・`funnelCurve` | `SpaceJunkGoalVortex.cs` | すり鉢の形（インスペクター）。`funnelMesh`・`funnelMeshShape` は作った形と、そのときの値 |
 | `absorbSeconds`・`spinTurns`・`selfSpinDegrees`・`endScale`・`sinkDepth` | `SpaceJunkGoalVortex.cs` | 吸い込みの動き（インスペクター。吸い込まれる係が読む） |
 | `pullAcceleration`・`depthBelowFloor` | `SpaceJunkGoalVortex.cs` | 引き寄せと、円柱の下の端（インスペクター） |
 | `areas`・`appear`・`visuals`・`lastPull` | `SpaceJunkGoalVortex.cs` | ゴールごとの円柱・出ている量・見た目の Renderer、物資ごとの最後に引き寄せた時刻 |
 | `All`（static） | `SpaceJunkGoalVortex.cs` | シーンにある渦の係（`In(シーン)` で探す） |
 | `Absorbed`（static event） | `SpaceJunkGoalVortex.cs` | ホストで吸い込み終わった瞬間（検証シーン・確認用） |
-| `startTime`・`seconds`・`center`・`startRadius`・`startAngle`・`startY`・`startScale`・`startRotation` | `SpaceJunkVortexAbsorb.cs` | 吸い込み1回ぶんの始めの状態 |
+| `startTime`・`seconds`・`center`・`area`・`startRadius`・`startAngle`・`startY`・`startScale`・`startRotation` | `SpaceJunkVortexAbsorb.cs` | 吸い込み1回ぶんの始めの状態 |
 | `authority` | `SpaceJunkVortexAbsorb.cs` | 位置を動かすPCか（ホスト・1人用） |
 | `IsAbsorbing` | `HookableObject.cs` | 吸い込み中の印。**true の間は `IsVanished` も true**（フック・ボット・仕掛けが触らないように）。`Vanish` は、ほんとうに消えたか（`vanished`）だけを見る |
 | `All`（static）・`BaseColor` | `SpaceJunkLobbyGoal.cs` | ロビーの練習用ゴールの一覧と、ふちの色 |
@@ -80,3 +89,4 @@
 | 日付 | 変更者 | 内容 |
 | --- | --- | --- |
 | 2026/11/17 | Claude Code（依頼：大槻 海斗） | 新規作成 |
+| 2026/11/17 | Claude Code（依頼：大槻 海斗） | すり鉢（立体の渦）の形・描き方と、吸い込みの高さをすり鉢の面に沿わせたことを書き足した |

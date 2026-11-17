@@ -156,11 +156,11 @@ public class SpaceJunkGoalVortexTests
             Assert.That(absorbedEvents, Is.EqualTo(1));
 
             // ---- 2個目：ゴールの角（渦の外）に落とす → 引き寄せられて吸い込まれる ----
-            (GameObject cornerItem, _) = Spawn(host, client, supplyPrefab, new Vector3(1.6f, 1.5f, 1.6f));
-            yield return Wait(0.3f);
-            GameObject cornerClient = FindClientCopy(client, cornerItem);
-            IgnoreEachOther(cornerItem, cornerClient);
-            Assert.That(new Vector2(1.6f, 1.6f).magnitude, Is.GreaterThan(1.8f), "テストの置き場所が渦の外になっていない");
+            // 参加者の写しが出たらすぐ、2つの写しが押し合わないようにする（押されてゴールの外へ出ると、引き寄せられない）
+            (GameObject cornerItem, _) = Spawn(host, client, supplyPrefab, new Vector3(1.5f, 1.2f, 1.5f));
+            yield return WaitFor("corner copy", () => cornerItem == null || FindClientCopy(client, cornerItem) != null);
+            IgnoreEachOther(cornerItem, FindClientCopy(client, cornerItem));
+            Assert.That(new Vector2(1.5f, 1.5f).magnitude, Is.GreaterThan(1.8f), "テストの置き場所が渦の外になっていない");
             yield return WaitFor("corner absorbed", () => cornerItem == null, 8f);
             Assert.That(absorbedEvents, Is.EqualTo(2));
             Assert.That(vortex.AbsorbCount, Is.EqualTo(2));

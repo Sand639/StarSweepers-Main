@@ -28,6 +28,18 @@ public class SpaceJunkGoalVortex : MonoBehaviour
     [Tooltip("ふちの光の明るさ")]
     [SerializeField] private float brightness = 1f;
 
+    [Header("すり鉢（床の渦の上に立つ、半透明の立体の渦）")]
+    [Tooltip("すり鉢の高さ（m）。物資を吸い込む円柱より高くはならない。0 ならすり鉢を出さない")]
+    [SerializeField] private float funnelHeight = 1.6f;
+
+    [Tooltip("すり鉢の底（床）の半径＝渦の半径×これ")]
+    [Range(0.05f, 0.9f)]
+    [SerializeField] private float funnelBottom = 0.3f;
+
+    [Tooltip("すり鉢の形の曲がり具合（1 でまっすぐな円すい。大きいほど底が細く深い）")]
+    [Range(1f, 4f)]
+    [SerializeField] private float funnelCurve = 1.8f;
+
     [Header("吸い込み")]
     [Tooltip("渦の円柱に入ってから、中心で消えて得点になるまでの秒数")]
     [SerializeField] private float absorbSeconds = 1f;
@@ -58,6 +70,21 @@ public class SpaceJunkGoalVortex : MonoBehaviour
     public float EndScale => endScale;
     public float SinkDepth => sinkDepth;
 
+    /// <summary>そのゴールのすり鉢の高さ（m）。円柱の高さを超えない。</summary>
+    public float FunnelHeightOf(Area area) => Mathf.Clamp(funnelHeight, 0f, Mathf.Max(0f, area.Top - area.Center.y));
+
+    /// <summary>渦の真ん中から水平に radius 離れた所の、すり鉢の内側の面の高さ（世界の y）。</summary>
+    public float FunnelSurfaceY(Area area, float radius)
+    {
+        float bottom = area.Radius * funnelBottom;
+        if (radius <= bottom || area.Radius <= bottom)
+        {
+            return area.Center.y;
+        }
+        float v = Mathf.Pow(Mathf.Clamp01((radius - bottom) / (area.Radius - bottom)), 1f / funnelCurve);
+        return area.Center.y + v * FunnelHeightOf(area);
+    }
+
     /// <summary>ホストで物資が吸い込み終わった瞬間（引数はゴール）。検証シーンが使う。</summary>
     public static event Action<Component> Absorbed;
 
@@ -79,11 +106,14 @@ public class SpaceJunkGoalVortex : MonoBehaviour
     private readonly Dictionary<HookableObject, float> lastPull = new Dictionary<HookableObject, float>();
     private MaterialPropertyBlock block;
     private static Mesh discMesh;
+    private Mesh funnelMesh;
+    private Vector2 funnelMeshShape;
 
     private static readonly int ColorId = Shader.PropertyToID("_Color");
     private static readonly int VortexTimeId = Shader.PropertyToID("_VortexTime");
     private static readonly int AppearId = Shader.PropertyToID("_Appear");
     private static readonly int BrightnessId = Shader.PropertyToID("_Brightness");
+    private static readonly int PartId = Shader.PropertyToID("_Part");
 
     /// <summary>そのシーンの渦（無ければ null）。</summary>
     public static SpaceJunkGoalVortex In(Scene scene)
@@ -143,7 +173,7 @@ public class SpaceJunkGoalVortex : MonoBehaviour
         if (IsInside(area, point))
         {
             float start = SpaceJunkVortexAbsorb.ClockOf(item);
-            SpaceJunkVortexAbsorb.Begin(item, area.Center, start, absorbSeconds, done =>
+            SpaceJunkVortexAbsorb.Begin(item, area, start, absorbSeconds, done =>
             {
                 Absorbed?.Invoke(goal);
                 onAbsorbed?.Invoke(done);
@@ -302,6 +332,12 @@ public class SpaceJunkGoalVortex : MonoBehaviour
         }
 
         discMesh ??= CreateDiscMesh();
+        if (funnelMesh == null || funnelMeshShape != new Vector2(funnelBottom, funnelCurve))
+        {
+            DestroyMesh(funnelMesh);
+            funnelMeshShape = new Vector2(funnelBottom, funnelCurve);
+            funnelMesh = CreateFunnelMesh(funnelBottom, funnelCurve);
+        }
         block ??= new MaterialPropertyBlock();
         RenderParams renderParams = new RenderParams(vortexMaterial)
         {
@@ -324,9 +360,20 @@ public class SpaceJunkGoalVortex : MonoBehaviour
             block.SetFloat(VortexTimeId, now);
             block.SetFloat(AppearId, amount);
             block.SetFloat(BrightnessId, brightness);
+            block.SetFloat(PartId, 0f);
             float diameter = area.Radius * 2f;
+            Vector3 floorPoint = area.Center + Vector3.up * lift;
             Graphics.RenderMesh(renderParams, discMesh, 0,
-                Matrix4x4.TRS(area.Center + Vector3.up * lift, Quaternion.identity, new Vector3(diameter, 1f, diameter)));
+                Matrix4x4.TRS(floorPoint, Quaternion.identity, new Vector3(diameter, 1f, diameter)));
+
+            // すり鉢の壁（出てくるときは、高さも下から伸びる）
+            float height = FunnelHeightOf(area) * amount;
+            if (height > 0.01f)
+            {
+                block.SetFloat(PartId, 1f);
+                Graphics.RenderMesh(renderParams, funnelMesh, 0,
+                    Matrix4x4.TRS(floorPoint, Quaternion.identity, new Vector3(area.Radius, height, area.Radius)));
+            }
         }
     }
 
@@ -387,6 +434,58 @@ public class SpaceJunkGoalVortex : MonoBehaviour
             }
         }
         return false;
+    }
+
+    private void OnDestroy()
+    {
+        DestroyMesh(funnelMesh);
+    }
+
+    private static void DestroyMesh(Mesh mesh)
+    {
+        if (mesh == null) return;
+        if (Application.isPlaying) Destroy(mesh);
+        else DestroyImmediate(mesh);
+    }
+
+    /// <summary>
+    /// すり鉢の壁（上のふちの半径 1・高さ 1。底の半径は bottom。上も下も開いている）。
+    /// 半径は高さ v で bottom＋(1−bottom)×v^curve（下ほど細く、上ほど外へ開く）。形の中の位置の y が高さ（シェーダーが使う）。
+    /// </summary>
+    private static Mesh CreateFunnelMesh(float bottom, float curve)
+    {
+        const int around = 48;
+        const int rings = 14;
+        var vertices = new Vector3[(around + 1) * (rings + 1)];
+        var triangles = new int[around * rings * 6];
+        for (int j = 0; j <= rings; j++)
+        {
+            float v = j / (float)rings;
+            float radius = bottom + (1f - bottom) * Mathf.Pow(v, curve);
+            for (int i = 0; i <= around; i++)
+            {
+                float a = i * Mathf.PI * 2f / around;
+                vertices[j * (around + 1) + i] = new Vector3(Mathf.Cos(a) * radius, v, Mathf.Sin(a) * radius);
+            }
+        }
+
+        int k = 0;
+        for (int j = 0; j < rings; j++)
+        {
+            for (int i = 0; i < around; i++)
+            {
+                int a = j * (around + 1) + i;
+                int b = a + around + 1;
+                triangles[k++] = a; triangles[k++] = b; triangles[k++] = a + 1;
+                triangles[k++] = a + 1; triangles[k++] = b; triangles[k++] = b + 1;
+            }
+        }
+
+        Mesh mesh = new Mesh { name = "GoalVortexFunnel" };
+        mesh.vertices = vertices;
+        mesh.triangles = triangles;
+        mesh.RecalculateBounds();
+        return mesh;
     }
 
     /// <summary>床に寝かせた板（幅・奥行き 1、真ん中が原点）。UV は真ん中が 0、ふちが ±1。</summary>

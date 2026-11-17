@@ -29,6 +29,9 @@ Material:
     - _Arms: 4
     - _Brightness: 1
     - _Darkness: 0.96
+    - _FunnelOpacity: 0.75
+    - _FunnelTwist: 7
+    - _Part: 0
     - _RimWidth: 0.07
     - _Specks: 0.6
     - _Speed: 0.35

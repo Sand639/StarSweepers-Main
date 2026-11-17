@@ -15,6 +15,7 @@ public class SpaceJunkVortexAbsorb : MonoBehaviour
     private NetworkManager manager;
     private bool authority;
     private Vector3 center;
+    private SpaceJunkGoalVortex.Area area;
     private float startTime;
     private float seconds;
     private Vector3 startScale;
@@ -34,7 +35,7 @@ public class SpaceJunkVortexAbsorb : MonoBehaviour
     /// 物資の吸い込みを始める。位置を動かすのはホスト（1人用ならそのPC）だけで、参加者のPCは小さくするだけ
     /// （位置と回転はホストから NetworkTransform で届く）。startTime は <see cref="ClockOf"/> の時刻。
     /// </summary>
-    public static SpaceJunkVortexAbsorb Begin(HookableObject item, Vector3 center, float startTime, float seconds,
+    public static SpaceJunkVortexAbsorb Begin(HookableObject item, SpaceJunkGoalVortex.Area area, float startTime, float seconds,
         Action<HookableObject> onFinished)
     {
         if (item == null || item.GetComponent<SpaceJunkVortexAbsorb>() != null)
@@ -43,7 +44,7 @@ public class SpaceJunkVortexAbsorb : MonoBehaviour
         }
 
         SpaceJunkVortexAbsorb absorb = item.gameObject.AddComponent<SpaceJunkVortexAbsorb>();
-        absorb.Setup(item, center, startTime, seconds, onFinished);
+        absorb.Setup(item, area, startTime, seconds, onFinished);
         return absorb;
     }
 
@@ -60,12 +61,13 @@ public class SpaceJunkVortexAbsorb : MonoBehaviour
         return network != null && network.IsSpawned ? network.NetworkManager : null;
     }
 
-    private void Setup(HookableObject target, Vector3 vortexCenter, float start, float duration, Action<HookableObject> finishedCallback)
+    private void Setup(HookableObject target, SpaceJunkGoalVortex.Area vortexArea, float start, float duration, Action<HookableObject> finishedCallback)
     {
         item = target;
         manager = ManagerOf(target);
         authority = manager == null || manager.IsServer;
-        center = vortexCenter;
+        area = vortexArea;
+        center = vortexArea.Center;
         startTime = start;
         seconds = Mathf.Max(0.05f, duration);
         onFinished = finishedCallback;
@@ -172,7 +174,10 @@ public class SpaceJunkVortexAbsorb : MonoBehaviour
         float inward = t * t * (3f - 2f * t);
         float radius = startRadius * (1f - inward);
         float angle = startAngle + turns * Mathf.PI * 2f * t * t;
-        float y = Mathf.Lerp(startY, center.y + 0.2f, 1f - (1f - t) * (1f - t)) - sink * t * t * t * t;
+        // 高さ：すり鉢の内側の面に沿って下りる（はじめから面より低い物は、そのままの高さから下りる）
+        float surface = settings != null && area.Radius > 0f ? settings.FunnelSurfaceY(area, radius) : center.y;
+        float target = Mathf.Min(startY, surface + 0.2f);
+        float y = Mathf.Lerp(startY, target, 1f - (1f - t) * (1f - t)) - sink * t * t * t * t;
 
         transform.position = new Vector3(center.x + Mathf.Cos(angle) * radius, y, center.z + Mathf.Sin(angle) * radius);
         transform.rotation = Quaternion.AngleAxis(-selfSpin * t * t, Vector3.up) * startRotation;

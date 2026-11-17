@@ -1,5 +1,7 @@
 // ゴールに常に出ている黒い渦（SpaceJunkGoalVortex）。説明は Documents/機能ドキュメント/ゴールの渦.md
-// 床に寝かせた板に、上から見て左回りに回る黒い渦を描く。真ん中ほど暗く、ふちはチームの色でうっすら光る。
+// 2つの部品を1つのシェーダーで描く（どちらを描くかは、スクリプトが _Part で渡す）。
+//   0 = 床の渦 … 床に寝かせた板に、上から見て左回りに回る黒い渦。真ん中ほど暗く、ふちはチームの色でうっすら光る（すり鉢の底）
+//   1 = すり鉢の壁 … 上が広く、床へ向かって細くなる半透明の筒。渦の筋が回りながら下へ流れ込む。上のふちはチームの色
 // 黒い所は下の床を暗くし（アルファ）、光る所は色を足す重ね方（Blend One OneMinusSrcAlpha）。
 Shader "StarSweepers/GoalVortex"
 {
@@ -15,6 +17,9 @@ Shader "StarSweepers/GoalVortex"
         _Darkness ("Darkness (渦の黒さ)", Range(0, 1)) = 0.96
         _RimWidth ("Rim Width (ふちの光の太さ 0-1)", Range(0.02, 0.5)) = 0.07
         _Specks ("Specks (吸い込まれていく光の粒の濃さ)", Range(0, 2)) = 0.6
+        _Part ("Part (0=床の渦 1=すり鉢の壁。スクリプトが入れる)", Float) = 0
+        _FunnelTwist ("Funnel Twist (すり鉢の筋の巻き具合)", Range(0, 20)) = 7
+        _FunnelOpacity ("Funnel Opacity (すり鉢の壁の濃さ)", Range(0, 1)) = 0.75
     }
 
     SubShader
@@ -46,6 +51,9 @@ Shader "StarSweepers/GoalVortex"
                 float _Darkness;
                 float _RimWidth;
                 float _Specks;
+                float _Part;
+                float _FunnelTwist;
+                float _FunnelOpacity;
             CBUFFER_END
 
             struct Attributes
@@ -58,6 +66,7 @@ Shader "StarSweepers/GoalVortex"
             {
                 float4 positionHCS : SV_POSITION;
                 float2 uv : TEXCOORD0;
+                float3 local : TEXCOORD1; // すり鉢：形の中の位置（y が高さ 0-1）
             };
 
             Varyings vert(Attributes input)
@@ -65,6 +74,7 @@ Shader "StarSweepers/GoalVortex"
                 Varyings output;
                 output.positionHCS = TransformObjectToHClip(input.positionOS.xyz);
                 output.uv = input.uv;
+                output.local = input.positionOS.xyz;
                 return output;
             }
 
@@ -73,8 +83,37 @@ Shader "StarSweepers/GoalVortex"
                 return frac(sin(dot(p, float2(127.1, 311.7))) * 43758.5453);
             }
 
+            // すり鉢の壁：下へ行くほど濃い半透明。渦の筋が、上から見て左回りに回りながら下へ流れ込む
+            half4 Funnel(Varyings input)
+            {
+                float v = saturate(input.local.y);
+                float angle = atan2(input.local.z, input.local.x);
+                float spin = _VortexTime * _Speed * 6.2831853;
+
+                float phase = angle * _Arms - v * _FunnelTwist - spin * _Arms * 1.5;
+                float wave = 0.5 + 0.5 * sin(phase);
+                float band = smoothstep(0.45, 0.95, wave);
+                float edgeLine = smoothstep(0.88, 1.0, 0.5 + 0.5 * sin(phase + 0.7));
+
+                // 濃さ：下ほど濃く、上のふちへ向かって消える（見下ろしのカメラで中が見えるように）
+                float topFade = 1.0 - smoothstep(0.7, 1.0, v);
+                float alpha = (0.25 + 0.45 * (1.0 - v) + band * 0.4) * topFade;
+
+                // 上のふちの光と、筋のふちの薄い光（チームの色）
+                float rim = smoothstep(0.8, 0.95, v) * (1.0 - smoothstep(0.95, 1.0, v));
+                float glow = (rim * 0.6 + edgeLine * 0.1 * (0.3 + v)) * _Brightness;
+
+                float appear = saturate(_Appear);
+                return half4(_Color.rgb * glow * appear, saturate(alpha * _FunnelOpacity * _Darkness) * appear);
+            }
+
             half4 frag(Varyings input) : SV_Target
             {
+                if (_Part > 0.5)
+                {
+                    return Funnel(input);
+                }
+
                 float r = length(input.uv);
                 if (r > 1.0)
                 {
