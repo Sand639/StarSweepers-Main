@@ -334,8 +334,10 @@ public class StageBarrier : MonoBehaviour
     {
         touchingNow.Clear();
 
-        // 始まりの演出中は、プレイヤーを乗せたゴールエリアが壁を通り抜けるので、波紋を出さない
-        bool quiet = SpaceJunkRound.Current != null && SpaceJunkRound.Current.IsIntro;
+        // プレイヤーを乗せた輸送機が壁を通り抜ける演出中は、波紋を出さない。
+        LobbyTestDeparture departure = LobbyTestDeparture.Current;
+        bool lobbyDeparture = departure != null && departure.gameObject.scene == gameObject.scene && departure.IsBoarding;
+        bool quiet = lobbyDeparture || (SpaceJunkRound.Current != null && SpaceJunkRound.Current.IsIntro);
 
         for (int w = 0; w < walls.Count + gaps.Count; w++)
         {
