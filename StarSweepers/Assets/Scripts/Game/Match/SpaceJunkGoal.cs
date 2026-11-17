@@ -21,10 +21,11 @@ using UnityEngine.SceneManagement;
 ///
 /// フックで引っ張ったまま持ち込んだ素材は数えない（引きずり込みで稼げないようにするため）。
 ///
-/// ## 入ってすぐには数えない（2026/10/21）
+/// ## 渦に吸い込まれたら数える（2026/11/17）
 ///
-/// 素材が**ゴールの中に <see cref="scoreDelaySeconds"/> 秒いつづけたら**数える。
-/// 途中でゴールから出たり、フックで引っ掛けられたりしたら、時間は0からやり直し。
+/// ゴールに入った素材は、ゴールの黒い渦（<see cref="SpaceJunkGoalVortex"/>）の円柱に入ると吸い込まれ、
+/// 中心で消えた瞬間に数える。渦の外で止まった素材は渦のほうへ引き寄せる。
+/// （前は「ゴールの中に1秒いつづけたら数えて消す」だった。渦が無いシーンでは、入った瞬間に数えて消す）
 /// </summary>
 [RequireComponent(typeof(Collider))]
 [RequireComponent(typeof(NetworkObject))]
@@ -36,11 +37,6 @@ public class SpaceJunkGoal : NetworkBehaviour
     [Header("このゴールの場所")]
     [Tooltip("ゴールの並び順の番号（0=北 / 1=東 / 2=南 / 3=西）。持ち主の割り当てに使う")]
     [SerializeField] private int goalIndex = 0;
-
-    [Header("得点")]
-    [Tooltip("素材がゴールの中に何秒いつづけたら得点になるか（0 なら入った瞬間）")]
-    [Min(0f)]
-    [SerializeField] private float scoreDelaySeconds = 1f;
 
     [Header("見た目")]
     [Tooltip("チームの色に塗る床の Renderer")]
@@ -137,9 +133,8 @@ public class SpaceJunkGoal : NetworkBehaviour
     private Color teamColor = Color.white;
     private float flashUntil = -999f;
 
-    /// <summary>ゴールの中にいる素材ごとの「いつから中にいるか」と「最後に中で見かけた時刻」（ホストだけが使う）。</summary>
-    private readonly Dictionary<HookableObject, (float since, float lastSeen)> staying =
-        new Dictionary<HookableObject, (float since, float lastSeen)>();
+    /// <summary>ゴールの中にいる素材ごとの「最後に中で見かけた時刻」（ホストだけが使う。眠らせないため）。</summary>
+    private readonly Dictionary<HookableObject, float> staying = new Dictionary<HookableObject, float>();
 
     /// <summary>
     /// この秒数より長く見かけなかった素材は「ゴールから出た」とみなす。
@@ -222,9 +217,9 @@ public class SpaceJunkGoal : NetworkBehaviour
         }
 
         List<HookableObject> gone = null;
-        foreach (KeyValuePair<HookableObject, (float since, float lastSeen)> pair in staying)
+        foreach (KeyValuePair<HookableObject, float> pair in staying)
         {
-            if (pair.Key == null || Time.time - pair.Value.lastSeen > LeftAfterSeconds)
+            if (pair.Key == null || pair.Key.IsVanished || Time.time - pair.Value > LeftAfterSeconds)
             {
                 (gone ??= new List<HookableObject>()).Add(pair.Key);
                 continue;
@@ -277,45 +272,52 @@ public class SpaceJunkGoal : NetworkBehaviour
 
         HookableObject item = other.GetComponentInParent<HookableObject>();
 
-        if (item == null || item.IsHooked || item.IsVanished)
+        if (item == null || item.IsVanished)
         {
             return;
         }
-
-        SpaceJunkMaterial material = item.GetComponent<SpaceJunkMaterial>();
 
         // 素材以外（宇宙ごみの飾りなど）は数えない
-        if (material == null)
+        if (item.GetComponent<SpaceJunkMaterial>() == null)
         {
             return;
         }
 
+        // 中にいる間は眠らせない（FixedUpdate）
+        staying[item] = Time.time;
+
+        // 引っ掛けたまま持ち込まれたものは数えない（手を離されたら渦が吸い込む）
         FishingNetSupply netSupply = item.GetComponent<FishingNetSupply>();
-
-        // 引っ掛けたまま持ち込まれたものは数えない
-        if (netSupply != null && netSupply.IsClaimed)
+        if (item.IsHooked || (netSupply != null && netSupply.IsClaimed))
         {
             return;
         }
 
-        // **決めた秒数いつづけるまでは数えない。** 見かけなかった間があれば、0から数え直す
-        float now = Time.time;
-        if (!staying.TryGetValue(item, out var stay) || now - stay.lastSeen > LeftAfterSeconds)
+        // **渦の円柱に入っていれば吸い込み、吸い込み終わったら数える。** 外なら渦のほうへ引き寄せる
+        SpaceJunkGoalVortex vortex = SpaceJunkGoalVortex.In(gameObject.scene);
+        if (vortex != null)
         {
-            stay.since = now;
+            vortex.ServerFeed(this, item, Collect);
         }
+        else
+        {
+            Collect(item);
+        }
+    }
 
-        staying[item] = (stay.since, now);
-
-        if (now - stay.since < scoreDelaySeconds)
+    /// <summary>素材を数えて消す（ホストだけ）。**もう持っている種類でも、素材は消える（何も起きない）。**</summary>
+    private void Collect(HookableObject item)
+    {
+        if (item == null)
         {
             return;
         }
 
         staying.Remove(item);
+        SpaceJunkMaterial material = item.GetComponent<SpaceJunkMaterial>();
+        FishingNetSupply netSupply = item.GetComponent<FishingNetSupply>();
 
-        // **もう持っている種類でも、素材は消える（何も起きない）。**
-        bool counted = SpaceJunkRound.Current != null
+        bool counted = !IsClosed && material != null && SpaceJunkRound.Current != null
                     && SpaceJunkRound.Current.ServerCollect(OwnerTeam, material.Kind, item.GetComponent<NetworkObject>());
 
         netSupply?.ClearLastThrower();
