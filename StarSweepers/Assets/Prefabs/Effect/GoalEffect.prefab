@@ -67,7 +67,11 @@ MonoBehaviour:
   pillarBrightness: 1.2
   streakCount: 14
   sparkleCount: 22
-  riseAbovePillar: 0.4
+  pillarMoveSeconds: 0.4
+  pillarRiseSeconds: 0.8
+  pillarRiseDistance: 1.2
+  pillarGlowSeconds: 0.35
+  pillarFlashSeconds: 0.3
   absorbSeconds: 1
   spinTurns: 1.25
   selfSpinDegrees: 540
