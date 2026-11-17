@@ -23,7 +23,7 @@ using UnityEngine.SceneManagement;
 ///
 /// ## 渦に吸い込まれたら数える（2026/11/17）
 ///
-/// ゴールに入った素材は、ゴールの黒い渦（<see cref="SpaceJunkGoalVortex"/>）の円柱に入ると吸い込まれ、
+/// ゴールに入った素材は、ゴールの黒い渦（<see cref="GoalEffect"/>）の円柱に入ると吸い込まれ、
 /// 中心で消えた瞬間に数える。渦の外で止まった素材は渦のほうへ引き寄せる。
 /// （前は「ゴールの中に1秒いつづけたら数えて消す」だった。渦が無いシーンでは、入った瞬間に数えて消す）
 /// </summary>
@@ -294,7 +294,7 @@ public class SpaceJunkGoal : NetworkBehaviour
         }
 
         // **渦の円柱に入っていれば吸い込み、吸い込み終わったら数える。** 外なら渦のほうへ引き寄せる
-        SpaceJunkGoalVortex vortex = SpaceJunkGoalVortex.In(gameObject.scene);
+        GoalEffect vortex = GoalEffect.In(gameObject.scene);
         if (vortex != null)
         {
             vortex.ServerFeed(this, item, Collect);

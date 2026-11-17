@@ -8,10 +8,10 @@ using UnityEngine;
 using UnityEngine.TestTools;
 
 /// <summary>
-/// ゴールの渦（<see cref="SpaceJunkGoalVortex"/>）の自動テスト。円柱の測り方と、
+/// ゴールの渦（<see cref="GoalEffect"/>）の自動テスト。円柱の測り方と、
 /// 1つの Unity の中でホストと参加者をつないで「渦に入った物資が、両方のPCで小さくなって消える」「渦の外の物資は引き寄せられる」を確かめる。
 /// </summary>
-public class SpaceJunkGoalVortexTests
+public class GoalEffectTests
 {
     private const string SupplyPrefabPath = "Assets/Prefabs/Item/SpaceJunkPlate.prefab";
     private const ushort Port = 17992;
@@ -56,7 +56,7 @@ public class SpaceJunkGoalVortexTests
         so.ApplyModifiedPropertiesWithoutUndo();
         Physics.SyncTransforms();
 
-        Assert.That(SpaceJunkGoalVortex.MeasureArea(goal, 0.9f, out SpaceJunkGoalVortex.Area area), Is.True);
+        Assert.That(GoalEffect.MeasureArea(goal, 0.9f, out GoalEffect.Area area), Is.True);
         Assert.That(area.Radius, Is.EqualTo(1.8f).Within(0.02f), "半径は床の短い辺（4m）の半分×0.9");
         Assert.That(area.Center.x, Is.EqualTo(10f).Within(0.01f));
         Assert.That(area.Center.z, Is.EqualTo(0f).Within(0.01f));
@@ -84,11 +84,11 @@ public class SpaceJunkGoalVortexTests
         GameObject ground = GameObject.CreatePrimitive(PrimitiveType.Plane);
         ground.transform.localScale = new Vector3(10f, 1f, 10f);
         var vortexObject = new GameObject("VortexUnderTest");
-        SpaceJunkGoalVortex vortex = vortexObject.AddComponent<SpaceJunkGoalVortex>();
+        GoalEffect vortex = vortexObject.AddComponent<GoalEffect>();
         GameObject goalObject = null;
         int absorbedEvents = 0;
         System.Action<Component> onAbsorbed = _ => absorbedEvents++;
-        SpaceJunkGoalVortex.Absorbed += onAbsorbed;
+        GoalEffect.Absorbed += onAbsorbed;
 
         var managers = new List<NetworkManager>();
         try
@@ -122,11 +122,11 @@ public class SpaceJunkGoalVortexTests
             IgnoreEachOther(hostItem, clientItem);
             Vector3 clientStartScale = clientItem.transform.localScale;
 
-            yield return WaitFor("host absorbs", () => hostItem == null || hostItem.GetComponent<SpaceJunkVortexAbsorb>() != null);
+            yield return WaitFor("host absorbs", () => hostItem == null || hostItem.GetComponent<GoalAbsorb>() != null);
             Assert.That(hostItem, Is.Not.Null, "吸い込みが見える前に消えた");
             Assert.That(hostItem.GetComponent<HookableObject>().IsVanished, Is.True, "吸い込み中は引っ掛けられない（消えた扱い）");
 
-            yield return WaitFor("client absorbs", () => clientItem == null || clientItem.GetComponent<SpaceJunkVortexAbsorb>() != null);
+            yield return WaitFor("client absorbs", () => clientItem == null || clientItem.GetComponent<GoalAbsorb>() != null);
             Assert.That(clientItem, Is.Not.Null, "参加者のPCで吸い込みが始まる前に消えた");
             Assert.That(clientItem.GetComponent<HookableObject>().IsAbsorbing, Is.True, "参加者のPCでも吸い込み中の印が付く");
             Assert.That(clientItem.GetComponent<Collider>().enabled, Is.False, "参加者のPCでも当たり判定が消える");
@@ -142,7 +142,7 @@ public class SpaceJunkGoalVortexTests
                 {
                     minClientScale = Mathf.Min(minClientScale, clientItem.transform.localScale.x / clientStartScale.x);
                 }
-                if (hostItem != null && hostItem.GetComponent<SpaceJunkVortexAbsorb>() != null)
+                if (hostItem != null && hostItem.GetComponent<GoalAbsorb>() != null)
                 {
                     minHostDistance = Mathf.Min(minHostDistance, Flat(hostItem.transform.position).magnitude);
                 }
@@ -167,7 +167,7 @@ public class SpaceJunkGoalVortexTests
         }
         finally
         {
-            SpaceJunkGoalVortex.Absorbed -= onAbsorbed;
+            GoalEffect.Absorbed -= onAbsorbed;
             for (int i = managers.Count - 1; i >= 0; i--)
             {
                 if (managers[i] == null) continue;

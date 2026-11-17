@@ -5,9 +5,9 @@ using UnityEngine;
 /// <summary>
 /// ゴールの渦の検証シーン専用。ホストとして始め、ゴールの上から物資（の代わりの箱）を順番に落として、渦に吸い込ませる。
 /// 吸い込み終わったら、得点が入ったときの光る演出も出す（検証シーンには試合の進行役が無いので、ここで出す）。
-/// 説明は Documents/スクリプトの説明/Game/Effect/SpaceJunkGoalVortex.md
+/// 説明は Documents/スクリプトの説明/Game/Effect/GoalEffect.md
 /// </summary>
-public class SpaceJunkGoalVortexTestDriver : MonoBehaviour
+public class GoalEffectTestDriver : MonoBehaviour
 {
     [Tooltip("物資を落とすゴール（順番に回す）")]
     [SerializeField] private SpaceJunkGoal[] goals;
@@ -55,13 +55,13 @@ public class SpaceJunkGoalVortexTestDriver : MonoBehaviour
             }
         }
 
-        SpaceJunkGoalVortex.Absorbed += OnAbsorbed;
+        GoalEffect.Absorbed += OnAbsorbed;
         timer = interval;
     }
 
     private void OnDestroy()
     {
-        SpaceJunkGoalVortex.Absorbed -= OnAbsorbed;
+        GoalEffect.Absorbed -= OnAbsorbed;
         if (createdManager != null)
         {
             createdManager.Shutdown();
@@ -88,15 +88,15 @@ public class SpaceJunkGoalVortexTestDriver : MonoBehaviour
         timer = 0f;
         SpaceJunkGoal goal = goals[next % goals.Length];
         next++;
-        SpaceJunkGoalVortex vortex = SpaceJunkGoalVortex.In(gameObject.scene);
-        if (goal != null && vortex != null && vortex.TryGetArea(goal, out SpaceJunkGoalVortex.Area area))
+        GoalEffect vortex = GoalEffect.In(gameObject.scene);
+        if (goal != null && vortex != null && vortex.TryGetArea(goal, out GoalEffect.Area area))
         {
             Drop(area);
         }
     }
 
     /// <summary>渦の中か、渦の外の角に、物資の代わりの箱を1つ落とす。</summary>
-    private void Drop(SpaceJunkGoalVortex.Area area)
+    private void Drop(GoalEffect.Area area)
     {
         float angle = (float)random.NextDouble() * Mathf.PI * 2f;
         bool corner = random.NextDouble() < cornerChance;

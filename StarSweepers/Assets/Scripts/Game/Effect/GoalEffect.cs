@@ -7,9 +7,9 @@ using UnityEngine.SceneManagement;
 /// <summary>
 /// ゴールに常に出ている黒い渦。渦の円柱に入った物資を、小さくしながら回して中心へ吸い込む（吸い込み終わったら得点）。
 /// 1つのシーンに1つ置けば、そのシーンの全部のゴールに出る。
-/// 説明は Documents/スクリプトの説明/Game/Effect/SpaceJunkGoalVortex.md
+/// 説明は Documents/スクリプトの説明/Game/Effect/GoalEffect.md
 /// </summary>
-public class SpaceJunkGoalVortex : MonoBehaviour
+public class GoalEffect : MonoBehaviour
 {
     [Header("見た目")]
     [Tooltip("渦の見た目（Art/Materials/GoalVortex。腕の数・回る速さ・壁や帯の濃さ・かけらの大きさと速さはマテリアルで変える）")]
@@ -124,7 +124,7 @@ public class SpaceJunkGoalVortex : MonoBehaviour
         public float Top;
     }
 
-    private static readonly List<SpaceJunkGoalVortex> All = new List<SpaceJunkGoalVortex>();
+    private static readonly List<GoalEffect> All = new List<GoalEffect>();
     private readonly Dictionary<Component, Area> areas = new Dictionary<Component, Area>();
     private readonly Dictionary<Component, float> appear = new Dictionary<Component, float>();
     private readonly Dictionary<Component, MeshRenderer[]> visuals = new Dictionary<Component, MeshRenderer[]>();
@@ -146,9 +146,9 @@ public class SpaceJunkGoalVortex : MonoBehaviour
     private static readonly int FunnelId = Shader.PropertyToID("_Funnel");
 
     /// <summary>そのシーンの渦（無ければ null）。</summary>
-    public static SpaceJunkGoalVortex In(Scene scene)
+    public static GoalEffect In(Scene scene)
     {
-        foreach (SpaceJunkGoalVortex vortex in All)
+        foreach (GoalEffect vortex in All)
         {
             if (vortex != null && vortex.gameObject.scene == scene)
             {
@@ -202,8 +202,8 @@ public class SpaceJunkGoalVortex : MonoBehaviour
         Vector3 point = item.Body != null ? item.Body.worldCenterOfMass : item.transform.position;
         if (IsInside(area, point))
         {
-            float start = SpaceJunkVortexAbsorb.ClockOf(item);
-            SpaceJunkVortexAbsorb.Begin(item, area, start, absorbSeconds, done =>
+            float start = GoalAbsorb.ClockOf(item);
+            GoalAbsorb.Begin(item, area, start, absorbSeconds, done =>
             {
                 Absorbed?.Invoke(goal);
                 onAbsorbed?.Invoke(done);

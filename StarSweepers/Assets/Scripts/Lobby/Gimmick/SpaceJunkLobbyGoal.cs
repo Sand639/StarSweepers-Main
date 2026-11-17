@@ -5,7 +5,7 @@ using UnityEngine;
 /// <summary>
 /// **ロビー（試合前）の練習エリアに置く簡易ゴール。**
 /// チーム分けや得点計算は一切せず、素材が入ってきたら「消える（Vanish）」挙動だけを再現する。
-/// シーンにゴールの渦（<see cref="SpaceJunkGoalVortex"/>）があれば、試合のゴールと同じく渦に吸い込まれてから消える（2026/11/17）。
+/// シーンにゴールの渦（<see cref="GoalEffect"/>）があれば、試合のゴールと同じく渦に吸い込まれてから消える（2026/11/17）。
 /// </summary>
 [RequireComponent(typeof(Collider))]
 [RequireComponent(typeof(NetworkObject))]
@@ -104,7 +104,7 @@ public class SpaceJunkLobbyGoal : NetworkBehaviour
         // ⚠ 試合中とは違い、練習用なので「フックで引っ張ったまま持ち込んだ場合」でも
         // 手を離した瞬間に綺麗に消えるように、item.IsHooked のガードはあえて外しています。
         // （渦があるときは、引っ掛けている間は吸い込まず、手を離したら吸い込む）
-        SpaceJunkGoalVortex vortex = SpaceJunkGoalVortex.In(gameObject.scene);
+        GoalEffect vortex = GoalEffect.In(gameObject.scene);
         if (vortex != null)
         {
             vortex.ServerFeed(this, item, Collect);

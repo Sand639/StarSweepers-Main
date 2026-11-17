@@ -4,9 +4,9 @@ using UnityEngine;
 
 /// <summary>
 /// ゴールの渦に吸い込まれている物資1つ分（吸い込みが始まったときに付き、終わったら外れる）。
-/// 説明は Documents/スクリプトの説明/Game/Effect/SpaceJunkGoalVortex.md
+/// 説明は Documents/スクリプトの説明/Game/Effect/GoalEffect.md
 /// </summary>
-public class SpaceJunkVortexAbsorb : MonoBehaviour
+public class GoalAbsorb : MonoBehaviour
 {
     /// <summary>参加者のPCで、吸い込み終わってもホストから消されなかったときに元へ戻すまでの秒数。</summary>
     private const float ClientRestoreSeconds = 3f;
@@ -15,7 +15,7 @@ public class SpaceJunkVortexAbsorb : MonoBehaviour
     private NetworkManager manager;
     private bool authority;
     private Vector3 center;
-    private SpaceJunkGoalVortex.Area area;
+    private GoalEffect.Area area;
     private float startTime;
     private float seconds;
     private Vector3 startScale;
@@ -24,7 +24,7 @@ public class SpaceJunkVortexAbsorb : MonoBehaviour
     private float startAngle;
     private float startY;
     private Action<HookableObject> onFinished;
-    private SpaceJunkGoalVortex settings;
+    private GoalEffect settings;
     private bool finished;
     private float finishedAt;
 
@@ -35,15 +35,15 @@ public class SpaceJunkVortexAbsorb : MonoBehaviour
     /// 物資の吸い込みを始める。位置を動かすのはホスト（1人用ならそのPC）だけで、参加者のPCは小さくするだけ
     /// （位置と回転はホストから NetworkTransform で届く）。startTime は <see cref="ClockOf"/> の時刻。
     /// </summary>
-    public static SpaceJunkVortexAbsorb Begin(HookableObject item, SpaceJunkGoalVortex.Area area, float startTime, float seconds,
+    public static GoalAbsorb Begin(HookableObject item, GoalEffect.Area area, float startTime, float seconds,
         Action<HookableObject> onFinished)
     {
-        if (item == null || item.GetComponent<SpaceJunkVortexAbsorb>() != null)
+        if (item == null || item.GetComponent<GoalAbsorb>() != null)
         {
             return null;
         }
 
-        SpaceJunkVortexAbsorb absorb = item.gameObject.AddComponent<SpaceJunkVortexAbsorb>();
+        GoalAbsorb absorb = item.gameObject.AddComponent<GoalAbsorb>();
         absorb.Setup(item, area, startTime, seconds, onFinished);
         return absorb;
     }
@@ -61,7 +61,7 @@ public class SpaceJunkVortexAbsorb : MonoBehaviour
         return network != null && network.IsSpawned ? network.NetworkManager : null;
     }
 
-    private void Setup(HookableObject target, SpaceJunkGoalVortex.Area vortexArea, float start, float duration, Action<HookableObject> finishedCallback)
+    private void Setup(HookableObject target, GoalEffect.Area vortexArea, float start, float duration, Action<HookableObject> finishedCallback)
     {
         item = target;
         manager = ManagerOf(target);
@@ -71,7 +71,7 @@ public class SpaceJunkVortexAbsorb : MonoBehaviour
         startTime = start;
         seconds = Mathf.Max(0.05f, duration);
         onFinished = finishedCallback;
-        settings = SpaceJunkGoalVortex.In(gameObject.scene);
+        settings = GoalEffect.In(gameObject.scene);
         startScale = transform.localScale;
         startRotation = transform.rotation;
 

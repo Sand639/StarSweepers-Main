@@ -4,15 +4,15 @@ using UnityEditor.SceneManagement;
 using UnityEngine;
 
 /// <summary>
-/// ゴールの渦（<see cref="SpaceJunkGoalVortex"/>）の検証シーンを作り、全ステージとロビーに入れるメニュー（エディタ専用）。
-/// 説明は Documents/スクリプトの説明/Game/Effect/SpaceJunkGoalVortex.md
+/// ゴールの渦（<see cref="GoalEffect"/>）の検証シーンを作り、全ステージとロビーに入れるメニュー（エディタ専用）。
+/// 説明は Documents/スクリプトの説明/Game/Effect/GoalEffect.md
 /// </summary>
-public static class SpaceJunkGoalVortexSetup
+public static class GoalEffectSetup
 {
     private const string ShaderName = "StarSweepers/GoalVortex";
     private const string MaterialPath = "Assets/Art/Materials/GoalVortex.mat";
-    private const string PrefabPath = "Assets/Prefabs/Effect/SpaceJunkGoalVortex.prefab";
-    private const string ScenePath = "Assets/Scenes/Test/GoalVortexTest.unity";
+    private const string PrefabPath = "Assets/Prefabs/Effect/GoalEffect.prefab";
+    private const string ScenePath = "Assets/Scenes/Test/GoalEffectTest.unity";
 
     /// <summary>得点が入ったときの光る演出（検証シーンにも置く）。</summary>
     private const string ScoreEffectPrefabPath = "Assets/Prefabs/Effect/SpaceJunkGoalScoreEffect.prefab";
@@ -88,7 +88,7 @@ public static class SpaceJunkGoalVortexSetup
         }
 
         var vortex = (GameObject)PrefabUtility.InstantiatePrefab(prefab, scene);
-        vortex.name = "SpaceJunkGoalVortex";
+        vortex.name = "GoalEffect";
 
         var scoreEffect = AssetDatabase.LoadAssetAtPath<GameObject>(ScoreEffectPrefabPath);
         if (scoreEffect != null)
@@ -97,7 +97,7 @@ public static class SpaceJunkGoalVortexSetup
         }
 
         var driverObject = new GameObject("TestDriver");
-        var driver = driverObject.AddComponent<SpaceJunkGoalVortexTestDriver>();
+        var driver = driverObject.AddComponent<GoalEffectTestDriver>();
         var so = new SerializedObject(driver);
         SerializedProperty goals = so.FindProperty("goals");
         goals.arraySize = 2;
@@ -144,10 +144,10 @@ public static class SpaceJunkGoalVortexSetup
         if (prefab == null) return;
 
         GameObject round = PrefabUtility.LoadPrefabContents(RoundPrefabPath);
-        if (round.GetComponentInChildren<SpaceJunkGoalVortex>(true) == null)
+        if (round.GetComponentInChildren<GoalEffect>(true) == null)
         {
             var child = (GameObject)PrefabUtility.InstantiatePrefab(prefab, round.transform);
-            child.name = "SpaceJunkGoalVortex";
+            child.name = "GoalEffect";
             PrefabUtility.SaveAsPrefabAsset(round, RoundPrefabPath);
             Debug.Log($"[VORTEX] 進行役のプレハブに入れました（全ステージに入ります）: {RoundPrefabPath}");
         }
@@ -158,10 +158,10 @@ public static class SpaceJunkGoalVortexSetup
         PrefabUtility.UnloadPrefabContents(round);
 
         var lobby = EditorSceneManager.OpenScene(LobbyScenePath, OpenSceneMode.Single);
-        if (Object.FindObjectsByType<SpaceJunkGoalVortex>(FindObjectsInactive.Include, FindObjectsSortMode.None).Length == 0)
+        if (Object.FindObjectsByType<GoalEffect>(FindObjectsInactive.Include, FindObjectsSortMode.None).Length == 0)
         {
             var instance = (GameObject)PrefabUtility.InstantiatePrefab(prefab, lobby);
-            instance.name = "SpaceJunkGoalVortex";
+            instance.name = "GoalEffect";
             EditorSceneManager.SaveScene(lobby);
             Debug.Log($"[VORTEX] ロビーに入れました: {LobbyScenePath}");
         }
@@ -185,8 +185,8 @@ public static class SpaceJunkGoalVortexSetup
         Material material = EnsureMaterial();
         if (material == null) return null;
 
-        var root = new GameObject("SpaceJunkGoalVortex");
-        var vortex = root.AddComponent<SpaceJunkGoalVortex>();
+        var root = new GameObject("GoalEffect");
+        var vortex = root.AddComponent<GoalEffect>();
         var so = new SerializedObject(vortex);
         so.FindProperty("vortexMaterial").objectReferenceValue = material;
         so.ApplyModifiedPropertiesWithoutUndo();

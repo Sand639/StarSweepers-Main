@@ -1327,7 +1327,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 7762970262435609578, guid: b787d2ac9f480ba4c94d454bbefa0f19, type: 3}
       propertyPath: m_Name
-      value: SpaceJunkGoalVortex
+      value: GoalEffect
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
