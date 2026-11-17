@@ -54,6 +54,10 @@ public class SweeperNetSync : NetworkBehaviour
     private readonly NetworkVariable<ulong> reelItemId = new NetworkVariable<ulong>(
         NoItem, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Owner);
 
+    /// <summary>本人の撃ち方（<see cref="SweeperShooter.ShotStyle"/> の数字。2026/11/17）。ほかの人の画面で、鞭の光線を曲げて描くかどうかに使う。</summary>
+    private readonly NetworkVariable<int> shotStyle = new NetworkVariable<int>(
+        (int)SweeperShooter.ShotStyle.Whip, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Owner);
+
     private FishingNetPlayer netPlayer;
     private SweeperPlayer profile;
     private SweeperRing ring;
@@ -312,6 +316,12 @@ public class SweeperNetSync : NetworkBehaviour
             shotPhase.Value = (int)phase;
         }
 
+        // 撃ち方（ポーズ画面の設定で変わる）。変わったときだけ書く
+        if (shotStyle.Value != (int)shooter.Style)
+        {
+            shotStyle.Value = (int)shooter.Style;
+        }
+
         if (phase == SweeperShooter.ShotPhase.Idle)
         {
             if (reelItemId.Value != NoItem)
@@ -335,6 +345,7 @@ public class SweeperNetSync : NetworkBehaviour
     /// <summary>ほかの人の体に、配られた光線の様子を出す。</summary>
     private void ShowShot()
     {
+        shooter.Style = (SweeperShooter.ShotStyle)shotStyle.Value;
         shooter.ShowRemote((SweeperShooter.ShotPhase)shotPhase.Value, shotDirection.Value, shotReach.Value,
             beamTip.Value, ItemOf(reelItemId.Value));
     }

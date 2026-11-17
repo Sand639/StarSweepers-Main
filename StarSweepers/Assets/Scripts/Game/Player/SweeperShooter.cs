@@ -57,6 +57,9 @@ public class SweeperShooter : MonoBehaviour
     [Tooltip("Whip：押すとすぐ狙った向きへ光線が出て、最長 Whip Seconds 秒出し続けられる。向きを変えると鞭のようにしなり、どこかが物資に触れたらつかむ。\nAim：今までどおり、押して溜めて長さを決め、離すとまっすぐ伸びる")]
     [SerializeField] private ShotStyle shotStyle = ShotStyle.Whip;
 
+    [Tooltip("ON：ポーズ画面の設定「撃ち方」（鞭／溜め）に合わせる。設定を変えると、次に押したときから変わる（インスペクターで変えた Shot Style は、設定を変えるまでそのまま）。\nOFF：いつもインスペクターの Shot Style。ボットは自分で OFF にする")]
+    [SerializeField] private bool followSettings = true;
+
     [Header("鞭の光線（撃ち方が Whip のとき）")]
     [Tooltip("光線を出し続けられる秒数")]
     [Min(0.1f)]
@@ -195,11 +198,60 @@ public class SweeperShooter : MonoBehaviour
     private readonly Vector3[] whipLastPoints = new Vector3[WhipSamples + 1];
     private bool whipHasLastPoints;
 
-    /// <summary>いまの撃ち方。</summary>
+    /// <summary>いまの撃ち方。オンラインのほかの人の体では、本人から届いた撃ち方が毎フレーム入る（<see cref="SweeperNetSync"/>）。</summary>
     public ShotStyle Style
     {
         get => shotStyle;
         set => shotStyle = value;
+    }
+
+    /// <summary>インスペクター（プレハブ）に入っていた撃ち方。設定に合わせるのをやめたときに戻す先。</summary>
+    private ShotStyle inspectorStyle;
+
+    /// <summary>最後に合わせた、ポーズ画面の設定「撃ち方」。設定が変わったときだけ合わせ直すために持つ。</summary>
+    private BeamShotType appliedSetting;
+
+    /// <summary>Awake が済んだか。</summary>
+    private bool awoken;
+
+    /// <summary>
+    /// ポーズ画面の設定「撃ち方」に合わせるか（2026/11/17）。ボットは false にする（OFF にした瞬間、インスペクターの撃ち方に戻る）。
+    /// </summary>
+    public bool FollowSettings
+    {
+        get => followSettings;
+        set
+        {
+            followSettings = value;
+
+            // まだ Awake の前なら、Awake で合わせる（インスペクターの撃ち方も、そこで覚える）
+            if (!awoken)
+            {
+                return;
+            }
+
+            if (value)
+            {
+                ApplySetting(true);
+            }
+            else
+            {
+                shotStyle = inspectorStyle;
+            }
+        }
+    }
+
+    /// <summary>ポーズ画面の設定「撃ち方」を Shot Style に入れる。<paramref name="force"/> が false なら、設定が変わったときだけ入れる。</summary>
+    private void ApplySetting(bool force)
+    {
+        BeamShotType setting = GameSettings.BeamShot;
+        if (!force && setting == appliedSetting)
+        {
+            return;
+        }
+
+        appliedSetting = setting;
+        shotStyle = setting == BeamShotType.Aim ? ShotStyle.Aim : ShotStyle.Whip;
     }
 
     /// <summary>鞭の光線を出している最中か（ボットは、この間ボタンを押し続ける）。</summary>
@@ -340,6 +392,13 @@ public class SweeperShooter : MonoBehaviour
         stun = GetComponent<PlayerStun>();
         input = PlayerInputSource.Get(this);
 
+        inspectorStyle = shotStyle;
+        awoken = true;
+        if (followSettings)
+        {
+            ApplySetting(true);
+        }
+
         if (inputActions == null)
         {
             Debug.LogError($"{name}: 入力の設定（InputSystem_Actions）が入っていません。", this);
@@ -403,6 +462,12 @@ public class SweeperShooter : MonoBehaviour
             case ShotPhase.Idle:
                 if (pressed && !stunned)
                 {
+                    // ポーズ画面で撃ち方が変えられていたら、ここで合わせる（撃っている途中では変えない）
+                    if (followSettings)
+                    {
+                        ApplySetting(false);
+                    }
+
                     if (shotStyle == ShotStyle.Whip)
                     {
                         BeginWhip();

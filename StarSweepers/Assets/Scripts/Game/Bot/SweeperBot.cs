@@ -256,6 +256,12 @@ public partial class SweeperBot : MonoBehaviour
         aim = GetComponent<SweeperAim>();
         navPath = new NavMeshPath();
 
+        // 撃ち方は、ホストのポーズ画面の設定ではなく、体（プレハブ）のまま（2026/11/17）
+        if (shooter != null)
+        {
+            shooter.FollowSettings = false;
+        }
+
         if (shooter == null || reel == null)
         {
             Debug.LogError($"{name}: このボットは新しい体（SweeperShooter と SweeperReel が付いた物）に付けてください。", this);

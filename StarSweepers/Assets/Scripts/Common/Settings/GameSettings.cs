@@ -42,6 +42,18 @@ public enum ThrowOperationType
 }
 
 /// <summary>
+/// **新しい体（Sweeper）の光線の撃ち方**（2026/11/17・小野田さんの変更案）。数字は保存に使うので、変えない。
+/// </summary>
+public enum BeamShotType
+{
+    /// <summary>鞭：押した瞬間に光線が出て最長1秒。向きを変えると鞭のようにしなり、どこかが物資に触れたらつかむ（<see cref="SweeperShooter"/>）。</summary>
+    Whip = 0,
+
+    /// <summary>溜め：押して溜めて長さを決め、離すとまっすぐ伸びる（今までの撃ち方）。</summary>
+    Aim = 1
+}
+
+/// <summary>
 /// **設定画面で変えられる値**を、どこからでも見られるようにしたもの。
 ///
 /// 音量・マウス感度・コントローラー操作方法・レティクル・投げ方を保存する。
@@ -53,16 +65,17 @@ public enum ThrowOperationType
 /// | **操作タイプ**（<see cref="ControllerOperation"/>） | コントローラーの移動・向き、フックの引き寄せ方 |
 /// | **レティクル**（<see cref="AimReticle"/>） | 溜めている間の狙いの見せ方（HookChargeStrip） |
 /// | **投げ方**（<see cref="ThrowOperation"/>） | 宇宙ごみ式のフックの撃ち方・投げ方（HookController・ThrowController） |
+/// | **撃ち方**（<see cref="BeamShot"/>。2026/11/17） | 新しい体の光線の撃ち方（SweeperShooter）。鞭／溜め。オンラインでは本人の選んだ撃ち方がほかの人にも配られる |
 /// | **名前・フレームレート・垂直同期・画質** | タイトル画面で変える（下のほうにまとめてある。2026/10/6） |
 ///
-/// 上の5つはポーズ画面（<see cref="PauseMenu"/>）の設定で変える（音量・マウス感度・操作タイプは、タイトル画面でも変えられる）。
+/// 上の6つはポーズ画面（<see cref="PauseMenu"/>）の設定で変える（音量・マウス感度・操作タイプは、タイトル画面でも変えられる）。
 ///
 /// **値は次に遊ぶときも残る**（`PlayerPrefs` に保存している）。
 /// 保存の名前（`StarSweepers.〜` のキー）を変えると、今までの保存が読めなくなるので変えないこと。
 ///
 /// ## 読み込みのしかた
 ///
-/// 音量〜投げ方の5つは、**最初に読まれたときに1回だけ** <c>PlayerPrefs</c> から読み、あとは手元の値を返す（<see cref="Load"/>）。
+/// 音量〜撃ち方の6つは、**最初に読まれたときに1回だけ** <c>PlayerPrefs</c> から読み、あとは手元の値を返す（<see cref="Load"/>）。
 /// 名前〜画質は、毎回 <c>PlayerPrefs</c> を直接読む。
 ///
 /// ## 足したいとき
@@ -78,6 +91,7 @@ public static class GameSettings
     private const string ControllerOperationKey = "StarSweepers.ControllerOperationType";
     private const string AimReticleKey = "StarSweepers.AimReticleType";
     private const string ThrowOperationKey = "StarSweepers.ThrowOperationType";
+    private const string BeamShotKey = "StarSweepers.BeamShotType";
 
     // 読み込んだ値の控え（Load のあとはこちらを返す）
     private static float volume = 1f;
@@ -88,6 +102,24 @@ public static class GameSettings
     private static ControllerOperationType controllerOperationType = ControllerOperationType.TypeA;
     private static AimReticleType aimReticleType = AimReticleType.TypeA;
     private static ThrowOperationType throwOperationType = ThrowOperationType.TwoButtons;
+    private static BeamShotType beamShotType = BeamShotType.Whip;
+
+    /// <summary>新しい体の光線の撃ち方。Whip（鞭）が初期値。変えたらすぐ保存する。次に押したときから効く。</summary>
+    public static BeamShotType BeamShot
+    {
+        get
+        {
+            Load();
+            return beamShotType;
+        }
+        set
+        {
+            Load();
+            beamShotType = value == BeamShotType.Aim ? BeamShotType.Aim : BeamShotType.Whip;
+            PlayerPrefs.SetInt(BeamShotKey, (int)beamShotType);
+            PlayerPrefs.Save();
+        }
+    }
 
     /// <summary>フックの投げ方。TwoButtons が今までの操作。</summary>
     public static ThrowOperationType ThrowOperation
@@ -213,6 +245,9 @@ public static class GameSettings
         throwOperationType = PlayerPrefs.GetInt(ThrowOperationKey, 0) == 1
             ? ThrowOperationType.OneButton
             : ThrowOperationType.TwoButtons;
+        beamShotType = PlayerPrefs.GetInt(BeamShotKey, 0) == 1
+            ? BeamShotType.Aim
+            : BeamShotType.Whip;
 
         AudioListener.volume = volume;
     }

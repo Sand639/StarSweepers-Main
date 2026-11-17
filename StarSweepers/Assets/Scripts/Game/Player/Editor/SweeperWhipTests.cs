@@ -44,6 +44,58 @@ public class SweeperWhipTests
         yield return new ExitPlayMode();
     }
 
+    [UnityTest]
+    public IEnumerator Setting_ChangesStyle()
+    {
+        yield return new EnterPlayMode();
+        yield return RunSetting();
+        yield return new ExitPlayMode();
+    }
+
+    /// <summary>
+    /// ポーズ画面の設定「撃ち方」が体に入ること、設定を変えると次に押したときから変わること、
+    /// 設定に合わせるのをやめる（ボット）とインスペクターの撃ち方に戻ることを確かめる。
+    /// 設定は PC に保存されるので、終わったら元に戻す。
+    /// </summary>
+    private static IEnumerator RunSetting()
+    {
+        GameObject prefab = AssetDatabase.LoadAssetAtPath<GameObject>(PlayerPrefabPath);
+        Assert.That(prefab, Is.Not.Null, "新しい体のプレハブが無い（メニューで作る）");
+
+        BeamShotType before = GameSettings.BeamShot;
+        GameObject player = null;
+        try
+        {
+            GameSettings.BeamShot = BeamShotType.Aim;
+            player = Object.Instantiate(prefab, Vector3.zero, Quaternion.identity);
+            SweeperShooter shooter = player.GetComponent<SweeperShooter>();
+            Assert.That(shooter.Style, Is.EqualTo(SweeperShooter.ShotStyle.Aim), "設定が「溜め」なのに、体が溜めになっていない");
+
+            // 押した瞬間と同じ合わせ方（設定が変わっていたら合わせる）
+            GameSettings.BeamShot = BeamShotType.Whip;
+            MethodInfo apply = typeof(SweeperShooter).GetMethod("ApplySetting", BindingFlags.Instance | BindingFlags.NonPublic);
+            apply.Invoke(shooter, new object[] { false });
+            Assert.That(shooter.Style, Is.EqualTo(SweeperShooter.ShotStyle.Whip), "設定を「鞭」にしたのに、鞭になっていない");
+
+            // ボットと同じ：設定に合わせるのをやめると、プレハブの撃ち方（Whip）に戻り、設定を変えても変わらない
+            GameSettings.BeamShot = BeamShotType.Aim;
+            shooter.FollowSettings = false;
+            Assert.That(shooter.Style, Is.EqualTo(SweeperShooter.ShotStyle.Whip), "設定に合わせるのをやめたのに、プレハブの撃ち方に戻っていない");
+            yield return NextFrame();
+            Assert.That(shooter.Style, Is.EqualTo(SweeperShooter.ShotStyle.Whip));
+        }
+        finally
+        {
+            GameSettings.BeamShot = before;
+            if (player != null)
+            {
+                Object.Destroy(player);
+            }
+        }
+
+        yield return null;
+    }
+
     /// <summary>中身。再生を始めてから呼ぶ別の関数にしてある（SweeperBendTests と同じ理由）。</summary>
     private static IEnumerator Run(Vector3 boxPosition, bool swing, bool expectGrab)
     {
