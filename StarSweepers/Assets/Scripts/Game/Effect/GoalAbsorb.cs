@@ -4,9 +4,9 @@ using UnityEngine;
 
 /// <summary>
 /// ゴールの渦に吸い込まれている物資1つ分（吸い込みが始まったときに付き、終わったら外れる）。
-/// 説明は Documents/スクリプトの説明/Game/Effect/SpaceJunkGoalVortex.md
+/// 説明は Documents/スクリプトの説明/Game/Effect/GoalEffect.md
 /// </summary>
-public class SpaceJunkVortexAbsorb : MonoBehaviour
+public class GoalAbsorb : MonoBehaviour
 {
     /// <summary>参加者のPCで、吸い込み終わってもホストから消されなかったときに元へ戻すまでの秒数。</summary>
     private const float ClientRestoreSeconds = 3f;
@@ -15,7 +15,7 @@ public class SpaceJunkVortexAbsorb : MonoBehaviour
     private NetworkManager manager;
     private bool authority;
     private Vector3 center;
-    private SpaceJunkGoalVortex.Area area;
+    private GoalEffect.Area area;
     private float startTime;
     private float seconds;
     private Vector3 startScale;
@@ -24,26 +24,48 @@ public class SpaceJunkVortexAbsorb : MonoBehaviour
     private float startAngle;
     private float startY;
     private Action<HookableObject> onFinished;
-    private SpaceJunkGoalVortex settings;
+    private GoalEffect settings;
     private bool finished;
     private float finishedAt;
+    private bool pillar;
+    private Vector3 startPosition;
+    private float itemSize = 0.6f;
+
+    /// <summary>いま吸い込み中の物資（光の柱が、消える前の光を描くのに使う）。</summary>
+    public static readonly System.Collections.Generic.List<GoalAbsorb> All = new System.Collections.Generic.List<GoalAbsorb>();
 
     /// <summary>吸い込みの進み具合（0〜1）。</summary>
     public float Progress { get; private set; }
+
+    /// <summary>光の柱の動きか（始まったときの見た目の種類で決まる）。</summary>
+    public bool IsPillar => pillar;
+
+    /// <summary>物資の見た目のおおよその大きさ（m）。消える瞬間の光の大きさに使う。</summary>
+    public float ItemSize => itemSize;
+
+    private void OnEnable()
+    {
+        All.Add(this);
+    }
+
+    private void OnDisable()
+    {
+        All.Remove(this);
+    }
 
     /// <summary>
     /// 物資の吸い込みを始める。位置を動かすのはホスト（1人用ならそのPC）だけで、参加者のPCは小さくするだけ
     /// （位置と回転はホストから NetworkTransform で届く）。startTime は <see cref="ClockOf"/> の時刻。
     /// </summary>
-    public static SpaceJunkVortexAbsorb Begin(HookableObject item, SpaceJunkGoalVortex.Area area, float startTime, float seconds,
+    public static GoalAbsorb Begin(HookableObject item, GoalEffect.Area area, float startTime, float seconds,
         Action<HookableObject> onFinished)
     {
-        if (item == null || item.GetComponent<SpaceJunkVortexAbsorb>() != null)
+        if (item == null || item.GetComponent<GoalAbsorb>() != null)
         {
             return null;
         }
 
-        SpaceJunkVortexAbsorb absorb = item.gameObject.AddComponent<SpaceJunkVortexAbsorb>();
+        GoalAbsorb absorb = item.gameObject.AddComponent<GoalAbsorb>();
         absorb.Setup(item, area, startTime, seconds, onFinished);
         return absorb;
     }
@@ -61,7 +83,7 @@ public class SpaceJunkVortexAbsorb : MonoBehaviour
         return network != null && network.IsSpawned ? network.NetworkManager : null;
     }
 
-    private void Setup(HookableObject target, SpaceJunkGoalVortex.Area vortexArea, float start, float duration, Action<HookableObject> finishedCallback)
+    private void Setup(HookableObject target, GoalEffect.Area vortexArea, float start, float duration, Action<HookableObject> finishedCallback)
     {
         item = target;
         manager = ManagerOf(target);
@@ -71,7 +93,7 @@ public class SpaceJunkVortexAbsorb : MonoBehaviour
         startTime = start;
         seconds = Mathf.Max(0.05f, duration);
         onFinished = finishedCallback;
-        settings = SpaceJunkGoalVortex.In(gameObject.scene);
+        settings = GoalEffect.In(gameObject.scene);
         startScale = transform.localScale;
         startRotation = transform.rotation;
 
@@ -79,6 +101,15 @@ public class SpaceJunkVortexAbsorb : MonoBehaviour
         startRadius = new Vector2(offset.x, offset.z).magnitude;
         startAngle = Mathf.Atan2(offset.z, offset.x);
         startY = transform.position.y;
+        startPosition = transform.position;
+        // 参加者のPCには円柱の大きさが届かない（位置はホストが動かす）ので、見た目の種類だけで決める
+        pillar = settings != null && settings.Style == GoalEffectStyle.Pillar;
+
+        Renderer look = GetComponentInChildren<Renderer>();
+        if (look != null)
+        {
+            itemSize = Mathf.Max(0.2f, look.bounds.size.magnitude);
+        }
 
         item.SetAbsorbing(true);
 
@@ -141,6 +172,10 @@ public class SpaceJunkVortexAbsorb : MonoBehaviour
         {
             finished = true;
             finishedAt = Time.time;
+            if (pillar && settings != null)
+            {
+                settings.PlayFlash(transform.position, itemSize);
+            }
         }
         else if (!item.IsAbsorbing)
         {
@@ -153,10 +188,21 @@ public class SpaceJunkVortexAbsorb : MonoBehaviour
         }
     }
 
-    /// <summary>進み具合 t の姿にする（小さくする・回す・中心へ寄せる）。</summary>
+    /// <summary>進み具合 t の姿にする（渦：小さくしながら回して中心へ／光の柱：真ん中の上へ運んで、ゆっくり上げる）。</summary>
     private void Apply(float t)
     {
         Progress = t;
+
+        if (pillar)
+        {
+            // 光の柱：大きさはそのまま。位置はホストだけが動かす
+            if (authority && area.Radius > 0f)
+            {
+                ApplyPillar(t);
+            }
+            return;
+        }
+
         float endScale = settings != null ? settings.EndScale : 0.05f;
         float shrink = Mathf.Lerp(1f, endScale, Mathf.Pow(t, 1.6f));
         transform.localScale = startScale * shrink;
@@ -170,7 +216,7 @@ public class SpaceJunkVortexAbsorb : MonoBehaviour
         float selfSpin = settings != null ? settings.SelfSpinDegrees : 540f;
         float sink = settings != null ? settings.SinkDepth : 0.4f;
 
-        // 中心へ寄りながら、だんだん速く回る（渦の見た目と同じ、上から見て左回り）
+        // 渦：中心へ寄りながら、だんだん速く回る（渦の見た目と同じ、上から見て左回り）
         float inward = t * t * (3f - 2f * t);
         float radius = startRadius * (1f - inward);
         float angle = startAngle + turns * Mathf.PI * 2f * t * t;
@@ -181,6 +227,31 @@ public class SpaceJunkVortexAbsorb : MonoBehaviour
 
         transform.position = new Vector3(center.x + Mathf.Cos(angle) * radius, y, center.z + Mathf.Sin(angle) * radius);
         transform.rotation = Quaternion.AngleAxis(-selfSpin * t * t, Vector3.up) * startRotation;
+    }
+
+    /// <summary>
+    /// 光の柱の動き。前半（Pillar Move Seconds）で、真ん中の上（光の柱の一番上あたり）へ一直線に運ぶ。
+    /// 後半（Pillar Rise Seconds）で、そこからゆっくり上げる。最後に光って消える（光は <see cref="GoalEffect.PlayFlash"/>）。
+    /// </summary>
+    private void ApplyPillar(float t)
+    {
+        float move = settings.PillarMoveSeconds;
+        float total = Mathf.Max(0.05f, move + settings.PillarRiseSeconds);
+        float elapsed = t * total;
+        Vector3 top = new Vector3(center.x, settings.PillarTopY(area), center.z);
+
+        if (elapsed < move)
+        {
+            float k = Mathf.Clamp01(elapsed / Mathf.Max(0.01f, move));
+            float ease = 1f - (1f - k) * (1f - k);
+            transform.position = Vector3.Lerp(startPosition, top, ease);
+            return;
+        }
+
+        float r = Mathf.Clamp01((elapsed - move) / Mathf.Max(0.01f, total - move));
+        float riseEase = r * r * (3f - 2f * r);
+        transform.position = top + Vector3.up * (settings.PillarRiseDistance * riseEase);
+        transform.rotation = Quaternion.AngleAxis(-90f * r, Vector3.up) * startRotation;
     }
 
     /// <summary>ホスト：吸い込み終わり。大きさを戻してから知らせる（知らせた先ですぐ消すので、戻した姿は見えない）。</summary>
@@ -194,6 +265,11 @@ public class SpaceJunkVortexAbsorb : MonoBehaviour
         finished = true;
         item.SetAbsorbing(false);
         transform.localScale = startScale;
+
+        if (pillar && settings != null && !item.IsVanished)
+        {
+            settings.PlayFlash(transform.position, itemSize);
+        }
 
         // 吸い込み中に、ほかの理由（爆発など）で消されていたら、何もしない（得点にしない）
         if (!item.IsVanished)

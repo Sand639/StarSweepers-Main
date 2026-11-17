@@ -4,15 +4,17 @@ using UnityEditor.SceneManagement;
 using UnityEngine;
 
 /// <summary>
-/// ゴールの渦（<see cref="SpaceJunkGoalVortex"/>）の検証シーンを作り、全ステージとロビーに入れるメニュー（エディタ専用）。
-/// 説明は Documents/スクリプトの説明/Game/Effect/SpaceJunkGoalVortex.md
+/// ゴールの演出（<see cref="GoalEffect"/>。渦と光の柱）の検証シーンを作り、全ステージとロビーに入れるメニュー（エディタ専用）。
+/// 説明は Documents/スクリプトの説明/Game/Effect/GoalEffect.md
 /// </summary>
-public static class SpaceJunkGoalVortexSetup
+public static class GoalEffectSetup
 {
     private const string ShaderName = "StarSweepers/GoalVortex";
     private const string MaterialPath = "Assets/Art/Materials/GoalVortex.mat";
-    private const string PrefabPath = "Assets/Prefabs/Effect/SpaceJunkGoalVortex.prefab";
-    private const string ScenePath = "Assets/Scenes/Test/GoalVortexTest.unity";
+    private const string PillarShaderName = "StarSweepers/GoalPillar";
+    private const string PillarMaterialPath = "Assets/Art/Materials/GoalPillar.mat";
+    private const string PrefabPath = "Assets/Prefabs/Effect/GoalEffect.prefab";
+    private const string ScenePath = "Assets/Scenes/Test/GoalEffectTest.unity";
 
     /// <summary>得点が入ったときの光る演出（検証シーンにも置く）。</summary>
     private const string ScoreEffectPrefabPath = "Assets/Prefabs/Effect/SpaceJunkGoalScoreEffect.prefab";
@@ -26,8 +28,8 @@ public static class SpaceJunkGoalVortexSetup
     /// <summary>ロビー（練習用ゴールがある）。</summary>
     private const string LobbyScenePath = "Assets/Scenes/MainLoop/Lobby.unity";
 
-    /// <summary>床のゴールと輸送機のゴールを並べ、上から物資を落として渦に吸い込ませる検証シーンを作る。</summary>
-    [MenuItem("Tools/StarSweepers/ゴールの渦の検証シーンを作る")]
+    /// <summary>床のゴールと輸送機のゴールを並べ、上から物資を落として吸い込ませる検証シーンを作る（渦と光の柱が一定の秒数ごとに入れ替わる）。</summary>
+    [MenuItem("Tools/StarSweepers/ゴールの演出の検証シーンを作る")]
     public static void CreateTestScene()
     {
         GameObject prefab = EnsurePrefab();
@@ -84,11 +86,11 @@ public static class SpaceJunkGoalVortexSetup
         }
         else
         {
-            Debug.LogWarning($"[VORTEX] 輸送機のモデルが見つかりません: {TransporterModelPath}（床のゴールだけで作ります）");
+            Debug.LogWarning($"[GOALEFFECT] 輸送機のモデルが見つかりません: {TransporterModelPath}（床のゴールだけで作ります）");
         }
 
         var vortex = (GameObject)PrefabUtility.InstantiatePrefab(prefab, scene);
-        vortex.name = "SpaceJunkGoalVortex";
+        vortex.name = "GoalEffect";
 
         var scoreEffect = AssetDatabase.LoadAssetAtPath<GameObject>(ScoreEffectPrefabPath);
         if (scoreEffect != null)
@@ -97,7 +99,7 @@ public static class SpaceJunkGoalVortexSetup
         }
 
         var driverObject = new GameObject("TestDriver");
-        var driver = driverObject.AddComponent<SpaceJunkGoalVortexTestDriver>();
+        var driver = driverObject.AddComponent<GoalEffectTestDriver>();
         var so = new SerializedObject(driver);
         SerializedProperty goals = so.FindProperty("goals");
         goals.arraySize = 2;
@@ -107,7 +109,7 @@ public static class SpaceJunkGoalVortexSetup
 
         EditorSceneManager.SaveScene(scene, ScenePath);
         AssetDatabase.SaveAssets();
-        Debug.Log($"[VORTEX] ゴールの渦の検証シーンを作りました: {ScenePath}（再生すると、左右のゴールに物資が落ちて渦に吸い込まれます）");
+        Debug.Log($"[GOALEFFECT] ゴールの演出の検証シーンを作りました: {ScenePath}（再生すると、左右のゴールに物資が落ちて吸い込まれます。渦と光の柱が入れ替わります）");
     }
 
     /// <summary>判定の箱（トリガー）・通信の部品・ゴールの部品が付いた、ゴールの入れ物を作る。</summary>
@@ -136,65 +138,103 @@ public static class SpaceJunkGoalVortexSetup
         so.ApplyModifiedPropertiesWithoutUndo();
     }
 
-    /// <summary>進行役のプレハブの子と、ロビーのシーンに渦を入れる（入っていれば何もしない）。</summary>
-    [MenuItem("Tools/StarSweepers/ゴールの渦を全ステージとロビーに入れる")]
+    /// <summary>進行役のプレハブの子と、ロビーのシーンにゴールの演出を入れる（入っていれば何もしない）。</summary>
+    [MenuItem("Tools/StarSweepers/ゴールの演出を全ステージとロビーに入れる")]
     public static void InstallEverywhere()
     {
         GameObject prefab = EnsurePrefab();
         if (prefab == null) return;
 
         GameObject round = PrefabUtility.LoadPrefabContents(RoundPrefabPath);
-        if (round.GetComponentInChildren<SpaceJunkGoalVortex>(true) == null)
+        if (round.GetComponentInChildren<GoalEffect>(true) == null)
         {
             var child = (GameObject)PrefabUtility.InstantiatePrefab(prefab, round.transform);
-            child.name = "SpaceJunkGoalVortex";
+            child.name = "GoalEffect";
             PrefabUtility.SaveAsPrefabAsset(round, RoundPrefabPath);
-            Debug.Log($"[VORTEX] 進行役のプレハブに入れました（全ステージに入ります）: {RoundPrefabPath}");
+            Debug.Log($"[GOALEFFECT] 進行役のプレハブに入れました（全ステージに入ります）: {RoundPrefabPath}");
         }
         else
         {
-            Debug.Log($"[VORTEX] 進行役のプレハブには、すでに入っています: {RoundPrefabPath}");
+            Debug.Log($"[GOALEFFECT] 進行役のプレハブには、すでに入っています: {RoundPrefabPath}");
         }
         PrefabUtility.UnloadPrefabContents(round);
 
         var lobby = EditorSceneManager.OpenScene(LobbyScenePath, OpenSceneMode.Single);
-        if (Object.FindObjectsByType<SpaceJunkGoalVortex>(FindObjectsInactive.Include, FindObjectsSortMode.None).Length == 0)
+        if (Object.FindObjectsByType<GoalEffect>(FindObjectsInactive.Include, FindObjectsSortMode.None).Length == 0)
         {
             var instance = (GameObject)PrefabUtility.InstantiatePrefab(prefab, lobby);
-            instance.name = "SpaceJunkGoalVortex";
+            instance.name = "GoalEffect";
             EditorSceneManager.SaveScene(lobby);
-            Debug.Log($"[VORTEX] ロビーに入れました: {LobbyScenePath}");
+            Debug.Log($"[GOALEFFECT] ロビーに入れました: {LobbyScenePath}");
         }
         else
         {
-            Debug.Log($"[VORTEX] ロビーには、すでに入っています: {LobbyScenePath}");
+            Debug.Log($"[GOALEFFECT] ロビーには、すでに入っています: {LobbyScenePath}");
         }
 
         AssetDatabase.SaveAssets();
     }
 
-    /// <summary>渦のプレハブを読み込む。無ければ作る（あれば作り直さない）。</summary>
+    /// <summary>ゴールの演出のプレハブを読み込む。無ければ作る（あれば作り直さない）。光の柱のマテリアルが入っていなければ入れる。</summary>
     private static GameObject EnsurePrefab()
     {
         GameObject prefab = AssetDatabase.LoadAssetAtPath<GameObject>(PrefabPath);
-        if (prefab != null)
+        if (prefab == null)
         {
-            return prefab;
+            Material material = EnsureMaterial();
+            if (material == null) return null;
+
+            var root = new GameObject("GoalEffect");
+            var effect = root.AddComponent<GoalEffect>();
+            var so = new SerializedObject(effect);
+            so.FindProperty("vortexMaterial").objectReferenceValue = material;
+            so.ApplyModifiedPropertiesWithoutUndo();
+
+            prefab = PrefabUtility.SaveAsPrefabAsset(root, PrefabPath);
+            Object.DestroyImmediate(root);
+            Debug.Log($"[GOALEFFECT] ゴールの演出のプレハブを作りました: {PrefabPath}");
         }
 
-        Material material = EnsureMaterial();
-        if (material == null) return null;
-
-        var root = new GameObject("SpaceJunkGoalVortex");
-        var vortex = root.AddComponent<SpaceJunkGoalVortex>();
-        var so = new SerializedObject(vortex);
-        so.FindProperty("vortexMaterial").objectReferenceValue = material;
-        so.ApplyModifiedPropertiesWithoutUndo();
-
-        prefab = PrefabUtility.SaveAsPrefabAsset(root, PrefabPath);
-        Object.DestroyImmediate(root);
-        Debug.Log($"[VORTEX] 渦のプレハブを作りました: {PrefabPath}");
+        GoalEffect prefabEffect = prefab.GetComponent<GoalEffect>();
+        var check = new SerializedObject(prefabEffect);
+        if (check.FindProperty("pillarMaterial").objectReferenceValue == null)
+        {
+            Material pillar = EnsurePillarMaterial();
+            if (pillar != null)
+            {
+                GameObject contents = PrefabUtility.LoadPrefabContents(PrefabPath);
+                var so = new SerializedObject(contents.GetComponent<GoalEffect>());
+                so.FindProperty("pillarMaterial").objectReferenceValue = pillar;
+                so.ApplyModifiedPropertiesWithoutUndo();
+                PrefabUtility.SaveAsPrefabAsset(contents, PrefabPath);
+                PrefabUtility.UnloadPrefabContents(contents);
+                prefab = AssetDatabase.LoadAssetAtPath<GameObject>(PrefabPath);
+                Debug.Log($"[GOALEFFECT] プレハブに光の柱のマテリアルを入れました: {PrefabPath}");
+            }
+        }
         return prefab;
+    }
+
+    /// <summary>光の柱のマテリアルを読み込む。無ければシェーダーから作る（あれば作り直さないので、調整した値は残る）。</summary>
+    private static Material EnsurePillarMaterial()
+    {
+        Material material = AssetDatabase.LoadAssetAtPath<Material>(PillarMaterialPath);
+        if (material != null)
+        {
+            return material;
+        }
+
+        Shader shader = Shader.Find(PillarShaderName);
+        if (shader == null)
+        {
+            Debug.LogError($"[GOALEFFECT] シェーダー {PillarShaderName}（Assets/Art/Shaders/GoalPillar.shader）が見つかりません。");
+            return null;
+        }
+
+        material = new Material(shader) { name = "GoalPillar" };
+        AssetDatabase.CreateAsset(material, PillarMaterialPath);
+        Debug.Log($"[GOALEFFECT] 光の柱のマテリアルを作りました: {PillarMaterialPath}");
+        return material;
     }
 
     /// <summary>渦のマテリアルを読み込む。無ければシェーダーから作る（あれば作り直さないので、調整した値は残る）。</summary>
@@ -209,13 +249,13 @@ public static class SpaceJunkGoalVortexSetup
         Shader shader = Shader.Find(ShaderName);
         if (shader == null)
         {
-            Debug.LogError($"[VORTEX] シェーダー {ShaderName}（Assets/Art/Shaders/GoalVortex.shader）が見つかりません。");
+            Debug.LogError($"[GOALEFFECT] シェーダー {ShaderName}（Assets/Art/Shaders/GoalVortex.shader）が見つかりません。");
             return null;
         }
 
         material = new Material(shader) { name = "GoalVortex" };
         AssetDatabase.CreateAsset(material, MaterialPath);
-        Debug.Log($"[VORTEX] 渦のマテリアルを作りました: {MaterialPath}");
+        Debug.Log($"[GOALEFFECT] 渦のマテリアルを作りました: {MaterialPath}");
         return material;
     }
 }

@@ -11,7 +11,7 @@ GameObject:
   - component: {fileID: 4666698540813950930}
   - component: {fileID: 5215965983636659680}
   m_Layer: 0
-  m_Name: SpaceJunkGoalVortex
+  m_Name: GoalEffect
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -44,11 +44,34 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 0ebd38253e3d00844b739a9b0c5fd594, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::SpaceJunkGoalVortex
+  style: 0
   vortexMaterial: {fileID: 2100000, guid: ae3259414a0a2a9468f40b02d777899f, type: 2}
   fill: 0.9
   lift: 0.03
   appearSeconds: 0.6
   brightness: 1
+  useTeamColor: 0
+  neutralColor: {r: 0.78, g: 0.78, b: 0.8, a: 1}
+  showFloorVortex: 0
+  funnelHeight: 1.6
+  funnelBottom: 0.3
+  funnelCurve: 1.8
+  ribbonCount: 6
+  ribbonTurns: 1.3
+  ribbonWidth: 0.13
+  debrisCount: 14
+  pillarMaterial: {fileID: 2100000, guid: ba5c2083ac198854ebcb3feaf7747f97, type: 2}
+  pillarHeight: 1.5
+  pillarUseTeamColor: 1
+  pillarColor: {r: 0.35, g: 1, b: 0.55, a: 1}
+  pillarBrightness: 0.8
+  streakCount: 14
+  sparkleCount: 22
+  pillarMoveSeconds: 0.4
+  pillarRiseSeconds: 0.8
+  pillarRiseDistance: 1.2
+  pillarGlowSeconds: 0.35
+  pillarFlashSeconds: 0.3
   absorbSeconds: 1
   spinTurns: 1.25
   selfSpinDegrees: 540

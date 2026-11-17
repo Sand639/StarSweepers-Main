@@ -1,26 +1,33 @@
-# SpaceJunkGoalVortex・SpaceJunkVortexAbsorb（ゴールの渦）
+# GoalEffect・GoalAbsorb（ゴールの渦と光の柱）
 
 | 項目 | 内容 |
 | --- | --- |
-| スクリプト | `StarSweepers/Assets/Scripts/Game/Effect/SpaceJunkGoalVortex.cs`（渦の係）・`SpaceJunkVortexAbsorb.cs`（吸い込まれる係）・`SpaceJunkGoalVortexTestDriver.cs`（検証シーン専用） |
-| 付いている場所 | 渦の係はプレハブ `Prefabs/Effect/SpaceJunkGoalVortex.prefab`。それを**進行役のプレハブ `Prefabs/System/SpaceJunkRound.prefab` の子**と、**ロビー `Scenes/MainLoop/Lobby.unity`** に置いてある。検証シーン `Scenes/Test/GoalVortexTest.unity` にも1つ。吸い込まれる係は、吸い込みが始まった物資に**再生中に付き、終わったら外れる**（どこにも置かない） |
+| スクリプト | `StarSweepers/Assets/Scripts/Game/Effect/GoalEffect.cs`（渦の係）・`GoalAbsorb.cs`（吸い込まれる係）・`GoalEffectTestDriver.cs`（検証シーン専用） |
+| 付いている場所 | 渦の係はプレハブ `Prefabs/Effect/GoalEffect.prefab`。それを**進行役のプレハブ `Prefabs/System/SpaceJunkRound.prefab` の子**と、**ロビー `Scenes/MainLoop/Lobby.unity`** に置いてある。検証シーン `Scenes/Test/GoalEffectTest.unity` にも1つ。吸い込まれる係は、吸い込みが始まった物資に**再生中に付き、終わったら外れる**（どこにも置かない） |
 | 見た目 | シェーダー `Art/Shaders/GoalVortex.shader`・マテリアル `Art/Materials/GoalVortex.mat` |
-| 一緒に使うスクリプト | `SpaceJunkGoal.cs`・`SpaceJunkLobbyGoal.cs`（ゴール。物資を渦に渡す）、`HookableObject.cs`（吸い込み中の印 `IsAbsorbing`）、`FishingNetSupply.cs`（参加者への知らせ `BeginAbsorbClientRpc`）、`SpaceJunkGoalScoreEffect.cs`（床の四角の測り方 `TryGetGoalArea` を借りる）、`Game/Match/Editor/SpaceJunkGoalVortexSetup.cs`（メニュー）、`SpaceJunkGoalVortexTests.cs`（自動テスト） |
-| 関係するドキュメント | `機能ドキュメント/ゴールの渦.md` |
+| 一緒に使うスクリプト | `SpaceJunkGoal.cs`・`SpaceJunkLobbyGoal.cs`（ゴール。物資を渦に渡す）、`HookableObject.cs`（吸い込み中の印 `IsAbsorbing`）、`FishingNetSupply.cs`（参加者への知らせ `BeginAbsorbClientRpc`）、`SpaceJunkGoalScoreEffect.cs`（床の四角の測り方 `TryGetGoalArea` を借りる）、`Game/Match/Editor/GoalEffectSetup.cs`（メニュー）、`GoalEffectTests.cs`（自動テスト） |
+| 関係するドキュメント | `機能ドキュメント/ゴールの渦と光の柱.md` |
 
 ## 何をするスクリプトか
 
-- **渦の係（`SpaceJunkGoalVortex`）**：同じシーンの全部のゴール（試合のゴール `SpaceJunkGoal` と、ロビーの練習用ゴール `SpaceJunkLobbyGoal`）の床に黒い渦を、その上に半透明のすり鉢（立体の渦）・らせんの帯・黒いかけらを描く（どれも黒と灰色。Use Team Color がオンなら明るい所がチームの色）。ホストからは、ゴールの中の物資について「渦の円柱に入っていれば吸い込みを始める／外なら渦のほうへ引き寄せる」を受け持つ。
-- **吸い込まれる係（`SpaceJunkVortexAbsorb`）**：吸い込み中の物資1つの動き。ホスト（1人用ならそのPC）は位置・回転・大きさを、参加者のPCは大きさだけを動かす。時間が来たら、ホストがゴールに知らせる（ゴールが点を数えて物資を消す）。
+> 2026/11/17 に名前を変えた（旧：`SpaceJunkGoalVortex`・`SpaceJunkVortexAbsorb`・`SpaceJunkGoalVortexTestDriver`・`SpaceJunkGoalVortexSetup`・`SpaceJunkGoalVortexTests`）。.meta の番号は同じなので、プレハブ・シーンの参照は前のまま。
+
+- **見た目の種類（`GoalEffectStyle`）**：`style` のプルダウンで **渦（Vortex）** と **光の柱（Pillar）** を選ぶ。`DrawAt` は種類によって `DrawVortices`（渦）か `DrawPillars`（光の柱）を呼ぶ。判定の円柱・引き寄せ・吸い込みの始まりと終わり・得点の流れ（`ServerFeed`）は共通。
+- **光の柱（`DrawPillars`）**：床の光（円の板。筒の 1.35 倍まで）・筒（`CreateCylinderMesh`。半径 1・高さ 1 の筒を、渦の半径×高さ×渦の半径にする）・光の筋・きらめき（`CreateBillboardMesh`。カメラのほうを向く板。足もとは筒の中の床で、高さと動きはシェーダーが決める）を `GoalPillar.shader` の `_Part` 0〜3 で描く。色は `pillarUseTeamColor` ならチームの色、そうでなければ `pillarColor`。`_Funnel` に（半径, 高さ）を渡す。
+- **光の柱のときの物資の動き（`GoalAbsorb.ApplyPillar`）**：吸い込みの長さは `CurrentAbsorbSeconds`＝Pillar Move Seconds＋Pillar Rise Seconds（ホストが参加者へ送る秒数もこれ）。前半は、始めの位置から「真ん中の上（`PillarTopY`＝床＋光の柱の高さ）」へ一直線に運ぶ（だんだん遅く）。後半は、そこから Pillar Rise Distance だけゆっくり上げる（smoothstep）。**大きさは変えない**（当たり判定は渦と同じく、始まったときに切る）。位置はホストだけが動かす。どのPCでも、そのPCの吸い込みが終わったときに `GoalEffect.PlayFlash` で消えた瞬間の光を出す（ホストは `Finish`、参加者は進み具合が 1 になったとき）。光の柱かどうかは、吸い込みが始まったときの見た目の種類で決める（`IsPillar`）。
+- **消える光（`DrawFlashes`）**：見た目の種類にかかわらず毎回描く。吸い込み中の物資（`GoalAbsorb.All`）のうち光の柱の物は、残りが Pillar Glow Seconds より短くなったら、物資の位置にやわらかい光の玉（`_Flash.x`＝0）。`PlayFlash` で足した光は、Pillar Flash Seconds の間、白っぽい芯・十字・広がる輪（`_Flash.x`＝1）。色は、いちばん近いゴールの光の柱の色（`ColorNear`）。`GoalPillar.shader` の `_Part`＝4 で、カメラのほうを向く板（`CreateFlashMesh`）に描く。
+
+- **渦の係（`GoalEffect`）**：同じシーンの全部のゴール（試合のゴール `SpaceJunkGoal` と、ロビーの練習用ゴール `SpaceJunkLobbyGoal`）の床に黒い渦を、その上に半透明のすり鉢（立体の渦）・らせんの帯・黒いかけらを描く（どれも黒と灰色。Use Team Color がオンなら明るい所がチームの色）。ホストからは、ゴールの中の物資について「渦の円柱に入っていれば吸い込みを始める／外なら渦のほうへ引き寄せる」を受け持つ。
+- **吸い込まれる係（`GoalAbsorb`）**：吸い込み中の物資1つの動き。ホスト（1人用ならそのPC）は位置・回転・大きさを、参加者のPCは大きさだけを動かす。時間が来たら、ホストがゴールに知らせる（ゴールが点を数えて物資を消す）。
 
 ## 流れ
 
 | いつ | 何をするか |
 | --- | --- |
-| ホストで、物資がゴールの判定の中にいる間（`OnTriggerStay`） | ゴールの `TryCollect` → `SpaceJunkGoalVortex.In(シーン).ServerFeed(ゴール, 物資, Collect)`。渦がシーンに無ければ、その場で `Collect`（入った瞬間に数えて消す） |
-| `ServerFeed` | 消えた・吸い込み中・引っ掛けられている物、持ち主がまだホストに戻っていない物（`FishingNetSupply.IsOwner` が false）は何もしない。`TryGetArea` で円柱を求め、物資の重心が中なら吸い込みを始める（`SpaceJunkVortexAbsorb.Begin` → `FishingNetSupply.ServerBeginAbsorb`。`AbsorbCount` を1増やす）。外なら `Pull` |
+| ホストで、物資がゴールの判定の中にいる間（`OnTriggerStay`） | ゴールの `TryCollect` → `GoalEffect.In(シーン).ServerFeed(ゴール, 物資, Collect)`。渦がシーンに無ければ、その場で `Collect`（入った瞬間に数えて消す） |
+| `ServerFeed` | 消えた・吸い込み中・引っ掛けられている物、持ち主がまだホストに戻っていない物（`FishingNetSupply.IsOwner` が false）は何もしない。`TryGetArea` で円柱を求め、物資の重心が中なら吸い込みを始める（`GoalAbsorb.Begin` → `FishingNetSupply.ServerBeginAbsorb`。`AbsorbCount` を1増やす）。外なら `Pull` |
 | `Pull` | 渦の真ん中への水平の向きに、Pull Acceleration の加速度を加える。物資は当たり判定が複数あると1回の物理の更新で何度も呼ばれるので、`Time.fixedTime` で1回だけにする |
-| `SpaceJunkVortexAbsorb.Begin`（ホスト） | 物資に係を付け、`HookableObject.SetAbsorbing(true)`、当たり判定を全部切り、物理を止める（Kinematic）。始めの位置を、渦の真ん中からの半径・角度・高さで覚える |
+| `GoalAbsorb.Begin`（ホスト） | 物資に係を付け、`HookableObject.SetAbsorbing(true)`、当たり判定を全部切り、物理を止める（Kinematic）。始めの位置を、渦の真ん中からの半径・角度・高さで覚える |
 | `BeginAbsorbClientRpc`（参加者のPC） | 同じく係を付ける（位置は動かさないので、真ん中の位置は渡さない）。印を付け、当たり判定を切る |
 | 係の `Update` | 進み具合 t＝（いまの時計 − 始めの時刻）÷ Absorb Seconds。大きさは `Lerp(1, End Scale, t^1.6)` 倍。ホストは半径を `1 − smoothstep(t)` 倍に縮め、角度を `Spin Turns × 2π × t²` 進め（上から見て左回り）、高さを「いまの半径でのすり鉢の面の高さ＋0.2m（`FunnelSurfaceY`）」と「始めの高さ」の低いほうへ寄せてから、最後に Sink Depth だけ沈める（すり鉢の面に沿って下りて見える）。自分の回転は `−Self Spin Degrees × t²`（上から見て左回り） |
 | t が 1 になった（ホスト） | 印を外し、大きさを元に戻してから、ゴールの `Collect`（`Absorbed` も出す）。`Collect` → `SpaceJunkRound.ServerCollect` → 数えたら `FlashClientRpc`（得点の光る演出）→ `HookableObject.Vanish`（全員の画面から消える）。戻した大きさは、同じフレームで見えなくなる |
@@ -28,7 +35,7 @@
 | 吸い込み中に、ほかの理由で `Vanish` された（爆発など） | `Vanish` が印を外すので、係はそれに気づいて大きさを戻して外れる。**得点にはしない** |
 | 渦の係の `Update` → `DrawAt(Time.time)` | ゴールごとに「出ている量」（0〜1）を Appear Seconds で増減し、円の板（`_Part`＝0。**Show Floor Vortex がオンのときだけ**。2026/11/17 からオフ）と、すり鉢（`_Part`＝1。高さは Funnel Height×出ている量）・らせんの帯（`_Part`＝2。すり鉢と同じ大きさ）・かけら（`_Part`＝3。大きさはそのまま m で、位置はシェーダーが決める）を `Graphics.RenderMesh` で描く。すり鉢から先は `_Funnel`（底の割合・曲がり具合・渦の半径・高さ）も渡す。閉ざされたゴールには描かない。試合のゴールは、見た目（`IntroVisual`）の MeshRenderer が全部切られている間（始まりの演出でゴールが飛んでいる間）は出ている量を 0 へ |
 
-### 時計（`SpaceJunkVortexAbsorb.ClockOf`）
+### 時計（`GoalAbsorb.ClockOf`）
 
 物資がオンラインで出ていれば、その物資の `NetworkManager.ServerTime`（全員で合わせたホストの時計）。そうでなければ `Time.time`。
 ホストは吸い込みを始めた時刻をこの時計で決めて参加者へ送り、参加者も同じ時計で進み具合を求めるので、小さくなる速さがそろう。
@@ -75,25 +82,30 @@
 
 | 変数 | ファイル | 意味 |
 | --- | --- | --- |
-| `vortexMaterial`・`fill`・`lift`・`appearSeconds`・`brightness` | `SpaceJunkGoalVortex.cs` | 見た目（インスペクター） |
-| `funnelHeight`・`funnelBottom`・`funnelCurve` | `SpaceJunkGoalVortex.cs` | すり鉢の形（インスペクター）。`funnelMesh`・`funnelMeshShape` は作った形と、そのときの値 |
-| `useTeamColor`・`neutralColor` | `SpaceJunkGoalVortex.cs` | 明るい所の色（チームの色か、灰色か） |
-| `showFloorVortex` | `SpaceJunkGoalVortex.cs` | 床の平らな渦巻き模様を描くか（見た目だけ。判定の円柱には関係ない） |
-| `ribbonCount`・`ribbonTurns`・`ribbonWidth`・`debrisCount` | `SpaceJunkGoalVortex.cs` | らせんの帯とかけら（インスペクター）。`ribbonMesh`・`debrisMesh` は作った形 |
-| `absorbSeconds`・`spinTurns`・`selfSpinDegrees`・`endScale`・`sinkDepth` | `SpaceJunkGoalVortex.cs` | 吸い込みの動き（インスペクター。吸い込まれる係が読む） |
-| `pullAcceleration`・`depthBelowFloor` | `SpaceJunkGoalVortex.cs` | 引き寄せと、円柱の下の端（インスペクター） |
-| `areas`・`appear`・`visuals`・`lastPull` | `SpaceJunkGoalVortex.cs` | ゴールごとの円柱・出ている量・見た目の Renderer、物資ごとの最後に引き寄せた時刻 |
-| `All`（static） | `SpaceJunkGoalVortex.cs` | シーンにある渦の係（`In(シーン)` で探す） |
-| `Absorbed`（static event） | `SpaceJunkGoalVortex.cs` | ホストで吸い込み終わった瞬間（検証シーン・確認用） |
-| `startTime`・`seconds`・`center`・`area`・`startRadius`・`startAngle`・`startY`・`startScale`・`startRotation` | `SpaceJunkVortexAbsorb.cs` | 吸い込み1回ぶんの始めの状態 |
-| `authority` | `SpaceJunkVortexAbsorb.cs` | 位置を動かすPCか（ホスト・1人用） |
+| `style`（`Style`） | `GoalEffect.cs` | 見た目の種類（渦・光の柱）。テスト・検証シーンからも切り替える |
+| `pillarMaterial`・`pillarHeight`・`pillarUseTeamColor`・`pillarColor`・`pillarBrightness`・`streakCount`・`sparkleCount` | `GoalEffect.cs` | 光の柱（インスペクター）。`cylinderMesh`・`streakMesh`・`sparkleMesh` は作った形 |
+| `pillarMoveSeconds`・`pillarRiseSeconds`・`pillarRiseDistance`・`pillarGlowSeconds`・`pillarFlashSeconds` | `GoalEffect.cs` | 光の柱のときの物資の動きと、消える光。`flashes` は出している途中の光 |
+| `pillar`・`startPosition`・`itemSize`、`All`（static） | `GoalAbsorb.cs` | 光の柱の動きか・始めの位置・物資のおおよその大きさ、吸い込み中の物資の一覧 |
+| `switchStyleSeconds` | `GoalEffectTestDriver.cs` | 検証シーンで、渦と光の柱を入れ替える秒数（0 なら入れ替えない） |
+| `vortexMaterial`・`fill`・`lift`・`appearSeconds`・`brightness` | `GoalEffect.cs` | 見た目（インスペクター） |
+| `funnelHeight`・`funnelBottom`・`funnelCurve` | `GoalEffect.cs` | すり鉢の形（インスペクター）。`funnelMesh`・`funnelMeshShape` は作った形と、そのときの値 |
+| `useTeamColor`・`neutralColor` | `GoalEffect.cs` | 明るい所の色（チームの色か、灰色か） |
+| `showFloorVortex` | `GoalEffect.cs` | 床の平らな渦巻き模様を描くか（見た目だけ。判定の円柱には関係ない） |
+| `ribbonCount`・`ribbonTurns`・`ribbonWidth`・`debrisCount` | `GoalEffect.cs` | らせんの帯とかけら（インスペクター）。`ribbonMesh`・`debrisMesh` は作った形 |
+| `absorbSeconds`・`spinTurns`・`selfSpinDegrees`・`endScale`・`sinkDepth` | `GoalEffect.cs` | 吸い込みの動き（インスペクター。吸い込まれる係が読む） |
+| `pullAcceleration`・`depthBelowFloor` | `GoalEffect.cs` | 引き寄せと、円柱の下の端（インスペクター） |
+| `areas`・`appear`・`visuals`・`lastPull` | `GoalEffect.cs` | ゴールごとの円柱・出ている量・見た目の Renderer、物資ごとの最後に引き寄せた時刻 |
+| `All`（static） | `GoalEffect.cs` | シーンにある渦の係（`In(シーン)` で探す） |
+| `Absorbed`（static event） | `GoalEffect.cs` | ホストで吸い込み終わった瞬間（検証シーン・確認用） |
+| `startTime`・`seconds`・`center`・`area`・`startRadius`・`startAngle`・`startY`・`startScale`・`startRotation` | `GoalAbsorb.cs` | 吸い込み1回ぶんの始めの状態 |
+| `authority` | `GoalAbsorb.cs` | 位置を動かすPCか（ホスト・1人用） |
 | `IsAbsorbing` | `HookableObject.cs` | 吸い込み中の印。**true の間は `IsVanished` も true**（フック・ボット・仕掛けが触らないように）。`Vanish` は、ほんとうに消えたか（`vanished`）だけを見る |
 | `All`（static）・`BaseColor` | `SpaceJunkLobbyGoal.cs` | ロビーの練習用ゴールの一覧と、ふちの色 |
 
 ## 気をつけること
 
 - **`IsVanished` の意味が少し広がった**（吸い込み中も true）。「もう無い物」として扱う所（フック・ボット・ベルトコンベア・列車・隕石・スポナーの数）は、それでよい。**「ほんとうに無くなったか」を知りたい所では `IsVanished && !IsAbsorbing` を使う**（例：重いデブリのイベントの一覧から外す処理 `SpaceJunkRound.ServerPruneLost`）。
-- 検証シーンの係（`SpaceJunkGoalVortexTestDriver`）は、`NetworkManager` が無ければ作ってホストとして始める（ゴールが数えるのはホストだけのため）。物資の代わりの箱は通信の部品を持たないので、吸い込みはそのPCだけで動き、得点も入らない（試合の進行役が無いため）。代わりに `Absorbed` を受けて、得点の光る演出を出す。
+- 検証シーンの係（`GoalEffectTestDriver`）は、`NetworkManager` が無ければ作ってホストとして始める（ゴールが数えるのはホストだけのため）。物資の代わりの箱は通信の部品を持たないので、吸い込みはそのPCだけで動き、得点も入らない（試合の進行役が無いため）。代わりに `Absorbed` を受けて、得点の光る演出を出す。
 - 画像で確かめるときは、`DrawAt(時刻, カメラ)` で好きなカメラに描いてから撮る（`AIの申し送り.md` の 2026/11/12「`Graphics.RenderMesh` で描くもの」）。
 
 ## 変更ログ
@@ -104,3 +116,5 @@
 | 2026/11/17 | Claude Code（依頼：大槻 海斗） | すり鉢（立体の渦）の形・描き方と、吸い込みの高さをすり鉢の面に沿わせたことを書き足した |
 | 2026/11/17 | Claude Code（依頼：大槻 海斗） | 黒と灰色・光らせない描き方、らせんの帯、黒いかけら、チームの色の切り替え（Use Team Color）を書き足した |
 | 2026/11/17 | Claude Code（依頼：大槻 海斗） | 床の平らな渦を描くかの切り替え（Show Floor Vortex。いまはオフ）を書き足した |
+| 2026/11/17 | Claude Code（依頼：大槻 海斗） | 名前を変えた（このファイルも `SpaceJunkGoalVortex.md` から `GoalEffect.md` に）。見た目の種類のプルダウンと光の柱、光の柱のときの物資の動きを書き足した |
+| 2026/11/17 | Claude Code（依頼：大槻 海斗） | 光の柱のときの物資の動き（真ん中の上へ運ぶ → ゆっくり上げる → 光って消える）と、消える光（`DrawFlashes`・`PlayFlash`）を書いた |

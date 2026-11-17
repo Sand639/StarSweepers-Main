@@ -607,7 +607,7 @@ public class FishingNetSupply : NetworkBehaviour
     {
         if (!IsServer)
         {
-            SpaceJunkVortexAbsorb.Begin(hookable, default, startTime, seconds, null);
+            GoalAbsorb.Begin(hookable, default, startTime, seconds, null);
         }
     }
 

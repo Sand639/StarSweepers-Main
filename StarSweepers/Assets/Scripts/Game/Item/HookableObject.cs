@@ -55,10 +55,10 @@ public class HookableObject : MonoBehaviour
 
     private bool vanished;
 
-    /// <summary>ゴールの渦に吸い込まれている途中か（<see cref="SpaceJunkVortexAbsorb"/> が切り替える）。</summary>
+    /// <summary>ゴールの渦に吸い込まれている途中か（<see cref="GoalAbsorb"/> が切り替える）。</summary>
     public bool IsAbsorbing { get; private set; }
 
-    /// <summary>吸い込みの始まり・終わりに <see cref="SpaceJunkVortexAbsorb"/> から呼ばれる。</summary>
+    /// <summary>吸い込みの始まり・終わりに <see cref="GoalAbsorb"/> から呼ばれる。</summary>
     public void SetAbsorbing(bool absorbing)
     {
         IsAbsorbing = absorbing;
@@ -143,7 +143,7 @@ public class HookableObject : MonoBehaviour
             return;
         }
 
-        // 渦に吸い込まれている途中なら、吸い込みはここで終わり（SpaceJunkVortexAbsorb が気づいて外れる）
+        // 渦に吸い込まれている途中なら、吸い込みはここで終わり（GoalAbsorb が気づいて外れる）
         IsAbsorbing = false;
 
         // 消える物を誰かが引っ掛けたままにしない（フック側が「外れた」と気づけるように）
