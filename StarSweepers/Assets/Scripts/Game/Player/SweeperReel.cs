@@ -35,8 +35,9 @@ using UnityEngine;
 ///
 /// ### 距離で変わる操作（設定「光線の操作：距離で変わる」。2026/11/17・大槻さんの案）
 ///
-/// ポーズ画面の設定で選んだ人だけ（ボットはいつも今までどおり）。引き寄せはいつもどおりで、
-/// **途中で押した瞬間の距離**（ビームの長さの上限 <see cref="SweeperShooter.MaxReach"/>。初期値 12m を 100% とした割合。溜めた長さには関係ない）で、飛ばし方と強さが決まる。
+/// ポーズ画面の設定で選んだ人だけ（ボットはいつも今までどおり）。
+/// **途中で押した瞬間の、ビームの形にそった長さ**（しなっていれば曲がった線の長さ）を、ビームの長さの上限（<see cref="SweeperShooter.MaxReach"/>。初期値 12m）を 100% とした割合で見て、
+/// 飛ばし方と強さを決める（溜めた長さには関係ない）。
 ///
 /// | 押した瞬間の距離 | どうなる |
 /// | --- | --- |
@@ -532,10 +533,38 @@ public class SweeperReel : MonoBehaviour
     /// </summary>
     private float BeamReach => Mathf.Max(0.1f, shooter != null ? shooter.MaxReach : 12f);
 
+    /// <summary>
+    /// 距離で変わる操作で使う距離：**ビームの形にそった長さ**（大槻さんの指定。2026/11/17）。
+    /// プレイヤーの中心 → 手元 → 光線（しなっていれば見た目と同じ曲線）→ 物資、を真上から見てたどった長さ。
+    /// まっすぐ引いているときは、プレイヤーの中心から物資までの距離とほぼ同じ。向きを変えて光線がしなっていると、そのぶん長くなる。
+    /// </summary>
+    private float BeamLength()
+    {
+        int count = shooter != null ? shooter.GetBeamPath(beamPath) : 0;
+        if (count < 2)
+        {
+            return FlatDistanceToPlayer();
+        }
+
+        float length = FlatLength(transform.position, beamPath[0]);
+        for (int i = 1; i < count; i++)
+        {
+            length += FlatLength(beamPath[i - 1], beamPath[i]);
+        }
+
+        return length;
+    }
+
+    /// <summary>2点の、真上から見た距離。</summary>
+    private static float FlatLength(Vector3 a, Vector3 b)
+    {
+        return Vector2.Distance(new Vector2(a.x, a.z), new Vector2(b.x, b.z));
+    }
+
     /// <summary>距離で変わる操作で、いま物資がクリティカルプルを取れる距離（Critical Near〜Critical Far）にいるか。</summary>
     private bool InCriticalBand()
     {
-        float ratio = FlatDistanceToPlayer() / BeamReach;
+        float ratio = BeamLength() / BeamReach;
         return ratio >= criticalNear && ratio < criticalFar;
     }
 
@@ -566,7 +595,7 @@ public class SweeperReel : MonoBehaviour
 
     /// <summary>
     /// **距離で変わる操作で押された**（大槻さんの図。2026/11/17）。クリティカルの距離なら今までどおりのクリティカルプル。それ以外は、押した瞬間の距離で、前へ投げるか引っ張る（後ろへ）かを決め、
-    /// いつもの飛ぶ速さ（向きと大きさ）に強さ（0〜1）を掛けて飛ばす。距離は、ビームの長さの上限（<see cref="BeamReach"/>）の割合で見る。
+    /// いつもの飛ぶ速さ（向きと大きさ）に強さ（0〜1）を掛けて飛ばす。距離はビームの形にそった長さ（<see cref="BeamLength"/>）で、ビームの長さの上限（<see cref="BeamReach"/>）の割合で見る。
     /// 投げる強さ：体のそばで 1、Throw Zone End で Throw Min Strength。引っ張る強さ：Throw Zone End で Pull Min Strength → Critical Near で 1、
     /// Critical Far で 1 → ビームの長さの上限で Pull Min Strength（どれもまっすぐ）。最小値の初期値は 0。
     /// </summary>
@@ -580,7 +609,7 @@ public class SweeperReel : MonoBehaviour
             return;
         }
 
-        float ratio = Mathf.Clamp01(FlatDistanceToPlayer() / BeamReach);
+        float ratio = Mathf.Clamp01(BeamLength() / BeamReach);
 
         if (ratio < throwZoneEnd)
         {
