@@ -12,13 +12,14 @@ Shader "StarSweepers/ProceduralStarrySky"
     {
         _BackgroundColor ("Background (空の地の色)", Color) = (0.006, 0.008, 0.02, 1)
         _Density ("Density (小さい星の細かさ。大きいほど数が増える)", Range(10, 200)) = 90
+        _SmallStarAmount ("Small Star Amount (小さい星の量。1=升目すべてに星、0=小さい星なし)", Range(0, 1)) = 0.35
         _BigDensity ("Big Star Density (明るい星の細かさ。大きいほど数が増える)", Range(4, 60)) = 20
         _StarSize ("Star Size (星の大きさ)", Range(0.01, 0.15)) = 0.05
         _Brightness ("Brightness (星の明るさ)", Range(0, 10)) = 2
         _BrightnessCurve ("Brightness Curve (大きいほど暗い星が増え、明るい星がまれになる)", Range(1, 12)) = 4
         _ColorAmount ("Color Amount (星の色の濃さ。0=白だけ、1=現実の星くらい、2以上=はっきり)", Range(0, 3)) = 1.6
         _Glow ("Glow (明るい星のまわりのにじみ)", Range(0, 1)) = 0.3
-        _TwinkleAmount ("Twinkle Amount (瞬きの強さ。0で瞬かない)", Range(0, 1)) = 0.4
+        _TwinkleMin ("Twinkle Min (瞬きでいちばん暗くなるときの明るさ。いちばん明るいときが1。1で瞬かない)", Range(0, 1)) = 0.2
         _TwinkleSpeed ("Twinkle Speed (瞬きの速さ)", Range(0, 10)) = 2.5
         _Exposure ("Exposure (全体の明るさ)", Range(0, 4)) = 1
     }
@@ -42,13 +43,14 @@ Shader "StarSweepers/ProceduralStarrySky"
             CBUFFER_START(UnityPerMaterial)
                 half4 _BackgroundColor;
                 float _Density;
+                float _SmallStarAmount;
                 float _BigDensity;
                 float _StarSize;
                 float _Brightness;
                 float _BrightnessCurve;
                 float _ColorAmount;
                 float _Glow;
-                float _TwinkleAmount;
+                float _TwinkleMin;
                 float _TwinkleSpeed;
                 float _Exposure;
             CBUFFER_END
@@ -103,8 +105,8 @@ Shader "StarSweepers/ProceduralStarrySky"
                 return color / max(max(color.r, color.g), max(color.b, 0.001));
             }
 
-            // 星の層を1つ描く。density=升目の細かさ、sizeCells=星の大きさ（升目に対する割合）
-            float3 StarLayer(float3 direction, float density, float sizeCells, float brightness, float pixelAngle, float seed)
+            // 星の層を1つ描く。density=升目の細かさ、sizeCells=星の大きさ（升目に対する割合）、amount=星がある升目の割合
+            float3 StarLayer(float3 direction, float density, float sizeCells, float brightness, float amount, float pixelAngle, float seed)
             {
                 float3 p = direction * density;
                 float3 baseCell = floor(p);
@@ -128,6 +130,12 @@ Shader "StarSweepers/ProceduralStarrySky"
                     float3 h2 = Hash33(cell + seed + 19.19);
                     float3 h3 = Hash33(cell + seed + 47.73);
 
+                    // 星を置く升目を、amount の割合だけに減らす
+                    if (h3.y >= amount)
+                    {
+                        continue;
+                    }
+
                     float dist = length(direction - center / len); // 星までの向きの差（ほぼ角度。ラジアン）
                     float size = sizeCells * (0.5 + h2.x) / density;
 
@@ -137,11 +145,13 @@ Shader "StarSweepers/ProceduralStarrySky"
                     float r = dist / drawSize;
                     float shape = exp(-r * r * 2.0) + _Glow * exp(-r);
 
-                    float twinkle = 1.0 + _TwinkleAmount * (
+                    // 瞬き：速さと始まりのずれが星ごとに違う2つの波を重ね（-1〜1）、明るさを _TwinkleMin〜1 の間で揺らす
+                    float wave =
                         0.6 * sin(_Time.y * _TwinkleSpeed * (0.7 + h2.z) + h1.x * 50.0) +
-                        0.4 * sin(_Time.y * _TwinkleSpeed * 2.3 * (0.6 + h1.y) + h1.z * 80.0));
+                        0.4 * sin(_Time.y * _TwinkleSpeed * 2.3 * (0.6 + h1.y) + h1.z * 80.0);
+                    float twinkle = lerp(_TwinkleMin, 1.0, wave * 0.5 + 0.5);
 
-                    float starBrightness = brightness * pow(h2.y, _BrightnessCurve) * energy * max(twinkle, 0.0);
+                    float starBrightness = brightness * pow(h2.y, _BrightnessCurve) * energy * twinkle;
                     sum += StarColor(h3.x) * starBrightness * shape;
                 }
 
@@ -154,8 +164,8 @@ Shader "StarSweepers/ProceduralStarrySky"
                 float pixelAngle = length(fwidth(direction)); // 画面の1ドットが空でどれくらいの角度か
 
                 float3 color = _BackgroundColor.rgb;
-                color += StarLayer(direction, _Density, _StarSize, _Brightness * 0.6, pixelAngle, 0.0);
-                color += StarLayer(direction, _BigDensity, _StarSize * 0.8, _Brightness * 2.5, pixelAngle, 113.0);
+                color += StarLayer(direction, _Density, _StarSize, _Brightness * 0.6, _SmallStarAmount, pixelAngle, 0.0);
+                color += StarLayer(direction, _BigDensity, _StarSize * 0.8, _Brightness * 2.5, 1.0, pixelAngle, 113.0);
 
                 return half4(color * _Exposure, 1.0);
             }

@@ -32,8 +32,9 @@ Material:
     - _Density: 90
     - _Exposure: 1
     - _Glow: 0.3
+    - _SmallStarAmount: 0.35
     - _StarSize: 0.05
-    - _TwinkleAmount: 0.4
+    - _TwinkleMin: 0.2
     - _TwinkleSpeed: 2.5
     m_Colors:
     - _BackgroundColor: {r: 0.006, g: 0.008, b: 0.02, a: 1}
