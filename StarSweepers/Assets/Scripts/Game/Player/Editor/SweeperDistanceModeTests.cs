@@ -9,9 +9,9 @@ using UnityEngine.TestTools;
 /// **新しい体の「光線の操作：距離で変わる」の自動テスト。**（2026/11/17）
 ///
 /// 通信なしで、新しい体のプレハブ（`SweeperPlayer.prefab`）と箱だけを置き、光線が当たった直後に押して確かめる。
-/// 距離の 100% は、その1発が何にも当たらなければ伸びる長さ（いちばん長く溜めると 12m、溜めずに撃つと 3m）。
+/// 距離の 100% は、ビームの長さの上限（Max Reach。12m）。溜めた長さには関係ない。
 /// ・近く（20% より手前）で押すと、**前へ投げる**（いつもの前へ投げる速さ × 強さ）
-/// ・遠くで押すと（溜めずに撃って、同じ近さの物資でも割合が大きいときも）、**引っ張る**＝いつもの後ろへの投げの速さ × 強さ。強さが 1 より小さいので、体の後ろまでは届かず手前に落ちる
+/// ・遠くで押すと、**引っ張る**＝いつもの後ろへの投げの速さ × 強さ。強さが 1 より小さいので、体の後ろまでは届かず手前に落ちる
 /// ・29〜32% で押すと、今までどおりのクリティカルプル（体の後ろまで飛ぶ）
 ///
 /// 作り方は <c>SweeperHeavyBotTests</c> と同じ。設定はテストの間だけ変え、終わったら元に戻す。
@@ -37,12 +37,12 @@ public class SweeperDistanceModeTests
         yield return new ExitPlayMode();
     }
 
-    /// <summary>100% は「その1発が何にも当たらなければ伸びる長さ」：溜めずに撃つ（3m）と、同じ 1.6m でも 53% なので引っ張りになる。</summary>
+    /// <summary>100% はビームの長さの上限（12m）で、溜めた長さには関係ない：溜めずに撃っても、1.6m 先は 13% なので前へ投げる。</summary>
     [UnityTest]
-    public IEnumerator ShortShot_SameDistanceBecomesPull()
+    public IEnumerator ShortShot_StillUsesMaxReach()
     {
         yield return new EnterPlayMode();
-        yield return Run(1.6f, 0f, false, false);
+        yield return Run(1.6f, 0f, true, false);
         yield return new ExitPlayMode();
     }
 
@@ -103,7 +103,7 @@ public class SweeperDistanceModeTests
                     yield return NextFrame();
                 }
                 Assert.That(reel.InCriticalWindow, Is.True, "クリティカルの距離に来なかった");
-                // クリティカルは距離で取る：いちばん長く溜めた 12m の 29〜32%（3.48〜3.84m）
+                // クリティカルは距離で取る：ビームの長さの上限 12m の 29〜32%（3.48〜3.84m）
                 float pressedAt = Mathf.Abs(box.transform.position.z - player.transform.position.z);
                 Debug.Log($"[SweeperDistanceModeTests] クリティカルの距離に来た：{pressedAt:F2}m");
                 Assert.That(pressedAt, Is.InRange(3.3f, 4.0f), "クリティカルになった距離が、29〜32% ではない");
@@ -138,17 +138,9 @@ public class SweeperDistanceModeTests
             else
             {
                 // 9m ÷ 12m＝0.75 → 引っ張る強さ (1 − 0.75) ÷ (1 − 0.32) ≒ 0.37
-                // 1.6m ÷ 3m（溜めずに撃った長さ）≒ 0.53 → 引っ張る強さ (1 − 0.53) ÷ (1 − 0.32) ≒ 0.69
                 StringAssert.StartsWith("後ろ", reel.LastResult);
-                if (boxDistance > 5f)
-                {
-                    Assert.That(end.z, Is.LessThan(start.z - 0.5f), "手前へ引っ張られていない");
-                    Assert.That(end.z, Is.GreaterThan(0f), "強さを掛けたのに、いつもどおり体の後ろまで飛んだ");
-                }
-                else
-                {
-                    Assert.That(end.z, Is.LessThan(start.z - 0.5f), "後ろのほうへ飛んでいない");
-                }
+                Assert.That(end.z, Is.LessThan(start.z - 0.5f), "手前へ引っ張られていない");
+                Assert.That(end.z, Is.GreaterThan(0f), "強さを掛けたのに、いつもどおり体の後ろまで飛んだ");
             }
         }
         finally
