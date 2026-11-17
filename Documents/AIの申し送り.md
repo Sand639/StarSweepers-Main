@@ -199,9 +199,8 @@
 
 | 日付 | 書いたAI | 何をしようとして | どう失敗したか | どうすればよかったか |
 | --- | --- | --- | --- | --- |
-
+| 2026/11/17 | Claude Code | 電車マップ2（`STAGE_Train2`）の背景を調べた | ドキュメントに「Hans さんのスクリプトはファイル名とクラス名が違うので Missing になり、動いていない」と書いてあったが、**実際には星空の回転（`RotateSkybox`）が動いていて**、試合中に共通の星空の素材 `Assets/Resources/SpaceJunkSkybox.mat` の `_Rotation` を書き換えていた（エディタで再生→閉じると、そのファイルが変更ありになる）。Unity 6 はシーンの部品に `m_EditorClassIdentifier: Assembly-CSharp::RotateSkybox` を残すので、ファイル名が違っても結びつくことがある | 「名前が違うから動かない」と決めつけず、**`git status` に覚えのない `.mat` の変更が出ていないか**で確かめる。`RenderSettings.skybox` を書き換える仕組み（`SpaceJunkSkybox`）と、その素材をいじる部品を同じシーンに置かない。今回は電車マップ2から回転の部品を外した |
 | 2026/11/12 | Claude Code | ttf（DSEG）から TextMeshPro のフォントをコードで作った（`TMP_FontAsset.CreateFontAsset(ttf, 90, 9, SDFAA, 512, 512, …)` → `TryAddCharacters(数字＋英大文字 40字)` → 静的にする） | **「ROUND 01」の「ROU」だけが、いつものフォント（LiberationSans）で出た。** 90pt の字は1つ約 100px 角なので、512×512 には 25 字ほどしか入らず、あふれた字は焼き込まれなかった。TextMeshPro は無い字を黙って予備のフォントで出すので、エラーにもならない | 焼き込む字の数に合った大きさにする（90pt で40字なら 1024×1024）。`TryAddCharacters(文字, out string missing)` の **missing をログに出す**と、入らなかった字がすぐ分かる。見た目は撮った画像で、字ごとに形が違っていないかを見る |
-
 | 2026/11/13 | Claude Code | 画面なしの Unity でボットの試合を何本も続けて動かした（小野田さんのPC。ボットのギミック対応） | ①**同じフォルダで、別の人（または別のセッション）が作業していた**（途中で `SpaceJunkGoalFence.cs` が増え、Hans さんの `SM_Transporter.fbx` が書き換わった）。気づかずに `git add .` していたら、人の作業をコミットしていた ②夜のあいだにPCが止まって、測っていた Unity が途中で終わり、`Temp/UnityLockfile` が残った（Unity は動いていない） | ①**コミットの前に `git status` を見て、自分が変えたファイルだけを名前で `git add` する。** 知らないファイルがあったら触らずにユーザーに伝える ②Unity を使う前に `Temp/UnityLockfile` と `tasklist` の両方を見る。ロックファイルがあっても Unity.exe が動いていなければ、残っているだけなので動かしてよい |
 | 2026/11/12 | Claude Code | ロビーのチームエリアを輸送機に替えたあと、ホスト1人の画面なしの Unity で「自分の体を赤の床へ歩かせる → 青の床へ」と、チームが変わるかを確かめようとした（大槻さんのPC） | ①**1人だと、床に乗った時点で「全員がエリアにいる」扱いになり、3秒で試合が始まる**（仕様どおり）。青を確かめる前に試合へ移ってしまった。②体を `CharacterController` を切って瞬間移動させてエリアの外へ出すと、**OnTriggerExit が来ず、エリアにいるままの扱い**になり、待ち時間が取り消されなかった（実際の遊びでは歩いて出るので起きない） | 床の上では 1.2 秒だけ待つ（チームが変わるのは 1 秒）。出るときは `CharacterController.Move` で**歩いて**出てから、外で瞬間移動する。道具は `調査の道具/ロビーの床でチームが変わるか自動で確かめる.cs.txt` |
 | 2026/11/12 | Claude Code | **時間で動く 3D の演出（`Graphics.RenderMesh` で描くもの）を、再生せずに時刻ごとの画像で確かめようとした**（ゴールの得点の演出。`-batchmode -quit -executeMethod` で、時刻を変えて描く → `Camera.Render()` をくり返した） | **撮った画像に、前の時刻の絵が重なって写った**（光の輪が何重にも見え、時間がたつほど明るくなった）。`Graphics.RenderMesh` は「このフレームで描く予約」なので、再生していない Unity ではフレームが終わらず、予約が消えないまま次の `Render()` にも残る | **時刻ごとに `Object.Instantiate(camera)` で別のカメラを作り、`RenderParams.camera` にそのカメラを渡して描いてから撮る**（撮ったら消す）。演出のスクリプトは「`Update` は `DrawAt(Time.time)` を呼ぶだけ・`DrawAt(時刻, カメラ)` で好きな時刻とカメラで描ける」形にしておくと、この撮り方ができる（`SpaceJunkGoalScoreEffect` が実例）。あわせて：画面なしの試合（`TempSpawnProbe` の solo）を動かすと、**星空の背景のマテリアル `Resources/SpaceJunkSkybox.mat` の回転の値が保存されて差分に出る**ので、コミットする前に `git checkout` で戻すこと |
@@ -580,3 +579,4 @@
 | 2026/11/12 | Claude Code | 「うまくいったやり方」に、もらったアニメーションを Unity を開かずに確かめてプレハブに付けるやり方を足した |
 | 2026/11/12 | Claude Code | 「失敗したこと」に、ロビーの床の確かめで、1人だと3秒で試合が始まる件と、瞬間移動では OnTriggerExit が来ない件を追加 |
 | 2026/11/12 | Claude Code（依頼：小野田 喬） | 「うまくいったやり方」に、FBX を Blender で直して、シーンからの参照が外れないかを別の空の Unity で確かめるやり方を足した |
+| 2026/11/17 | Claude Code | 「失敗したこと」に、名前の違う Hans さんの星空の回転が実は動いていて、共通の星空の素材を書き換えていた件を書いた |

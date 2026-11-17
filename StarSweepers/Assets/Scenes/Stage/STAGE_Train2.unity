@@ -26,7 +26,7 @@ RenderSettings:
   m_AmbientIntensity: 1
   m_AmbientMode: 0
   m_SubtractiveShadowColor: {r: 0.42, g: 0.478, b: 0.627, a: 1}
-  m_SkyboxMaterial: {fileID: 2100000, guid: 8f9afd7e68051da438923dcf852688c8, type: 2}
+  m_SkyboxMaterial: {fileID: 10304, guid: 0000000000000000f000000000000000, type: 0}
   m_HaloStrength: 0.5
   m_FlareStrength: 1
   m_FlareFadeSpeed: 3
@@ -2617,49 +2617,6 @@ BoxCollider:
   serializedVersion: 3
   m_Size: {x: 1.5, y: 0.25026247, z: 2.9999995}
   m_Center: {x: 0, y: 0.12513123, z: 0}
---- !u!1 &854771824
-GameObject:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  serializedVersion: 6
-  m_Component:
-  - component: {fileID: 854771826}
-  - component: {fileID: 854771825}
-  m_Layer: 0
-  m_Name: SkyboxController
-  m_TagString: Untagged
-  m_Icon: {fileID: 0}
-  m_NavMeshLayer: 0
-  m_StaticEditorFlags: 0
-  m_IsActive: 1
---- !u!114 &854771825
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 854771824}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 127f4d6a409fda54ab62154906811f65, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::RotateSkybox
-  rotationSpeed: 1
---- !u!4 &854771826
-Transform:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 854771824}
-  serializedVersion: 2
-  m_LocalRotation: {x: 0, y: 0.7071068, z: 0, w: 0.7071068}
-  m_LocalPosition: {x: -0.45828992, y: 1.4375, z: -0.86046}
-  m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 0
-  m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1001 &862124405
@@ -7299,7 +7256,6 @@ SceneRoots:
   - {fileID: 1954706850}
   - {fileID: 1882652293}
   - {fileID: 360338875}
-  - {fileID: 854771826}
   - {fileID: 691858868}
   - {fileID: 335614270}
   - {fileID: 483882177}
