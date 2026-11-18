@@ -601,7 +601,20 @@ public class SweeperShooter : MonoBehaviour
         charge = Mathf.Clamp01(charge + Time.deltaTime / chargeSeconds);
 
         float ringRadius = ring != null ? ring.Radius : 0.5f;
-        aimArea?.Show(transform.position, aim != null ? aim.Direction : transform.forward, ringRadius, CurrentReach);
+        if (aimArea != null)
+        {
+            // 距離で変わる操作なら、帯を投げ・引っ張り・クリティカルのゾーンで色分けする（2026/11/18）
+            float throwEnd = 0f, criticalNear = 0f, criticalFar = 0f;
+            if (reel != null && reel.TryGetDistanceZones(out throwEnd, out criticalNear, out criticalFar))
+            {
+                aimArea.SetZones(throwEnd, criticalNear, criticalFar);
+            }
+            else
+            {
+                aimArea.ClearZones();
+            }
+            aimArea.Show(transform.position, aim != null ? aim.Direction : transform.forward, ringRadius, CurrentReach);
+        }
 
         if (released)
         {

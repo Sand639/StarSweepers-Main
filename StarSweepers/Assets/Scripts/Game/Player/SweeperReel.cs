@@ -532,6 +532,19 @@ public class SweeperReel : MonoBehaviour
     /// </summary>
     private float BeamReach => Mathf.Max(0.1f, shooter != null ? shooter.MaxReach : 12f);
 
+    /// <summary>
+    /// **狙いの帯の色分けに使う、距離で変わる操作のゾーンの境目**（プレイヤーの中心からの m）。
+    /// この体が距離で変わる操作のとき true（ボット・いつもの操作では false）。<see cref="SweeperShooter"/> が溜めている間に読む。
+    /// </summary>
+    public bool TryGetDistanceZones(out float throwEnd, out float criticalNearDistance, out float criticalFarDistance)
+    {
+        float reach = BeamReach;
+        throwEnd = throwZoneEnd * reach;
+        criticalNearDistance = criticalNear * reach;
+        criticalFarDistance = criticalFar * reach;
+        return input != null && input.BeamOperation == BeamOperationType.DistanceStrength;
+    }
+
     /// <summary>距離で変わる操作で、いま物資がクリティカルプルを取れる距離（Critical Near〜Critical Far）にいるか。</summary>
     private bool InCriticalBand()
     {
