@@ -11,7 +11,8 @@ using UnityEngine.TestTools;
 /// 通信なしで、新しい体のプレハブ（`SweeperPlayer.prefab`）と箱だけを置き、光線が当たった直後に押して確かめる。
 /// 距離の 100% は、ビームの長さの上限（Max Reach。12m）。溜めた長さには関係ない。
 /// ・近く（20% より手前）で押すと、**前へ投げる**（いつもの前へ投げる速さ × 強さ）
-/// ・遠くで押すと、**引っ張る**＝いつもの後ろへの投げの速さ × 強さ。強さが 1 より小さいので、体の後ろまでは届かず手前に落ちる
+/// ・投げとクリティカルの間（20〜29%）で押すと、強さ 0.5 で引っ張る
+/// ・クリティカルより遠くで押すと、**引っ張る**＝いつもの後ろへの投げの速さ × 強さ。強さが 1 より小さいので、体の後ろまでは届かず手前に落ちる
 /// ・29〜32% で押すと、今までどおりのクリティカルプル（体の後ろまで飛ぶ）
 ///
 /// 作り方は <c>SweeperHeavyBotTests</c> と同じ。設定はテストの間だけ変え、終わったら元に戻す。
@@ -26,6 +27,15 @@ public class SweeperDistanceModeTests
     {
         yield return new EnterPlayMode();
         yield return Run(1.6f, 1f, true, false);
+        yield return new ExitPlayMode();
+    }
+
+    /// <summary>投げとクリティカルの間（20〜29%）の引っ張りは、どこで押しても強さ 0.5。3m ÷ 12m＝25%。</summary>
+    [UnityTest]
+    public IEnumerator MiddlePress_PullsAtHalfStrength()
+    {
+        yield return new EnterPlayMode();
+        yield return Run(3f, 1f, false, false);
         yield return new ExitPlayMode();
     }
 
@@ -200,9 +210,14 @@ public class SweeperDistanceModeTests
                 StringAssert.StartsWith("前", reel.LastResult);
                 Assert.That(end.z, Is.GreaterThan(start.z + 0.3f), "前へ飛んでいない");
             }
+            else if (boxDistance < 3.4f)
+            {
+                // 投げとクリティカルの間：いつも強さ 0.5
+                Assert.That(reel.LastResult, Is.EqualTo("後ろ（強さ 0.50）"));
+            }
             else
             {
-                // 9m ÷ 12m＝0.75 → 引っ張る強さ (1 − 0.75) ÷ (1 − 0.32) ≒ 0.37
+                // 9m ÷ 12m＝0.75 → クリティカルより遠い引っ張り：0.2 ＋ 0.8 × (1 − 0.75) ÷ (1 − 0.32) ≒ 0.49
                 StringAssert.StartsWith("後ろ", reel.LastResult);
                 Assert.That(end.z, Is.LessThan(start.z - 0.5f), "手前へ引っ張られていない");
                 Assert.That(end.z, Is.GreaterThan(0f), "強さを掛けたのに、いつもどおり体の後ろまで飛んだ");

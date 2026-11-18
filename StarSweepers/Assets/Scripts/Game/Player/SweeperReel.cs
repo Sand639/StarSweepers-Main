@@ -41,11 +41,11 @@ using UnityEngine;
 /// | 押した瞬間の距離 | どうなる |
 /// | --- | --- |
 /// | 0〜20%（Throw Zone End まで） | **前へ投げる**（いつもの前へ投げる速さ × 投げる強さ）。体のそばで強さ 1 → 20% で 0 |
-/// | 20〜29%（Critical Near まで） | **引っ張る**＝いつもの後ろへの投げの速さ × 引っ張る強さ。20% で 0 → 29% で 1 |
+/// | 20〜29%（Critical Near まで） | **引っ張る**＝いつもの後ろへの投げの速さ × 引っ張る強さ。**どこで押しても 0.5**（Middle Pull Strength） |
 /// | 29〜32%（Critical Far まで） | **クリティカルプル**（今までどおり。強さは掛けない） |
-/// | 32〜100% | **引っ張る**。32% で 1 → ビームの長さの上限（100%）で 0 |
+/// | 32〜100% | **引っ張る**。100% で 0.2（Far Pull Min Strength）→ クリティカルに近づくほど強くなり、32% で 1 |
 ///
-/// 「0」と書いた所の強さは、Throw Min Strength（前へ投げる）・Pull Min Strength（引っ張る）で上げられる（初期値は 0）。
+/// 前へ投げるの「0」は、Throw Min Strength で上げられる（初期値は 0）。（2026/11/18：引っ張りの強さを大槻さんの指定に変えた）
 ///
 /// （大槻さんの指定：投げ 0〜20・引っ張り 20〜28・クリティカルプル 29〜31・引っ張り 32〜100。数字は、ビームの長さの上限（12m）に対する %。物資に当たった距離・溜めた長さではない）
 ///
@@ -199,9 +199,13 @@ public class SweeperReel : MonoBehaviour
     [Range(0f, 1f)]
     [SerializeField] private float throwMinStrength = 0f;
 
-    [Tooltip("引っ張る強さの最小値（0〜1）。いちばん弱い所（Throw Zone End と、ビームの長さの上限）で押したときの強さ。クリティカルのそばでは 1")]
+    [Tooltip("投げとクリティカルの間（Throw Zone End〜Critical Near）の引っ張る強さ（0〜1）。この間はどこで押しても同じ強さ")]
     [Range(0f, 1f)]
-    [SerializeField] private float pullMinStrength = 0f;
+    [SerializeField] private float middlePullStrength = 0.5f;
+
+    [Tooltip("クリティカルより遠い引っ張りの、いちばん弱い所（ビームの長さの上限）の強さ（0〜1）。クリティカルに近づくほど強くなり、Critical Far で 1")]
+    [Range(0f, 1f)]
+    [SerializeField] private float farPullMinStrength = 0.2f;
 
     [Tooltip("物資が寄ってくる速さ（m/秒）。この操作では、距離に関係なくいつもこの速さで近づき（Reel Seconds は使わない）、手前（Stop Distance）に着いたら前へ投げる")]
     [Min(0.1f)]
@@ -580,8 +584,8 @@ public class SweeperReel : MonoBehaviour
     /// <summary>
     /// **距離で変わる操作で押された**（大槻さんの図。2026/11/17）。クリティカルの距離なら今までどおりのクリティカルプル。それ以外は、押した瞬間の距離で、前へ投げるか引っ張る（後ろへ）かを決め、
     /// いつもの飛ぶ速さ（向きと大きさ）に強さ（0〜1）を掛けて飛ばす。距離は、ビームの長さの上限（<see cref="BeamReach"/>）の割合で見る。
-    /// 投げる強さ：体のそばで 1、Throw Zone End で Throw Min Strength。引っ張る強さ：Throw Zone End で Pull Min Strength → Critical Near で 1、
-    /// Critical Far で 1 → ビームの長さの上限で Pull Min Strength（どれもまっすぐ）。最小値の初期値は 0。
+    /// 投げる強さ：体のそばで 1、Throw Zone End で Throw Min Strength（まっすぐ）。
+    /// 引っ張る強さ：投げとクリティカルの間はいつも Middle Pull Strength（0.5）、クリティカルより遠くは Critical Far で 1 → ビームの長さの上限で Far Pull Min Strength（0.2。まっすぐ）。
     /// </summary>
     private void PressByDistance()
     {
@@ -603,9 +607,9 @@ public class SweeperReel : MonoBehaviour
             return;
         }
 
-        float pullStrength = Mathf.Lerp(pullMinStrength, 1f, ratio < criticalNear
-            ? Mathf.InverseLerp(throwZoneEnd, criticalNear, ratio)
-            : Mathf.InverseLerp(1f, criticalFar, ratio));
+        float pullStrength = ratio < criticalNear
+            ? middlePullStrength
+            : Mathf.Lerp(farPullMinStrength, 1f, Mathf.InverseLerp(1f, criticalFar, ratio));
         ThrowBack(false, pullStrength);
         Finish($"後ろ（強さ {pullStrength:F2}）", false, false);
     }
