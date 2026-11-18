@@ -3091,6 +3091,10 @@ PrefabInstance:
       propertyPath: m_Name
       value: Train (1)
       objectReference: {fileID: 0}
+    - target: {fileID: 763590577590954314, guid: f55373ee22880484da257aa01ba581c4, type: 3}
+      propertyPath: pattern
+      value: 1
+      objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
@@ -3175,6 +3179,10 @@ PrefabInstance:
     - target: {fileID: 1945116408546878632, guid: f55373ee22880484da257aa01ba581c4, type: 3}
       propertyPath: m_Name
       value: Train (2)
+      objectReference: {fileID: 0}
+    - target: {fileID: 763590577590954314, guid: f55373ee22880484da257aa01ba581c4, type: 3}
+      propertyPath: pattern
+      value: 1
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
@@ -7286,10 +7294,80 @@ MonoBehaviour:
   flashColor: {r: 1, g: 1, b: 1, a: 1}
   flashSeconds: 0.4
   introVisual: {fileID: 2113064756}
+--- !u!1001 &5300000003
+PrefabInstance:
+  m_ObjectHideFlags: 0
+  serializedVersion: 2
+  m_Modification:
+    serializedVersion: 3
+    m_TransformParent: {fileID: 0}
+    m_Modifications:
+    - target: {fileID: 61446926247612941, guid: f55373ee22880484da257aa01ba581c4, type: 3}
+      propertyPath: m_LocalPosition.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 61446926247612941, guid: f55373ee22880484da257aa01ba581c4, type: 3}
+      propertyPath: m_LocalPosition.y
+      value: 1.313
+      objectReference: {fileID: 0}
+    - target: {fileID: 61446926247612941, guid: f55373ee22880484da257aa01ba581c4, type: 3}
+      propertyPath: m_LocalPosition.z
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 61446926247612941, guid: f55373ee22880484da257aa01ba581c4, type: 3}
+      propertyPath: m_LocalRotation.w
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 61446926247612941, guid: f55373ee22880484da257aa01ba581c4, type: 3}
+      propertyPath: m_LocalRotation.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 61446926247612941, guid: f55373ee22880484da257aa01ba581c4, type: 3}
+      propertyPath: m_LocalRotation.y
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 61446926247612941, guid: f55373ee22880484da257aa01ba581c4, type: 3}
+      propertyPath: m_LocalRotation.z
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 61446926247612941, guid: f55373ee22880484da257aa01ba581c4, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 61446926247612941, guid: f55373ee22880484da257aa01ba581c4, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 61446926247612941, guid: f55373ee22880484da257aa01ba581c4, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.z
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 763590577590954314, guid: f55373ee22880484da257aa01ba581c4, type: 3}
+      propertyPath: intervalSeconds
+      value: 10
+      objectReference: {fileID: 0}
+    - target: {fileID: 1945116408546878632, guid: f55373ee22880484da257aa01ba581c4, type: 3}
+      propertyPath: m_Name
+      value: TrainCenterLarge
+      objectReference: {fileID: 0}
+    - target: {fileID: 763590577590954314, guid: f55373ee22880484da257aa01ba581c4, type: 3}
+      propertyPath: pattern
+      value: 2
+      objectReference: {fileID: 0}
+    - target: {fileID: 763590577590954314, guid: f55373ee22880484da257aa01ba581c4, type: 3}
+      propertyPath: trainSize.x
+      value: 6
+      objectReference: {fileID: 0}
+    m_RemovedComponents: []
+    m_RemovedGameObjects: []
+    m_AddedGameObjects: []
+    m_AddedComponents: []
+  m_SourcePrefab: {fileID: 100100000, guid: f55373ee22880484da257aa01ba581c4, type: 3}
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
   m_ObjectHideFlags: 0
   m_Roots:
+  - {fileID: 5300000003}
   - {fileID: 1376065870}
   - {fileID: 1049219761}
   - {fileID: 2113064755}
