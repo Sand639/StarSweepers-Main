@@ -587,6 +587,31 @@ public class FishingNetSupply : NetworkBehaviour
         }
     }
 
+    /// <summary>
+    /// **ホストだけが呼ぶ。** ゴールの渦に吸い込まれ始めたことを、参加者のPCへ知らせる（小さくなる動きを同じ時刻で出すため）。
+    /// 位置と回転はホストが動かし、NetworkTransform で配られる。
+    /// </summary>
+    public void ServerBeginAbsorb(float startTime, float seconds, bool pillarMotion)
+    {
+        if (!IsServer)
+        {
+            return;
+        }
+
+        hookedByPlayerIndex.Value = -1;
+        BeginAbsorbClientRpc(startTime, seconds, pillarMotion);
+    }
+
+    /// <summary>pillarMotion：光の柱の動き（上へ運んで光って消える）か、渦の吸い込みか（ホストが決めた物）。</summary>
+    [ClientRpc]
+    private void BeginAbsorbClientRpc(float startTime, float seconds, bool pillarMotion)
+    {
+        if (!IsServer)
+        {
+            GoalAbsorb.Begin(hookable, default, startTime, seconds, pillarMotion, null);
+        }
+    }
+
     /// <summary>ホストが点を入れたあとに、投げた人の記録を消す。</summary>
     public void ClearLastThrower()
     {
