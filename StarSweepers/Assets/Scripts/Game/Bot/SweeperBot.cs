@@ -256,11 +256,7 @@ public partial class SweeperBot : MonoBehaviour
         aim = GetComponent<SweeperAim>();
         navPath = new NavMeshPath();
 
-        // 撃ち方は、ホストのポーズ画面の設定ではなく、体（プレハブ）のまま（2026/11/17）
-        if (shooter != null)
-        {
-            shooter.FollowSettings = false;
-        }
+        // 撃ち方は、人と同じくロビーコンソールのプレイヤー挙動に従う（試合のルールなので。2026/11/18）
 
         if (shooter == null || reel == null)
         {

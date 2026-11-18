@@ -99,6 +99,81 @@ public partial class SpaceJunkSession
         }
     }
 
+    // ------------------------------------------------------------
+    // プレイヤー挙動のパターン（2026/11/18・小野田さん）
+    // ------------------------------------------------------------
+
+    /// <summary>その段階の通信の値。</summary>
+    private NetworkVariable<int> BehaviorVariable(PlayerBehaviorStep step)
+    {
+        switch (step)
+        {
+            case PlayerBehaviorStep.Aim: return behaviorAim;
+            case PlayerBehaviorStep.Fire: return behaviorFire;
+            case PlayerBehaviorStep.Pull: return behaviorPull;
+            default: return behaviorThrow;
+        }
+    }
+
+    /// <summary>いまのプレイヤー挙動のパターン（ホストが決めて配った値。参加者のPCからも読める）。</summary>
+    public PlayerBehaviorPattern BehaviorOf(PlayerBehaviorStep step)
+    {
+        return (PlayerBehaviorPattern)BehaviorVariable(step).Value;
+    }
+
+    /// <summary>いまの4つのパターンを、まとめて写す。</summary>
+    public PlayerBehaviorPattern[] CopyBehaviors()
+    {
+        PlayerBehaviorPattern[] values = new PlayerBehaviorPattern[PlayerBehavior.StepCount];
+        for (int i = 0; i < values.Length; i++)
+        {
+            values[i] = BehaviorOf((PlayerBehaviorStep)i);
+        }
+        return values;
+    }
+
+    /// <summary>
+    /// **プレイヤー挙動の、ある段階のパターンを変える（ホストだけ・ロビーにいる間だけ）。**
+    /// 固定の組（狙う⇔発射、引っ張る⇔投げる）は、組の段階も一緒に変わる（<see cref="PlayerBehavior.Assign"/>）。
+    /// 変えた値は、次にホストをしたときのために保存する。
+    /// </summary>
+    public void ServerSetBehavior(PlayerBehaviorStep step, PlayerBehaviorPattern pattern)
+    {
+        if (!IsServer)
+        {
+            return;
+        }
+
+        if (state.Value != SpaceJunkMatchState.Lobby)
+        {
+            Debug.LogWarning("[JUNK] プレイヤー挙動は、ロビーにいる間しか変えられません。");
+            return;
+        }
+
+        PlayerBehaviorPattern[] values = CopyBehaviors();
+        PlayerBehavior.Assign(values, step, pattern);
+        ServerApplyBehaviors(values, true);
+    }
+
+    /// <summary>4つのパターンを決まりに合わせて配る。<paramref name="remember"/> が true なら、このPCに保存する。</summary>
+    private void ServerApplyBehaviors(PlayerBehaviorPattern[] values, bool remember)
+    {
+        PlayerBehavior.Normalize(values);
+        for (int i = 0; i < values.Length; i++)
+        {
+            NetworkVariable<int> variable = BehaviorVariable((PlayerBehaviorStep)i);
+            if (variable.Value != (int)values[i])
+            {
+                variable.Value = (int)values[i];
+            }
+        }
+
+        if (remember)
+        {
+            PlayerBehavior.Save(values);
+        }
+    }
+
     /// <summary>
     /// 使うマップを、選ぶ／選ばないで切り替える。
     /// <paramref name="remember"/> が true なら、次にホストをしたときのために保存する

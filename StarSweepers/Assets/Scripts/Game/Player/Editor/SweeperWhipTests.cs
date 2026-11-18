@@ -53,40 +53,66 @@ public class SweeperWhipTests
     }
 
     /// <summary>
-    /// ポーズ画面の設定「撃ち方」が体に入ること、設定を変えると次に押したときから変わること、
-    /// 設定に合わせるのをやめる（ボット）とインスペクターの撃ち方に戻ることを確かめる。
-    /// 設定は PC に保存されるので、終わったら元に戻す。
+    /// プレイヤー挙動の「固定の組」の決まり（2026/11/18）：狙うを変えると発射も、発射を変えると狙うも同じパターンになる。
+    /// 引っ張る・投げるは A しか無いので、B にはならない。食い違った値は、前の段階（狙う）に合わせて直る。
+    /// </summary>
+    [Test]
+    public void Behavior_FixedPairs()
+    {
+        PlayerBehaviorPattern[] values = new PlayerBehaviorPattern[PlayerBehavior.StepCount];
+
+        PlayerBehavior.Assign(values, PlayerBehaviorStep.Aim, PlayerBehaviorPattern.B);
+        Assert.That(values[(int)PlayerBehaviorStep.Fire], Is.EqualTo(PlayerBehaviorPattern.B), "狙うを B にしたのに、発射が B にならない");
+
+        PlayerBehavior.Assign(values, PlayerBehaviorStep.Fire, PlayerBehaviorPattern.A);
+        Assert.That(values[(int)PlayerBehaviorStep.Aim], Is.EqualTo(PlayerBehaviorPattern.A), "発射を A にしたのに、狙うが A にならない");
+
+        PlayerBehavior.Assign(values, PlayerBehaviorStep.Pull, PlayerBehaviorPattern.B);
+        Assert.That(values[(int)PlayerBehaviorStep.Pull], Is.EqualTo(PlayerBehaviorPattern.A), "引っ張るに無いパターン（B）が入った");
+        Assert.That(values[(int)PlayerBehaviorStep.Throw], Is.EqualTo(PlayerBehaviorPattern.A));
+
+        values[(int)PlayerBehaviorStep.Aim] = PlayerBehaviorPattern.B;
+        values[(int)PlayerBehaviorStep.Fire] = PlayerBehaviorPattern.A;
+        values[(int)PlayerBehaviorStep.Throw] = PlayerBehaviorPattern.B;
+        PlayerBehavior.Normalize(values);
+        Assert.That(values[(int)PlayerBehaviorStep.Fire], Is.EqualTo(PlayerBehaviorPattern.B), "食い違った組が、狙うに合わせて直っていない");
+        Assert.That(values[(int)PlayerBehaviorStep.Throw], Is.EqualTo(PlayerBehaviorPattern.A), "投げるに無いパターンが A に直っていない");
+    }
+
+    /// <summary>
+    /// プレイヤー挙動「狙う・発射」（通信なしなので、このPCに保存した値）が体に入ること、変えると次に押したときから変わること、
+    /// 合わせるのをやめるとインスペクターの撃ち方に戻ることを確かめる。値は PC に保存されるので、終わったら元に戻す。
     /// </summary>
     private static IEnumerator RunSetting()
     {
         GameObject prefab = AssetDatabase.LoadAssetAtPath<GameObject>(PlayerPrefabPath);
         Assert.That(prefab, Is.Not.Null, "新しい体のプレハブが無い（メニューで作る）");
 
-        BeamShotType before = GameSettings.BeamShot;
+        PlayerBehaviorPattern[] before = PlayerBehavior.CopySaved();
         GameObject player = null;
         try
         {
-            GameSettings.BeamShot = BeamShotType.Aim;
+            SaveShot(PlayerBehaviorPattern.B);
             player = Object.Instantiate(prefab, Vector3.zero, Quaternion.identity);
             SweeperShooter shooter = player.GetComponent<SweeperShooter>();
-            Assert.That(shooter.Style, Is.EqualTo(SweeperShooter.ShotStyle.Aim), "設定が「溜め」なのに、体が溜めになっていない");
+            Assert.That(shooter.Style, Is.EqualTo(SweeperShooter.ShotStyle.Aim), "挙動が B（溜め）なのに、体が溜めになっていない");
 
-            // 押した瞬間と同じ合わせ方（設定が変わっていたら合わせる）
-            GameSettings.BeamShot = BeamShotType.Whip;
+            // 押した瞬間と同じ合わせ方（挙動が変わっていたら合わせる）
+            SaveShot(PlayerBehaviorPattern.A);
             MethodInfo apply = typeof(SweeperShooter).GetMethod("ApplySetting", BindingFlags.Instance | BindingFlags.NonPublic);
             apply.Invoke(shooter, new object[] { false });
-            Assert.That(shooter.Style, Is.EqualTo(SweeperShooter.ShotStyle.Whip), "設定を「鞭」にしたのに、鞭になっていない");
+            Assert.That(shooter.Style, Is.EqualTo(SweeperShooter.ShotStyle.Whip), "挙動を A（鞭）にしたのに、鞭になっていない");
 
-            // ボットと同じ：設定に合わせるのをやめると、プレハブの撃ち方（Whip）に戻り、設定を変えても変わらない
-            GameSettings.BeamShot = BeamShotType.Aim;
+            // 合わせるのをやめると、プレハブの撃ち方（Whip）に戻り、挙動を変えても変わらない
+            SaveShot(PlayerBehaviorPattern.B);
             shooter.FollowSettings = false;
-            Assert.That(shooter.Style, Is.EqualTo(SweeperShooter.ShotStyle.Whip), "設定に合わせるのをやめたのに、プレハブの撃ち方に戻っていない");
+            Assert.That(shooter.Style, Is.EqualTo(SweeperShooter.ShotStyle.Whip), "合わせるのをやめたのに、プレハブの撃ち方に戻っていない");
             yield return NextFrame();
             Assert.That(shooter.Style, Is.EqualTo(SweeperShooter.ShotStyle.Whip));
         }
         finally
         {
-            GameSettings.BeamShot = before;
+            PlayerBehavior.Save(before);
             if (player != null)
             {
                 Object.Destroy(player);
@@ -94,6 +120,14 @@ public class SweeperWhipTests
         }
 
         yield return null;
+    }
+
+    /// <summary>このPCに保存したプレイヤー挙動の「狙う」（発射も固定の組で同じになる）を変える。</summary>
+    private static void SaveShot(PlayerBehaviorPattern pattern)
+    {
+        PlayerBehaviorPattern[] values = PlayerBehavior.CopySaved();
+        PlayerBehavior.Assign(values, PlayerBehaviorStep.Aim, pattern);
+        PlayerBehavior.Save(values);
     }
 
     /// <summary>中身。再生を始めてから呼ぶ別の関数にしてある（SweeperBendTests と同じ理由）。</summary>

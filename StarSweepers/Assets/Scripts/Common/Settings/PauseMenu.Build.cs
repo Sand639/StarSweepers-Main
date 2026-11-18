@@ -114,7 +114,7 @@ public partial class PauseMenu
     /// 設定の画面の項目を並べる。y は画面の真ん中からの高さ（上が＋）。
     /// 1段目（y＝90）から「項目の高さ＋すき間」（88）の何段ぶん下か（× 2f、× 3f …）で置いている。
     /// ただし2本目のスライダーだけは、1段目から 96 下げた位置に直接置いている。
-    /// 項目を足すときは、下の「もどる」の段の数（× 6f）も1つ増やす。
+    /// 項目を足すときは、下の「もどる」の段の数（× 5f）も1つ増やす。
     /// </summary>
     private void BuildSettingsPage()
     {
@@ -133,28 +133,10 @@ public partial class PauseMenu
         CreateMenuItem(settingsPage.transform, ThrowOperationLabel(), 90f - (ItemHeight + ItemGap) * 4f,
             ToggleThrowOperation);
 
-        CreateMenuItem(settingsPage.transform, BeamShotLabel(), 90f - (ItemHeight + ItemGap) * 5f,
-            ToggleBeamShot);
+        // 「撃ち方：鞭／溜め」の項目は 2026/11/18 にやめた。ロビーコンソールのプレイヤー挙動（ホストが全員ぶん決める）に移した
 
-        CreateMenuItem(settingsPage.transform, "もどる", 90f - (ItemHeight + ItemGap) * 6f,
+        CreateMenuItem(settingsPage.transform, "もどる", 90f - (ItemHeight + ItemGap) * 5f,
             () => ShowSettings(false));
-    }
-
-    /// <summary>撃ち方の項目に出す文字（いまの設定を見せる。新しい体の光線。2026/11/17）。</summary>
-    private static string BeamShotLabel()
-    {
-        return GameSettings.BeamShot == BeamShotType.Aim
-            ? "撃ち方：溜め"
-            : "撃ち方：鞭";
-    }
-
-    /// <summary>撃ち方を 鞭 ⇔ 溜め に切り替えて保存し、項目の文字を新しくする（次に押したときから効く）。</summary>
-    private void ToggleBeamShot()
-    {
-        GameSettings.BeamShot = GameSettings.BeamShot == BeamShotType.Whip
-            ? BeamShotType.Aim
-            : BeamShotType.Whip;
-        BuildSettingsPageRefresh();
     }
 
     /// <summary>操作タイプの項目に出す文字（いまの設定を見せる）。</summary>

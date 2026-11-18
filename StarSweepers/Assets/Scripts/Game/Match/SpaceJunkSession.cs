@@ -171,6 +171,15 @@ public partial class SpaceJunkSession : NetworkBehaviour
     /// </summary>
     private readonly NetworkVariable<FixedString64Bytes> fixedMap = new NetworkVariable<FixedString64Bytes>(default);
 
+    /// <summary>
+    /// **プレイヤー挙動（狙う・発射・引っ張る・投げる）のパターン。** ホストがロビーコンソールで決め、全員の体がこれで動く
+    /// （<see cref="PlayerBehavior"/>。2026/11/18・小野田さん）。値は <see cref="PlayerBehaviorPattern"/> の数字。
+    /// </summary>
+    private readonly NetworkVariable<int> behaviorAim = new NetworkVariable<int>(0);
+    private readonly NetworkVariable<int> behaviorFire = new NetworkVariable<int>(0);
+    private readonly NetworkVariable<int> behaviorPull = new NetworkVariable<int>(0);
+    private readonly NetworkVariable<int> behaviorThrow = new NetworkVariable<int>(0);
+
     /// <summary>チームごとのラウンドの勝ち数。長さは常に <see cref="SpaceJunkTeams.MaxTeams"/>。</summary>
     private readonly NetworkList<int> roundWins = new NetworkList<int>();
 
@@ -367,6 +376,9 @@ public partial class SpaceJunkSession : NetworkBehaviour
 
             // 前回ホストをしたときのマップの選び方（チェックと「このマップで遊ぶ」）を読み込む
             LoadSavedMapChoice();
+
+            // 前回ホストをしたときのプレイヤー挙動のパターンを読み込む（2026/11/18）
+            ServerApplyBehaviors(PlayerBehavior.CopySaved(), false);
         }
     }
 

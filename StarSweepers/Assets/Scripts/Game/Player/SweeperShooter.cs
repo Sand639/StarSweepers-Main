@@ -16,7 +16,8 @@ using UnityEngine.InputSystem;
 /// **巻き取り中に向きを変えると、光線が釣り糸のようにしなる**（手元からは体の向きに少し遅れて出て、物資へ曲がってつながる。2026/11/4）。
 /// 撃った瞬間に <see cref="SweeperAnimation.PlayShoot"/>（A_SHOOT → A_AIM_01）を呼ぶ。
 ///
-/// **撃ち方は2つから選べる**（<see cref="shotStyle"/>。2026/11/17・小野田さんの変更案）。
+/// **撃ち方は2つから選べる**（<see cref="shotStyle"/>。2026/11/17・小野田さんの変更案）。2026/11/18 から、ロビーコンソールの
+/// プレイヤー挙動「1 狙う・2 発射」（A＝Whip／B＝Aim）で、ホストが全員ぶん決める（<see cref="PlayerBehavior"/>）。
 /// Whip（初期値）：溜めずに、押した瞬間に狙った向きへ光線が出て、最長 1 秒出し続けられる。向きを変えると**鞭のようにしなり**、
 /// 光線のどこかが物資に触れたらつかむ。Aim：上の表のとおり（溜めて長さを決めてから撃つ）。詳しくは `Documents/機能ドキュメント/鞭のように曲がる光線.md`。
 /// </summary>
@@ -57,7 +58,7 @@ public class SweeperShooter : MonoBehaviour
     [Tooltip("Whip：押すとすぐ狙った向きへ光線が出て、最長 Whip Seconds 秒出し続けられる。向きを変えると鞭のようにしなり、どこかが物資に触れたらつかむ。\nAim：今までどおり、押して溜めて長さを決め、離すとまっすぐ伸びる")]
     [SerializeField] private ShotStyle shotStyle = ShotStyle.Whip;
 
-    [Tooltip("ON：ポーズ画面の設定「撃ち方」（鞭／溜め）に合わせる。設定を変えると、次に押したときから変わる（インスペクターで変えた Shot Style は、設定を変えるまでそのまま）。\nOFF：いつもインスペクターの Shot Style。ボットは自分で OFF にする")]
+    [Tooltip("ON：ロビーコンソールでホストが決めたプレイヤー挙動「1 狙う・2 発射」（A＝鞭／B＝溜め）に合わせる。変わると、次に押したときから変わる（インスペクターで変えた Shot Style は、挙動が変わるまでそのまま）。通信なしのときは、このPCに保存した値。\nOFF：いつもインスペクターの Shot Style")]
     [SerializeField] private bool followSettings = true;
 
     [Header("鞭の光線（撃ち方が Whip のとき）")]
@@ -208,14 +209,15 @@ public class SweeperShooter : MonoBehaviour
     /// <summary>インスペクター（プレハブ）に入っていた撃ち方。設定に合わせるのをやめたときに戻す先。</summary>
     private ShotStyle inspectorStyle;
 
-    /// <summary>最後に合わせた、ポーズ画面の設定「撃ち方」。設定が変わったときだけ合わせ直すために持つ。</summary>
-    private BeamShotType appliedSetting;
+    /// <summary>最後に合わせた、プレイヤー挙動「狙う」のパターン。変わったときだけ合わせ直すために持つ。</summary>
+    private PlayerBehaviorPattern appliedSetting;
 
     /// <summary>Awake が済んだか。</summary>
     private bool awoken;
 
     /// <summary>
-    /// ポーズ画面の設定「撃ち方」に合わせるか（2026/11/17）。ボットは false にする（OFF にした瞬間、インスペクターの撃ち方に戻る）。
+    /// ロビーコンソールのプレイヤー挙動「狙う・発射」に合わせるか（2026/11/18。前はポーズ画面の設定「撃ち方」）。
+    /// OFF にした瞬間、インスペクターの撃ち方に戻る。
     /// </summary>
     public bool FollowSettings
     {
@@ -241,17 +243,26 @@ public class SweeperShooter : MonoBehaviour
         }
     }
 
-    /// <summary>ポーズ画面の設定「撃ち方」を Shot Style に入れる。<paramref name="force"/> が false なら、設定が変わったときだけ入れる。</summary>
+    /// <summary>
+    /// プレイヤー挙動「狙う」のパターンを Shot Style に入れる（A＝鞭、B＝溜め。「発射」は固定の組なので同じ）。
+    /// <paramref name="force"/> が false なら、パターンが変わったときだけ入れる。
+    /// </summary>
     private void ApplySetting(bool force)
     {
-        BeamShotType setting = GameSettings.BeamShot;
+        PlayerBehaviorPattern setting = PlayerBehavior.Get(PlayerBehaviorStep.Aim);
         if (!force && setting == appliedSetting)
         {
             return;
         }
 
         appliedSetting = setting;
-        shotStyle = setting == BeamShotType.Aim ? ShotStyle.Aim : ShotStyle.Whip;
+        shotStyle = StyleOf(setting);
+    }
+
+    /// <summary>プレイヤー挙動「狙う・発射」のパターンにあたる撃ち方（A＝鞭、B＝溜め）。</summary>
+    public static ShotStyle StyleOf(PlayerBehaviorPattern pattern)
+    {
+        return pattern == PlayerBehaviorPattern.B ? ShotStyle.Aim : ShotStyle.Whip;
     }
 
     /// <summary>鞭の光線を出している最中か（ボットは、この間ボタンを押し続ける）。</summary>
@@ -462,7 +473,7 @@ public class SweeperShooter : MonoBehaviour
             case ShotPhase.Idle:
                 if (pressed && !stunned)
                 {
-                    // ポーズ画面で撃ち方が変えられていたら、ここで合わせる（撃っている途中では変えない）
+                    // ロビーコンソールで挙動が変えられていたら、ここで合わせる（撃っている途中では変えない）
                     if (followSettings)
                     {
                         ApplySetting(false);

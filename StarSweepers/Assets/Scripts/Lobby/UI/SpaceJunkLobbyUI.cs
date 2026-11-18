@@ -19,6 +19,8 @@ using UnityEngine.SceneManagement;
 ///   ・ロビーのシーンに画面が置かれていなければ、プレハブから出す（置き忘れの保険）
 ///   ・**このPCで遊ぶ人数（1台で複数人）**の小窓を出し、人数をホストへ伝える（<see cref="LocalMultiplayer"/>）。
 ///     プレハブの画面には入れず、OnGUI の小窓で出している（2026/10/7。ロビーの画面のプレハブを触らずに済むように）
+///   ・同じ小窓（**ロビーコンソール**）に、デバッグ用のボットの数と、**プレイヤー挙動のパターン**（狙う・発射・引っ張る・投げる。
+///     ホストが選び、全員に効く。2026/11/18）も出す（<see cref="PlayerBehavior"/>）
 /// </summary>
 public class SpaceJunkLobbyUI : MonoBehaviour
 {
@@ -72,7 +74,7 @@ public class SpaceJunkLobbyUI : MonoBehaviour
     /// 「このPCで遊ぶ人数」の小窓（つかんで動かせる枠）。
     /// 最初は画面の右端から 12 内側・上から 260 の所に、幅 340 で出す（1920×1080 のときの大きさ）。
     /// </summary>
-    private readonly DraggableGuiPanel localPlayersPanel = new DraggableGuiPanel("このPCで遊ぶ人数", 1f, -12f, 260f, 340f);
+    private readonly DraggableGuiPanel localPlayersPanel = new DraggableGuiPanel("ロビーコンソール（ボット・挙動・このPCで遊ぶ人数）", 1f, -12f, 260f, 520f);
 
     /// <summary>小窓の文字の見た目。GUI.skin は OnGUI の中でしか使えないので、最初の OnGUI で作る。</summary>
     private GUIStyle labelStyle;
@@ -183,6 +185,7 @@ public class SpaceJunkLobbyUI : MonoBehaviour
     private void DrawLocalPlayers()
     {
         DrawBots();
+        DrawBehaviors();
 
         GUILayout.BeginHorizontal();
         if (GUILayout.Button("－", GUILayout.Width(32f)))
@@ -271,6 +274,69 @@ public class SpaceJunkLobbyUI : MonoBehaviour
         GUILayout.EndHorizontal();
 
         GUILayout.Space(6f);
+    }
+
+    /// <summary>
+    /// **プレイヤー挙動**（1 狙う・2 発射・3 引っ張る・4 投げる）のパターン（2026/11/18・小野田さん）。
+    /// ホストは段階ごとに「＜」「＞」でパターンを変えられる。参加者には、いまの値だけを見せる。
+    /// 固定の組（狙う⇔発射、引っ張る⇔投げる）は、片方を変えるともう片方も変わる（<see cref="PlayerBehavior"/>）。
+    /// </summary>
+    private void DrawBehaviors()
+    {
+        SpaceJunkSession session = SpaceJunkSession.Current;
+        if (session == null)
+        {
+            return;
+        }
+
+        bool canEdit = session.IsServer;
+        GUILayout.Label(canEdit ? "プレイヤー挙動（全員に効く）" : "プレイヤー挙動（ホストが決める）", labelStyle);
+
+        for (int i = 0; i < PlayerBehavior.StepCount; i++)
+        {
+            PlayerBehaviorStep step = (PlayerBehaviorStep)i;
+            PlayerBehaviorPattern current = session.BehaviorOf(step);
+            PlayerBehaviorPattern[] patterns = PlayerBehavior.PatternsOf(step);
+
+            GUILayout.BeginHorizontal();
+            GUILayout.Label(PlayerBehavior.NameOf(step), labelStyle, GUILayout.Width(88f));
+
+            bool saved = GUI.enabled;
+            GUI.enabled = saved && canEdit && patterns.Length > 1;
+            if (GUILayout.Button("＜", GUILayout.Width(28f)))
+            {
+                session.ServerSetBehavior(step, Neighbor(patterns, current, -1));
+            }
+            GUILayout.Label($"  {current}", labelStyle, GUILayout.Width(32f));
+            if (GUILayout.Button("＞", GUILayout.Width(28f)))
+            {
+                session.ServerSetBehavior(step, Neighbor(patterns, current, 1));
+            }
+            GUI.enabled = saved;
+
+            // 組の後ろの段階（発射・投げる）は、前の段階と固定の組なら「固定」とだけ書く
+            bool follower = step == PlayerBehaviorStep.Fire || step == PlayerBehaviorStep.Throw;
+            string note = follower && PlayerBehavior.IsFixedPair(step, current)
+                ? $"└ {PlayerBehavior.NameOf(PlayerBehavior.PartnerOf(step)).Substring(2)}と固定"
+                : PlayerBehavior.Describe(step, current);
+            GUILayout.Label(note, labelStyle);
+            GUILayout.EndHorizontal();
+        }
+
+        GUILayout.Space(6f);
+    }
+
+    /// <summary><paramref name="patterns"/> の中で、<paramref name="current"/> の隣（<paramref name="offset"/> が -1 なら前、+1 なら次。端は反対側へ回る）。</summary>
+    private static PlayerBehaviorPattern Neighbor(PlayerBehaviorPattern[] patterns, PlayerBehaviorPattern current, int offset)
+    {
+        int index = System.Array.IndexOf(patterns, current);
+        if (index < 0)
+        {
+            return patterns[0];
+        }
+
+        int count = patterns.Length;
+        return patterns[((index + offset) % count + count) % count];
     }
 
     /// <summary>機器がつながっていれば「○」、無ければ「－」。</summary>
