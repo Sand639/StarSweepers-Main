@@ -64,7 +64,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d5a57f767e5e46a458fc5d3c628d0cbb, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Unity.Netcode.Runtime::Unity.Netcode.NetworkObject
-  GlobalObjectIdHash: 3160497423
+  GlobalObjectIdHash: 4185652134
   InScenePlacedSourceGlobalObjectIdHash: 0
   m_InScenePlacedDisabledByDefault: 0
   DeferredDespawnTick: 0
@@ -236,6 +236,7 @@ MonoBehaviour:
   resetButton: 4
   fallResetHeight: -8
   respawnLockSeconds: 3
+  showRadar: 0
   radarFrame: {fileID: 21300000, guid: b652b1e57f0aa4044bd3287a56cba29e, type: 3}
   radarCompass: {fileID: 21300000, guid: 6f1aabd4b43821e4fa99e58794b86fff, type: 3}
   radarSelf: {fileID: 21300000, guid: 90809c33bf2411348aa5b44ada3cb6c2, type: 3}
@@ -361,6 +362,13 @@ MonoBehaviour:
   heavyDragMinDistance: 0.8
   heavyDragSpeed: 3
   heavyStopDistance: 2
+  throwZoneEnd: 0.18
+  criticalNear: 0.33
+  criticalFar: 0.4
+  throwMinStrength: 1
+  middlePullStrength: 0.5
+  farPullMinStrength: 0.2
+  distanceReelSpeed: 5.5
   criticalStart: 1
   criticalLength: 0.2
   criticalBackDistance: 18
@@ -771,6 +779,9 @@ MonoBehaviour:
   lift: 0.025
   color: {r: 0.3, g: 0.6, b: 0.95, a: 1}
   alpha: 0.85
+  throwZoneColor: {r: 1, g: 0.45, b: 0.1, a: 1}
+  pullZoneColor: {r: 0.2, g: 0.55, b: 1, a: 1}
+  criticalZoneColor: {r: 1, g: 0.9, b: 0.15, a: 1}
 --- !u!1001 &681065990896444453
 PrefabInstance:
   m_ObjectHideFlags: 0

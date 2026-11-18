@@ -257,7 +257,7 @@ StarSweepers-Main/                     ← リポジトリのルート
     │       ├── MainLoop/             タイトルとロビー（TitleScene・Lobby。2026/11/11 から Lobby。前のロビー SpaceJunkLobby は使っていない）
     │       ├── Stage/            ステージ（`STAGE_Simple`・`STAGE_Train` など。名前の付け方と一覧は `宇宙ごみのマップの作り方.md`）
     │       ├── HansStages/       Hansさんのステージ
-    │       └── Test/             機能ごとの検証用シーン（ビルドには含めない）。いまは `SceneTransitionTest`・`TeamScoreBarUITest`・`DebrisSetUITest`・`StageBarrierTest`・`GoalScoreEffectTest`・`HighValueRouletteUITest`・`SweeperWhipTest`（ほかはメニューで作る）
+    │       └── Test/             機能ごとの検証用シーン（ビルドには含めない）。いまは `SceneTransitionTest`・`TeamScoreBarUITest`・`DebrisSetUITest`・`StageBarrierTest`・`GoalScoreEffectTest`・`HighValueRouletteUITest`・`ProceduralStarrySkyTest`・`GoalEffectTest`・`SweeperWhipTest`（ほかはメニューで作る）
     ├── Packages/
     ├── steam_appid.txt           Steam のテスト用の App ID（480）。Steam の外で起動するときに使う
     └── ProjectSettings/
@@ -756,3 +756,6 @@ Unityは `.meta` ファイルで各アセットの参照を管理しているた
 | 11/12（木） | Claude Code | リポジトリ構成の図を今の状態に合わせた（`Resources/` に高単価デブリのルーレットUIのプレハブが入った、`Scenes/Test/` の検証シーンに `StageBarrierTest`・`HighValueRouletteUITest` を足した）。ルールの部分は変えていない |
 | 11/12（木） | Claude Code | リポジトリ構成の図の `Scenes/Test/` の検証シーンに `StageBarrierTest`・`GoalScoreEffectTest` を足した（バリアとゴールの得点の演出の検証シーンができたため）。ルールは変えていない |
 | 11/17（火） | Claude Code | リポジトリ構成の図の `Scenes/Test/` の検証シーンに `SweeperWhipTest` を足した（鞭のように曲がる光線の検証シーンができたため）。ルールは変えていない |
+| 11/17（火） | Claude Code | リポジトリ構成の図の `Scenes/Test/` の検証シーンに `ProceduralStarrySkyTest` を足した（計算で作る星空の検証シーンができたため）。ルールは変えていない |
+| 11/17（火） | Claude Code | リポジトリ構成の図の `Scenes/Test/` の検証シーンに `GoalEffectTest` を足した（ゴールの渦の検証シーンができたため）。ルールは変えていない |
+| 11/17（火） | Claude Code | リポジトリ構成の図の `Scenes/Test/` の検証シーン `GoalVortexTest` を `GoalEffectTest` にした（名前から SpaceJunk を外す整理で、検証シーンの名前も変えたため）。ルールは変えていない |

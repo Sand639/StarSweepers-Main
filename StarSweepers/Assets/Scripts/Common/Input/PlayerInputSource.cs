@@ -63,6 +63,10 @@ public class PlayerInputSource : MonoBehaviour
     public ThrowOperationType ThrowOperation =>
         UsesVirtual ? ThrowOperationType.TwoButtons : GameSettings.ThrowOperation;
 
+    /// <summary>新しい体の光線の操作。ボットはいつも今までどおり、人はPCの設定（<see cref="GameSettings.BeamOperation"/>）。</summary>
+    public BeamOperationType BeamOperation =>
+        UsesVirtual ? BeamOperationType.Normal : GameSettings.BeamOperation;
+
     /// <summary>
     /// 読んでいる席。単体操作のとき、または席がまだ無い（InputSeatManager が無い・番号が大きすぎる）ときは null。
     /// **席で読む設定なのに null のときは、何も入力しない**（全員が同じ機器で動いてしまわないように）。

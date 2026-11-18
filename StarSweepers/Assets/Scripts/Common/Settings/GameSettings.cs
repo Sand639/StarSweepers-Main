@@ -42,6 +42,22 @@ public enum ThrowOperationType
 }
 
 /// <summary>
+/// **新しい体（Sweeper）の光線の操作**（<see cref="SweeperReel"/>。2026/11/17・大槻さんの案）。
+/// </summary>
+public enum BeamOperationType
+{
+    /// <summary>今までどおり。当たったら決まった時間で引き寄せ、途中で押すと後ろへ投げる（クリティカルあり）。</summary>
+    Normal = 0,
+
+    /// <summary>
+    /// **引き寄せの途中で押した瞬間の距離で、前へ投げる・引っ張る（後ろへ）・クリティカルプルのどれかと、その強さが決まる。**
+    /// ビームの長さの上限（12m）を 100% として、前へ投げる 0〜20%・引っ張る 20〜29%・クリティカルプル 29〜32%・引っ張る 32〜100%（大槻さんの指定）。
+    /// 強さは、いつもの飛ぶ速さに掛ける。
+    /// </summary>
+    DistanceStrength = 1
+}
+
+/// <summary>
 /// **設定画面で変えられる値**を、どこからでも見られるようにしたもの。
 ///
 /// 音量・マウス感度・コントローラー操作方法・レティクル・投げ方を保存する。
@@ -53,6 +69,7 @@ public enum ThrowOperationType
 /// | **操作タイプ**（<see cref="ControllerOperation"/>） | コントローラーの移動・向き、フックの引き寄せ方 |
 /// | **レティクル**（<see cref="AimReticle"/>） | 溜めている間の狙いの見せ方（HookChargeStrip） |
 /// | **投げ方**（<see cref="ThrowOperation"/>） | 宇宙ごみ式のフックの撃ち方・投げ方（HookController・ThrowController） |
+/// | **光線の操作**（<see cref="BeamOperation"/>） | 新しい体の光線で押したときの飛ばし方（SweeperReel。2026/11/17） |
 /// | **名前・フレームレート・垂直同期・画質** | タイトル画面で変える（下のほうにまとめてある。2026/10/6） |
 ///
 /// 上の5つはポーズ画面（<see cref="PauseMenu"/>）の設定で変える（音量・マウス感度・操作タイプは、タイトル画面でも変えられる）。
@@ -78,6 +95,7 @@ public static class GameSettings
     private const string ControllerOperationKey = "StarSweepers.ControllerOperationType";
     private const string AimReticleKey = "StarSweepers.AimReticleType";
     private const string ThrowOperationKey = "StarSweepers.ThrowOperationType";
+    private const string BeamOperationKey = "StarSweepers.BeamOperationType";
 
     // 読み込んだ値の控え（Load のあとはこちらを返す）
     private static float volume = 1f;
@@ -88,6 +106,26 @@ public static class GameSettings
     private static ControllerOperationType controllerOperationType = ControllerOperationType.TypeA;
     private static AimReticleType aimReticleType = AimReticleType.TypeA;
     private static ThrowOperationType throwOperationType = ThrowOperationType.TwoButtons;
+    private static BeamOperationType beamOperationType = BeamOperationType.Normal;
+
+    /// <summary>新しい体の光線の操作。Normal が今までの操作。</summary>
+    public static BeamOperationType BeamOperation
+    {
+        get
+        {
+            Load();
+            return beamOperationType;
+        }
+        set
+        {
+            Load();
+            beamOperationType = value == BeamOperationType.DistanceStrength
+                ? BeamOperationType.DistanceStrength
+                : BeamOperationType.Normal;
+            PlayerPrefs.SetInt(BeamOperationKey, (int)beamOperationType);
+            PlayerPrefs.Save();
+        }
+    }
 
     /// <summary>フックの投げ方。TwoButtons が今までの操作。</summary>
     public static ThrowOperationType ThrowOperation
@@ -213,6 +251,9 @@ public static class GameSettings
         throwOperationType = PlayerPrefs.GetInt(ThrowOperationKey, 0) == 1
             ? ThrowOperationType.OneButton
             : ThrowOperationType.TwoButtons;
+        beamOperationType = PlayerPrefs.GetInt(BeamOperationKey, 0) == 1
+            ? BeamOperationType.DistanceStrength
+            : BeamOperationType.Normal;
 
         AudioListener.volume = volume;
     }

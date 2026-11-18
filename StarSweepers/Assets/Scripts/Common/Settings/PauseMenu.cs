@@ -30,6 +30,7 @@ using UnityEngine.UI;
 /// | **操作タイプ：タイプA／B** | コントローラーの移動・向きの操作と、フックの引き寄せ方 | FishingPlayerController・PlayerAimController・ThrowController |
 /// | **レティクル：タイプA／B** | 溜めている間の狙いの見せ方 | HookChargeStrip |
 /// | **投げ方：左右で使い分け／ZRワンボタン** | 宇宙ごみ式のフックの撃ち方・投げ方 | HookController・ThrowController |
+/// | **光線の操作：いつもの／距離で変わる** | 新しい体の光線で押したとき（押した瞬間の距離で、前へ投げるか引っ張るかと強さが決まる。2026/11/17） | SweeperReel |
 ///
 /// 切り替えの項目は、押すたびにもう片方へ変わり、**設定の画面を作り直して**新しい文字を見せる
 /// （<see cref="BuildSettingsPageRefresh"/>）。
