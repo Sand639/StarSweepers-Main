@@ -63,9 +63,14 @@ public class PlayerInputSource : MonoBehaviour
     public ThrowOperationType ThrowOperation =>
         UsesVirtual ? ThrowOperationType.TwoButtons : GameSettings.ThrowOperation;
 
-    /// <summary>新しい体の光線の操作。ボットはいつも今までどおり、人はPCの設定（<see cref="GameSettings.BeamOperation"/>）。</summary>
+    /// <summary>
+    /// 新しい体の光線の操作。ボットはいつも今までどおり（ボットの頭は、いつもの操作のタイミングしか知らないため）。
+    /// 人は、ロビーコンソールのプレイヤー挙動「3 引っ張る・4 投げる」（A＝いつもの、B＝距離で変わる。2026/11/18）。
+    /// </summary>
     public BeamOperationType BeamOperation =>
-        UsesVirtual ? BeamOperationType.Normal : GameSettings.BeamOperation;
+        UsesVirtual || PlayerBehavior.Get(PlayerBehaviorStep.Pull) != PlayerBehaviorPattern.B
+            ? BeamOperationType.Normal
+            : BeamOperationType.DistanceStrength;
 
     /// <summary>
     /// 読んでいる席。単体操作のとき、または席がまだ無い（InputSeatManager が無い・番号が大きすぎる）ときは null。

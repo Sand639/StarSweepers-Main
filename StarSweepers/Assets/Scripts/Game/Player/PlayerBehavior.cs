@@ -32,7 +32,7 @@ public enum PlayerBehaviorPattern
 /// | 段階 | A | B | C | D |
 /// | --- | --- | --- | --- | --- |
 /// | 1 狙う・2 発射 | **鞭**（押した瞬間に狙った向きへ出て、体を振ってしならせて当てる） | **溜め**（押して長さを決め、離すとまっすぐ伸びる） | **曲げ撃ち**（体はあまり回らず、光線の先がすぐ狙いへ曲がる） | **曲げ撃ち（遅れ）**（C と同じで、先が遅れて付いていく） |
-/// | 3 引っ張る・4 投げる | **しなって引き寄せ、押せば後ろへ投げる／押さなければ前へはじき飛ぶ** | （まだ無い） | （まだ無い） | （まだ無い） |
+/// | 3 引っ張る・4 投げる | **しなって引き寄せ、押せば後ろへ投げる／押さなければ前へはじき飛ぶ** | **距離で変わる**（押した瞬間の距離で、前へ投げる・引っ張る・クリティカルと強さが決まる。大槻さんの案。ボットは A のまま） | （まだ無い） | （まだ無い） |
 ///
 /// C・D は中身（作り）が同じで、パラメータ（インスペクターの値）をパターンごとに別に持つ（2026/11/18・小野田さん）。
 ///
@@ -54,8 +54,8 @@ public static class PlayerBehavior
     {
         new[] { PlayerBehaviorPattern.A, PlayerBehaviorPattern.B, PlayerBehaviorPattern.C, PlayerBehaviorPattern.D }, // 狙う
         new[] { PlayerBehaviorPattern.A, PlayerBehaviorPattern.B, PlayerBehaviorPattern.C, PlayerBehaviorPattern.D }, // 発射
-        new[] { PlayerBehaviorPattern.A },                          // 引っ張る
-        new[] { PlayerBehaviorPattern.A },                          // 投げる
+        new[] { PlayerBehaviorPattern.A, PlayerBehaviorPattern.B }, // 引っ張る
+        new[] { PlayerBehaviorPattern.A, PlayerBehaviorPattern.B }, // 投げる
     };
 
     /// <summary>保存の名前（PlayerPrefs のキー）の頭。後ろに段階の数字が付く。変えると、今までの保存が読めなくなる。</summary>
@@ -94,7 +94,9 @@ public static class PlayerBehavior
             }
         }
 
-        return "しなって引き寄せ、押せば後ろへ投げる／押さなければ前へはじき飛ぶ";
+        return pattern == PlayerBehaviorPattern.B
+            ? "距離で変わる：押した瞬間の距離で、前へ投げる・引っ張る・クリティカルと強さが決まる"
+            : "しなって引き寄せ、押せば後ろへ投げる／押さなければ前へはじき飛ぶ";
     }
 
     /// <summary>その段階で選べるパターン。</summary>

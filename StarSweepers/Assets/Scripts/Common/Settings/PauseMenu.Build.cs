@@ -133,27 +133,11 @@ public partial class PauseMenu
         CreateMenuItem(settingsPage.transform, ThrowOperationLabel(), 90f - (ItemHeight + ItemGap) * 4f,
             ToggleThrowOperation);
 
-        // 「撃ち方：鞭／溜め」の項目は 2026/11/18 にやめた。ロビーコンソールのプレイヤー挙動（ホストが全員ぶん決める）に移した
+        // 「撃ち方：鞭／溜め」「光線の操作：いつもの／距離で変わる」の項目は 2026/11/18 にやめた。
+        // ロビーコンソールのプレイヤー挙動（ホストが全員ぶん決める。狙う・発射／引っ張る・投げる）に移した
 
         CreateMenuItem(settingsPage.transform, "もどる", 90f - (ItemHeight + ItemGap) * 5f,
             () => ShowSettings(false));
-    }
-
-    /// <summary>光線の操作の項目に出す文字（いまの設定を見せる）。</summary>
-    private static string BeamOperationLabel()
-    {
-        return GameSettings.BeamOperation == BeamOperationType.DistanceStrength
-            ? "光線の操作：距離で変わる"
-            : "光線の操作：いつもの";
-    }
-
-    // 光線の操作の切り替え（新しい体だけに効く。2026/11/17）
-    private void ToggleBeamOperation()
-    {
-        GameSettings.BeamOperation = GameSettings.BeamOperation == BeamOperationType.Normal
-            ? BeamOperationType.DistanceStrength
-            : BeamOperationType.Normal;
-        BuildSettingsPageRefresh();
     }
 
     /// <summary>操作タイプの項目に出す文字（いまの設定を見せる）。</summary>

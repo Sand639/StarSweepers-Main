@@ -68,8 +68,11 @@ public class SweeperDistanceModeTests
     private static IEnumerator RunNoPress()
     {
         GameObject prefab = AssetDatabase.LoadAssetAtPath<GameObject>(PlayerPrefabPath);
-        BeamOperationType before = GameSettings.BeamOperation;
-        GameSettings.BeamOperation = BeamOperationType.DistanceStrength;
+        // 距離で変わる操作は、プレイヤー挙動「引っ張る・投げる」のパターン B（2026/11/18。前はポーズ画面の設定）。通信なしなので、このPCに保存した値を使う
+        PlayerBehaviorPattern[] before = PlayerBehavior.CopySaved();
+        PlayerBehaviorPattern[] distance = PlayerBehavior.CopySaved();
+        PlayerBehavior.Assign(distance, PlayerBehaviorStep.Pull, PlayerBehaviorPattern.B);
+        PlayerBehavior.Save(distance);
 
         GameObject ground = GameObject.CreatePrimitive(PrimitiveType.Plane);
         ground.transform.localScale = new Vector3(10f, 1f, 10f);
@@ -112,7 +115,7 @@ public class SweeperDistanceModeTests
         }
         finally
         {
-            GameSettings.BeamOperation = before;
+            PlayerBehavior.Save(before);
             Object.Destroy(player);
             Object.Destroy(box);
             Object.Destroy(ground);
@@ -134,8 +137,11 @@ public class SweeperDistanceModeTests
         GameObject prefab = AssetDatabase.LoadAssetAtPath<GameObject>(PlayerPrefabPath);
         Assert.That(prefab, Is.Not.Null, "新しい体のプレハブが無い");
 
-        BeamOperationType before = GameSettings.BeamOperation;
-        GameSettings.BeamOperation = BeamOperationType.DistanceStrength;
+        // 距離で変わる操作は、プレイヤー挙動「引っ張る・投げる」のパターン B（2026/11/18。前はポーズ画面の設定）。通信なしなので、このPCに保存した値を使う
+        PlayerBehaviorPattern[] before = PlayerBehavior.CopySaved();
+        PlayerBehaviorPattern[] distance = PlayerBehavior.CopySaved();
+        PlayerBehavior.Assign(distance, PlayerBehaviorStep.Pull, PlayerBehaviorPattern.B);
+        PlayerBehavior.Save(distance);
 
         GameObject ground = GameObject.CreatePrimitive(PrimitiveType.Plane);
         ground.transform.localScale = new Vector3(10f, 1f, 10f);
@@ -225,7 +231,7 @@ public class SweeperDistanceModeTests
         }
         finally
         {
-            GameSettings.BeamOperation = before;
+            PlayerBehavior.Save(before);
             Object.Destroy(player);
             Object.Destroy(box);
             Object.Destroy(ground);

@@ -78,13 +78,17 @@ public class SweeperWhipTests
         PlayerBehavior.Assign(values, PlayerBehaviorStep.Fire, PlayerBehaviorPattern.A);
         Assert.That(values[(int)PlayerBehaviorStep.Aim], Is.EqualTo(PlayerBehaviorPattern.A), "発射を A にしたのに、狙うが A にならない");
 
+        // 引っ張る・投げるの B（距離で変わる。2026/11/18）も固定の組。C は無いので入らない
         PlayerBehavior.Assign(values, PlayerBehaviorStep.Pull, PlayerBehaviorPattern.B);
-        Assert.That(values[(int)PlayerBehaviorStep.Pull], Is.EqualTo(PlayerBehaviorPattern.A), "引っ張るに無いパターン（B）が入った");
-        Assert.That(values[(int)PlayerBehaviorStep.Throw], Is.EqualTo(PlayerBehaviorPattern.A));
+        Assert.That(values[(int)PlayerBehaviorStep.Throw], Is.EqualTo(PlayerBehaviorPattern.B), "引っ張るを B にしたのに、投げるが B にならない");
+        PlayerBehavior.Assign(values, PlayerBehaviorStep.Throw, PlayerBehaviorPattern.C);
+        Assert.That(values[(int)PlayerBehaviorStep.Throw], Is.EqualTo(PlayerBehaviorPattern.B), "投げるに無いパターン（C）が入った");
+        PlayerBehavior.Assign(values, PlayerBehaviorStep.Throw, PlayerBehaviorPattern.A);
+        Assert.That(values[(int)PlayerBehaviorStep.Pull], Is.EqualTo(PlayerBehaviorPattern.A), "投げるを A にしたのに、引っ張るが A にならない");
 
         values[(int)PlayerBehaviorStep.Aim] = PlayerBehaviorPattern.B;
         values[(int)PlayerBehaviorStep.Fire] = PlayerBehaviorPattern.A;
-        values[(int)PlayerBehaviorStep.Throw] = PlayerBehaviorPattern.B;
+        values[(int)PlayerBehaviorStep.Throw] = PlayerBehaviorPattern.C;
         PlayerBehavior.Normalize(values);
         Assert.That(values[(int)PlayerBehaviorStep.Fire], Is.EqualTo(PlayerBehaviorPattern.B), "食い違った組が、狙うに合わせて直っていない");
         Assert.That(values[(int)PlayerBehaviorStep.Throw], Is.EqualTo(PlayerBehaviorPattern.A), "投げるに無いパターンが A に直っていない");
