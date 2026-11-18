@@ -20,7 +20,7 @@
 | `SpaceJunkLobbyScreen.NumberInputs.cs` | 数字の入力欄 |
 | `SpaceJunkLobbyScreen.Password.cs` | パスワード（ホストが変える） |
 | `SpaceJunkLobbyScreen.Settings.cs` | ゲーム設定（ルール・プレイヤー・マップの一覧） |
-| `SpaceJunkLobbyScreen.StartGame.cs` | ゲームを始める |
+| `SpaceJunkLobbyScreen.StartGame.cs` | ゲームを始める。検証用ロビーでは、床で準備完了する操作を案内する |
 
 ## 変数の置き場所
 
@@ -39,3 +39,4 @@
 | --- | --- | --- |
 | 2026/11/6 | Claude Code | 新規作成（大槻さんの依頼）。長いスクリプトを機能ごとのファイルに分けたので、分け方を書いた |
 | 2026/11/7 | Claude Code | 「変数の置き場所」を足し、ずれやすい行数の列を表から消した（大槻さんの依頼。AIが読んで気づいた弱点の修正） |
+| 2026/11/17 | Codex | 検証ロビーの準備完了の案内を追記 |

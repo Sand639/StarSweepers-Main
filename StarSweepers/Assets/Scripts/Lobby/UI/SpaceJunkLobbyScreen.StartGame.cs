@@ -53,6 +53,11 @@ public partial class SpaceJunkLobbyScreen
     /// <summary>始められない理由。始められるなら null。</summary>
     private static string StartProblem(SpaceJunkSession session)
     {
+        if (LobbyTestDeparture.Current != null)
+        {
+            return "自分のチームの床で Enter または B を押して準備完了にしてください。";
+        }
+
         NetworkManager manager = NetworkManager.Singleton;
         if (manager != null && !manager.NetworkConfig.EnableSceneManagement)
         {

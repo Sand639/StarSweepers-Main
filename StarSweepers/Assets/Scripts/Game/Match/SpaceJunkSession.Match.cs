@@ -18,7 +18,10 @@ public partial class SpaceJunkSession
     /// </summary>
     public void ServerStartMatch()
     {
-        if (!IsServer)
+        LobbyTestDeparture departure = LobbyTestDeparture.Current;
+        if (!IsServer ||
+            (departure != null && (State != SpaceJunkMatchState.Lobby || TestBoardingTime <= 0 ||
+                                   NetworkManager.ServerTime.Time < TestBoardingTime + departure.Duration)))
         {
             return;
         }

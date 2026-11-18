@@ -260,7 +260,7 @@ public partial class SpaceJunkPlayerSetup : MonoBehaviour
         }
 
         // 置き直しを待っている間は、落下の判定もしない（止めて待っているため）
-        if (!placementPending)
+        if (!placementPending && LobbyTestDeparture.Current?.IsBoarding != true)
         {
             CheckReset();
         }

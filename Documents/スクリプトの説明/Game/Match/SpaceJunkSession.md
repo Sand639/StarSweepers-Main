@@ -19,6 +19,7 @@
 | `SpaceJunkSession.Bots.cs` | デバッグ用のボット |
 | `SpaceJunkSession.HostSettings.cs` | ホストが設定を変える（チーム・ルール・マップ） |
 | `SpaceJunkSession.LobbyZones.cs` | ロビーのチームエリアと開始のカウントダウン |
+| `SpaceJunkSession.LobbyTest.cs` | 検証用ロビーの準備完了、乗る位置、出発時刻 |
 | `SpaceJunkSession.LocalPlayers.cs` | 1台のPCで複数人 |
 | `SpaceJunkSession.Match.cs` | ラウンドの進行（ホストだけ） |
 | `SpaceJunkSession.SlotCheck.cs` | 席の答え合わせ（ホストだけ） |
@@ -37,7 +38,7 @@
 
 逆に、**ロビーのカウントダウンの変数（`playersInTeamZones`・`lobbyCountdown…`）は入口のファイルにあるが、使うのは `SpaceJunkSession.LobbyZones.cs`**。
 
-入口の `Update` は、毎フレーム `LobbyZones.cs` の `UpdateLobbyStartCountdown` と、1秒ごとに `SlotCheck.cs` の `ServerCheckSlots` を呼んでいる。
+準備完了した席と乗り込み時刻（`testReadyPlayers`・`testBoardingTime`）は `LobbyTest.cs` にある。入口の `Update` は検証用ロビーで出発を進め、それ以外では従来のカウントダウンを進める。席の答え合わせも定期的に呼ぶ。
 
 ## 気をつけること
 
@@ -56,3 +57,4 @@
 | 2026/11/7 | Claude Code | 「変数の置き場所」を足し、ずれやすい行数の列を表から消した（大槻さんの依頼。AIが読んで気づいた弱点の修正） |
 | 2026/11/7 | Claude Code | `SpaceJunkSession.Bots.cs`：古い体用のボット（`SpaceJunkBot`）を消したので、ボットの頭を付ける所を `SweeperBot` だけにした。気をつけることに書き足した |
 | 2026/11/10 | Claude Code | `SpaceJunkSession.Match.cs`：試合を始めるとき、トランジション（`SceneTransition`）で全員の画面を覆ってからマップへ移るようにした。気をつけることに書き足した |
+| 2026/11/17 | Codex | 検証ロビーの準備完了と出発の担当ファイル・変数を追記 |
