@@ -26,6 +26,16 @@ using UnityEngine;
 /// </summary>
 public class SpaceJunkTrain : MonoBehaviour
 {
+    public enum TrainPattern
+    {
+        Always = 0,
+        SidePair = 1,
+        CenterLarge = 2,
+    }
+
+    [Tooltip("Always は従来どおり。SidePair と CenterLarge は同じ間隔・時刻の設定で使う")]
+    [SerializeField] private TrainPattern pattern = TrainPattern.Always;
+
     /// <summary>走る向き。</summary>
     public enum TrainDirection
     {
@@ -135,7 +145,7 @@ public class SpaceJunkTrain : MonoBehaviour
         // 片側の端から走り始めて、反対の端（2倍の距離）まで行ったら今回の通過は終わり
         float halfLength = Mathf.Max(1f, runHalfLength);
         float travelled = sinceStart * Mathf.Max(0.1f, Mathf.Abs(moveSpeed));
-        bool running = travelled <= halfLength * 2f;
+        bool running = RunsInCycle(index) && travelled <= halfLength * 2f;
 
         if (body.gameObject.activeSelf != running)
         {
@@ -194,6 +204,25 @@ public class SpaceJunkTrain : MonoBehaviour
 
         // 速さがマイナスなら逆向き
         return moveSpeed >= 0f ? south : !south;
+    }
+
+    private bool RunsInCycle(long index)
+    {
+        if (pattern == TrainPattern.Always)
+        {
+            return true;
+        }
+
+        // 同じ通過番号なら、参加者のPCとボットの予測も同じ組み合わせを選ぶ。
+        unchecked
+        {
+            ulong hash = (ulong)index + 0x9E3779B97F4A7C15UL;
+            hash = (hash ^ (hash >> 30)) * 0xBF58476D1CE4E5B9UL;
+            hash = (hash ^ (hash >> 27)) * 0x94D049BB133111EBUL;
+            hash ^= hash >> 31;
+            bool center = (hash & 1UL) != 0;
+            return center == (pattern == TrainPattern.CenterLarge);
+        }
     }
 
     /// <summary>
@@ -301,7 +330,7 @@ public class SpaceJunkTrain : MonoBehaviour
             double clock = now + t;
             long index = (long)System.Math.Floor(clock / interval);
             float travelled = (float)(clock - index * (double)interval) * speed;
-            if (travelled > halfLength * 2f)
+            if (!RunsInCycle(index) || travelled > halfLength * 2f)
             {
                 continue;
             }
