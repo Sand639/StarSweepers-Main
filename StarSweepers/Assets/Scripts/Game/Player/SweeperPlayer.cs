@@ -17,6 +17,8 @@ using UnityEngine;
 /// | <see cref="SweeperShooter"/> | 溜める・光線を伸ばす・当たったら巻き取りへ |
 /// | <see cref="SweeperReel"/> | 巻き取りと、前後への投げ・クリティカル |
 /// | <see cref="SweeperAnimation"/> | アニメーションの切り替え |
+/// | <see cref="CharacterColorController"/> | 服の色（Hans さん作。チームの色はここから渡す） |
+/// | <see cref="FaceExpressionController"/> | 顔の表情とまばたき（Hans さん作） |
 ///
 /// 詳しくは `Documents/機能ドキュメント/プレイヤーの本実装.md`。
 /// </summary>
@@ -36,6 +38,22 @@ public class SweeperPlayer : MonoBehaviour
 
     [Tooltip("Use Team Color が OFF のときの色")]
     [SerializeField] private Color customColor = Color.white;
+
+    [Header("服の色（体のモデルの赤い部分。Hans さんの CharacterColorController に渡す）")]
+    [Tooltip("ON：赤チームは、Hans さんが決めたモデルの元の色（M_Character の Suit Color）のまま。OFF：赤チームも下の表の色にする")]
+    [SerializeField] private bool redTeamUsesModelColor = true;
+
+    [Tooltip("チームごとの服の色（0 = 青、1 = 赤、2 = 緑、3 = 黄）。青は、元の赤の色の赤と青を入れ替えた色")]
+    [SerializeField] private Color[] suitColors =
+    {
+        new Color(0.192f, 0.333f, 0.808f), // 青
+        new Color(0.808f, 0.333f, 0.192f), // 赤（元の色と同じ）
+        new Color(0.250f, 0.640f, 0.250f), // 緑
+        new Color(0.860f, 0.700f, 0.190f), // 黄
+    };
+
+    /// <summary>赤チームの番号（<see cref="SpaceJunkTeams"/> の色の並びと同じ）。</summary>
+    private const int RedTeam = 1;
 
     /// <summary>名前。</summary>
     public string PlayerName => playerName;
@@ -87,6 +105,47 @@ public class SweeperPlayer : MonoBehaviour
         {
             shooter.SetColor(color);
         }
+
+        ApplySuitColor();
+    }
+
+    /// <summary>
+    /// **体のモデルの服の色（赤い部分）を、チームに合わせて塗り替える。**
+    /// 塗るのは Hans さんの <see cref="CharacterColorController"/>（体のモデル `Model` に付いている）。
+    /// 赤チームは元の色のまま、青チームは青に変わる。
+    /// </summary>
+    private void ApplySuitColor()
+    {
+        bool useModelColor = useTeamColor && teamIndex == RedTeam && redTeamUsesModelColor;
+        Color suit = SuitColor();
+
+        foreach (CharacterColorController suitPainter in GetComponentsInChildren<CharacterColorController>(true))
+        {
+            if (useModelColor)
+            {
+                suitPainter.ResetToDefault();
+            }
+            else
+            {
+                suitPainter.SetCustomColor(suit);
+            }
+        }
+    }
+
+    /// <summary>このプレイヤーの服の色。Use Team Color が OFF のときは Custom Color。</summary>
+    private Color SuitColor()
+    {
+        if (!useTeamColor)
+        {
+            return customColor;
+        }
+
+        if (suitColors == null || suitColors.Length == 0)
+        {
+            return SpaceJunkTeams.TeamColor(teamIndex);
+        }
+
+        return suitColors[Mathf.Clamp(teamIndex, 0, suitColors.Length - 1)];
     }
 
 #if UNITY_EDITOR
