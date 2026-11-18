@@ -322,6 +322,12 @@ MonoBehaviour:
   heavyDragMinDistance: 0.8
   heavyDragSpeed: 3
   heavyStopDistance: 2
+  throwZoneEnd: 0.2
+  criticalNear: 0.29
+  criticalFar: 0.32
+  throwMinStrength: 0.3
+  pullMinStrength: 0.3
+  distanceReelSpeed: 6
   criticalStart: 1
   criticalLength: 0.2
   criticalBackDistance: 11

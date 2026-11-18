@@ -256,6 +256,8 @@ public partial class SweeperBot : MonoBehaviour
         aim = GetComponent<SweeperAim>();
         navPath = new NavMeshPath();
 
+        // 撃ち方は、人と同じくロビーコンソールのプレイヤー挙動に従う（試合のルールなので。2026/11/18）
+
         if (shooter == null || reel == null)
         {
             Debug.LogError($"{name}: このボットは新しい体（SweeperShooter と SweeperReel が付いた物）に付けてください。", this);
@@ -339,6 +341,9 @@ public partial class SweeperBot : MonoBehaviour
                 {
                     PointAt(target.transform.position);
                 }
+
+                // 鞭・曲げ撃ちの光線（撃ち方 Whip・SteerSnap・SteerLag）は押している間だけ出るので、出ている間は押し続ける（曲げ撃ちは、素材を指し続けると先が素材へ曲がる）
+                hold = shooter.IsWhipping;
                 break;
         }
 

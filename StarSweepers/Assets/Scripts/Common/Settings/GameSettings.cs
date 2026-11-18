@@ -42,6 +42,24 @@ public enum ThrowOperationType
 }
 
 /// <summary>
+/// **新しい体（Sweeper）の光線の操作**（<see cref="SweeperReel"/>。2026/11/17・大槻さんの案）。
+/// 2026/11/18 から、ポーズ画面の設定ではなく、ロビーコンソールのプレイヤー挙動「3 引っ張る・4 投げる」で選ぶ（A＝Normal、B＝DistanceStrength。<see cref="PlayerBehavior"/>）。
+/// 体ごとの値は <see cref="PlayerInputSource.BeamOperation"/> で読む。
+/// </summary>
+public enum BeamOperationType
+{
+    /// <summary>今までどおり。当たったら決まった時間で引き寄せ、途中で押すと後ろへ投げる（クリティカルあり）。</summary>
+    Normal = 0,
+
+    /// <summary>
+    /// **引き寄せの途中で押した瞬間の距離で、前へ投げる・引っ張る（後ろへ）・クリティカルプルのどれかと、その強さが決まる。**
+    /// ビームの長さの上限（12m）を 100% として、前へ投げる 0〜20%・引っ張る 20〜29%・クリティカルプル 29〜32%・引っ張る 32〜100%（大槻さんの指定）。
+    /// 強さは、いつもの飛ぶ速さに掛ける。
+    /// </summary>
+    DistanceStrength = 1
+}
+
+/// <summary>
 /// **設定画面で変えられる値**を、どこからでも見られるようにしたもの。
 ///
 /// 音量・マウス感度・コントローラー操作方法・レティクル・投げ方を保存する。

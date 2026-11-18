@@ -1,0 +1,388 @@
+using System.Collections;
+using System.Reflection;
+using NUnit.Framework;
+using UnityEditor;
+using UnityEngine;
+using UnityEngine.TestTools;
+
+/// <summary>
+/// **鞭の光線（撃ち方 Whip）の自動テスト。**（2026/11/17・小野田さんの変更案）
+///
+/// 通信なしで、新しい体のプレハブ（`SweeperPlayer.prefab`）と箱1つだけを置いて確かめる。
+/// ・正面の箱には、まっすぐ伸びてつかむ
+/// ・真横の箱は、向きを変えなければつかめず、1 秒で光線が戻る
+/// ・真横の箱も、出している間に向きを変えて振れば、しなった光線が触れてつかめる
+///
+/// 体の向きはテストが手で決める（歩く部品 SweeperMover は止めておく）。
+/// `Window > General > Test Runner` の EditMode から実行できる。
+/// </summary>
+public class SweeperWhipTests
+{
+    private const string PlayerPrefabPath = "Assets/Prefabs/Player/SweeperPlayer.prefab";
+
+    [UnityTest]
+    public IEnumerator Front_GrabsStraight()
+    {
+        yield return new EnterPlayMode();
+        yield return Run(new Vector3(0f, 0.5f, 5f), false, true);
+        yield return new ExitPlayMode();
+    }
+
+    [UnityTest]
+    public IEnumerator Side_NoSwing_Misses()
+    {
+        yield return new EnterPlayMode();
+        yield return Run(new Vector3(5f, 0.5f, 0f), false, false);
+        yield return new ExitPlayMode();
+    }
+
+    [UnityTest]
+    public IEnumerator Side_Swing_Grabs()
+    {
+        yield return new EnterPlayMode();
+        yield return Run(new Vector3(5f, 0.5f, 0f), true, true);
+        yield return new ExitPlayMode();
+    }
+
+    /// <summary>
+    /// 爆弾を鞭でつかむと、導火線に火がつく（2026/11/18。新しい光線では火がつかず、爆弾が爆発しなかった）。
+    /// </summary>
+    [UnityTest]
+    public IEnumerator Bomb_GrabLightsFuse()
+    {
+        yield return new EnterPlayMode();
+        yield return Run(new Vector3(0f, 0.5f, 5f), false, true, true);
+        yield return new ExitPlayMode();
+    }
+
+    [UnityTest]
+    public IEnumerator Setting_ChangesStyle()
+    {
+        yield return new EnterPlayMode();
+        yield return RunSetting();
+        yield return new ExitPlayMode();
+    }
+
+    /// <summary>
+    /// プレイヤー挙動の「固定の組」の決まり（2026/11/18）：狙うを変えると発射も、発射を変えると狙うも同じパターンになる。
+    /// 引っ張る・投げるは A しか無いので、B にはならない。食い違った値は、前の段階（狙う）に合わせて直る。
+    /// </summary>
+    [Test]
+    public void Behavior_FixedPairs()
+    {
+        PlayerBehaviorPattern[] values = new PlayerBehaviorPattern[PlayerBehavior.StepCount];
+
+        PlayerBehavior.Assign(values, PlayerBehaviorStep.Aim, PlayerBehaviorPattern.B);
+        Assert.That(values[(int)PlayerBehaviorStep.Fire], Is.EqualTo(PlayerBehaviorPattern.B), "狙うを B にしたのに、発射が B にならない");
+
+        PlayerBehavior.Assign(values, PlayerBehaviorStep.Fire, PlayerBehaviorPattern.A);
+        Assert.That(values[(int)PlayerBehaviorStep.Aim], Is.EqualTo(PlayerBehaviorPattern.A), "発射を A にしたのに、狙うが A にならない");
+
+        // 引っ張る・投げるの B（距離で変わる。2026/11/18）も固定の組。C は無いので入らない
+        PlayerBehavior.Assign(values, PlayerBehaviorStep.Pull, PlayerBehaviorPattern.B);
+        Assert.That(values[(int)PlayerBehaviorStep.Throw], Is.EqualTo(PlayerBehaviorPattern.B), "引っ張るを B にしたのに、投げるが B にならない");
+        PlayerBehavior.Assign(values, PlayerBehaviorStep.Throw, PlayerBehaviorPattern.C);
+        Assert.That(values[(int)PlayerBehaviorStep.Throw], Is.EqualTo(PlayerBehaviorPattern.B), "投げるに無いパターン（C）が入った");
+        PlayerBehavior.Assign(values, PlayerBehaviorStep.Throw, PlayerBehaviorPattern.A);
+        Assert.That(values[(int)PlayerBehaviorStep.Pull], Is.EqualTo(PlayerBehaviorPattern.A), "投げるを A にしたのに、引っ張るが A にならない");
+
+        values[(int)PlayerBehaviorStep.Aim] = PlayerBehaviorPattern.B;
+        values[(int)PlayerBehaviorStep.Fire] = PlayerBehaviorPattern.A;
+        values[(int)PlayerBehaviorStep.Throw] = PlayerBehaviorPattern.C;
+        PlayerBehavior.Normalize(values);
+        Assert.That(values[(int)PlayerBehaviorStep.Fire], Is.EqualTo(PlayerBehaviorPattern.B), "食い違った組が、狙うに合わせて直っていない");
+        Assert.That(values[(int)PlayerBehaviorStep.Throw], Is.EqualTo(PlayerBehaviorPattern.A), "投げるに無いパターンが A に直っていない");
+
+        // 曲げ撃ち（C・D。2026/11/18）も、狙う⇔発射で固定の組。撃ち方は C＝SteerSnap、D＝SteerLag
+        PlayerBehavior.Assign(values, PlayerBehaviorStep.Fire, PlayerBehaviorPattern.D);
+        Assert.That(values[(int)PlayerBehaviorStep.Aim], Is.EqualTo(PlayerBehaviorPattern.D), "発射を D にしたのに、狙うが D にならない");
+        Assert.That(SweeperShooter.StyleOf(PlayerBehaviorPattern.C), Is.EqualTo(SweeperShooter.ShotStyle.SteerSnap));
+        Assert.That(SweeperShooter.StyleOf(PlayerBehaviorPattern.D), Is.EqualTo(SweeperShooter.ShotStyle.SteerLag));
+    }
+
+    /// <summary>
+    /// 曲げ撃ち C（先がすぐ狙いへ向く）：正面へ撃ってから狙いを真横へ動かすと、体はあまり回らずに、光線の先が曲がって真横の箱をつかむ（2026/11/18）。
+    /// </summary>
+    [UnityTest]
+    public IEnumerator SteerSnap_SideBox_GrabsWithoutTurningBody()
+    {
+        yield return new EnterPlayMode();
+        yield return RunSteer(SweeperShooter.ShotStyle.SteerSnap);
+        yield return new ExitPlayMode();
+    }
+
+    /// <summary>曲げ撃ち C：狙いを動かさなければ、光線はまっすぐのままで、右前の箱には届かない（2026/11/18）。</summary>
+    [UnityTest]
+    public IEnumerator SteerSnap_NoSteer_Misses()
+    {
+        yield return new EnterPlayMode();
+        yield return RunSteer(SweeperShooter.ShotStyle.SteerSnap, false);
+        yield return new ExitPlayMode();
+    }
+
+    /// <summary>曲げ撃ち D（先が遅れて付いていく）：C と同じく、体はあまり回らずに真横の箱をつかむ（2026/11/18）。</summary>
+    [UnityTest]
+    public IEnumerator SteerLag_SideBox_GrabsWithoutTurningBody()
+    {
+        yield return new EnterPlayMode();
+        yield return RunSteer(SweeperShooter.ShotStyle.SteerLag);
+        yield return new ExitPlayMode();
+    }
+
+    /// <summary>
+    /// 曲げ撃ちの中身（小野田さんの絵と同じ流れ）。体は正面（+Z）。正面へ撃ち、0.3 秒たったら狙いを真横（右・+X）へ動かす。
+    /// 光線の先は進路を右へ変え、右前の縦長の箱（x＝5、z＝3〜9）に入ってつかむ。体は 30° までしか回らない。
+    /// まっすぐ撃っただけでは届かない場所（光線のまっすぐの所から 5m 右）なので、曲がらなければつかめない。
+    /// 狙いは、狙いの部品（SweeperAim）を止めて、向きを直接入れる。体の向きは光線の部品が決める（歩く部品は止めておく）。
+    /// </summary>
+    private static IEnumerator RunSteer(SweeperShooter.ShotStyle style, bool steerAim = true)
+    {
+        GameObject prefab = AssetDatabase.LoadAssetAtPath<GameObject>(PlayerPrefabPath);
+        Assert.That(prefab, Is.Not.Null, "新しい体のプレハブが無い（メニューで作る）");
+
+        GameObject ground = GameObject.CreatePrimitive(PrimitiveType.Plane);
+        ground.transform.localScale = new Vector3(10f, 1f, 10f);
+
+        GameObject player = Object.Instantiate(prefab, Vector3.zero, Quaternion.identity);
+        GameObject box = GameObject.CreatePrimitive(PrimitiveType.Cube);
+        try
+        {
+            player.GetComponent<SweeperMover>().enabled = false;
+            player.transform.rotation = Quaternion.identity;
+
+            SweeperAim aim = player.GetComponent<SweeperAim>();
+            aim.enabled = false;
+            FieldInfo aimDirection = typeof(SweeperAim).GetField("lastDirection", BindingFlags.Instance | BindingFlags.NonPublic);
+            Assert.That(aimDirection, Is.Not.Null, "SweeperAim の lastDirection が見つからない");
+            aimDirection.SetValue(aim, Vector3.forward);
+
+            Vector3 steerTo = Vector3.right;
+            box.transform.position = new Vector3(5f, 0.5f, 6f);
+            box.transform.localScale = new Vector3(1f, 1f, 6f);
+            box.AddComponent<Rigidbody>();
+            box.AddComponent<HookableObject>();
+            yield return Wait(0.5f);
+
+            SweeperShooter shooter = player.GetComponent<SweeperShooter>();
+            shooter.FollowSettings = false;
+            shooter.Style = style;
+
+            Invoke(shooter, "BeginWhip");
+            Assert.That(shooter.IsWhipping, Is.True, "押しても光線が出ていない");
+
+            bool grabbed = false;
+            float maxBodyYaw = 0f;
+            float startTime = Time.time;
+            float until = Time.realtimeSinceStartup + 4f;
+            while (Time.realtimeSinceStartup < until)
+            {
+                float elapsed = Time.time - startTime;
+                if (steerAim && elapsed > 0.3f)
+                {
+                    aimDirection.SetValue(aim, steerTo);
+                }
+
+                maxBodyYaw = Mathf.Max(maxBodyYaw, Mathf.Abs(Mathf.DeltaAngle(0f, player.transform.eulerAngles.y)));
+
+                if (shooter.Phase == SweeperShooter.ShotPhase.Reeling)
+                {
+                    grabbed = true;
+                    break;
+                }
+
+                if (shooter.Phase == SweeperShooter.ShotPhase.Idle)
+                {
+                    break;
+                }
+
+                yield return NextFrame();
+            }
+
+            float seconds = Time.time - startTime;
+            Debug.Log($"[SweeperWhipTests] 曲げ撃ち {style} 曲げる={steerAim} つかんだ={grabbed} 経過={seconds:F2}秒 体が回った最大={maxBodyYaw:F1}° 段階={shooter.Phase}");
+
+            if (!steerAim)
+            {
+                Assert.That(grabbed, Is.False, "狙いを動かしていないのに、右前の箱をつかんだ（まっすぐの光線では届かない場所のはず）");
+                yield break;
+            }
+
+            Assert.That(grabbed, Is.True, $"狙いを右へ動かしたのに、右前の箱をつかめなかった（段階 {shooter.Phase}・光線の先 {shooter.BeamTip}）");
+            Assert.That(seconds, Is.LessThan(1.05f), "出していられる 1 秒を過ぎてからつかんだ");
+            Assert.That(maxBodyYaw, Is.LessThanOrEqualTo(31f), "体が回りすぎている（曲げ撃ちは、体は最大 30° まで）");
+        }
+        finally
+        {
+            Object.Destroy(player);
+            Object.Destroy(box);
+            Object.Destroy(ground);
+        }
+
+        yield return null;
+    }
+
+    /// <summary>
+    /// プレイヤー挙動「狙う・発射」（通信なしなので、このPCに保存した値）が体に入ること、変えると次に押したときから変わること、
+    /// 合わせるのをやめるとインスペクターの撃ち方に戻ることを確かめる。値は PC に保存されるので、終わったら元に戻す。
+    /// </summary>
+    private static IEnumerator RunSetting()
+    {
+        GameObject prefab = AssetDatabase.LoadAssetAtPath<GameObject>(PlayerPrefabPath);
+        Assert.That(prefab, Is.Not.Null, "新しい体のプレハブが無い（メニューで作る）");
+
+        PlayerBehaviorPattern[] before = PlayerBehavior.CopySaved();
+        GameObject player = null;
+        try
+        {
+            SaveShot(PlayerBehaviorPattern.B);
+            player = Object.Instantiate(prefab, Vector3.zero, Quaternion.identity);
+            SweeperShooter shooter = player.GetComponent<SweeperShooter>();
+            Assert.That(shooter.Style, Is.EqualTo(SweeperShooter.ShotStyle.Aim), "挙動が B（溜め）なのに、体が溜めになっていない");
+
+            // 押した瞬間と同じ合わせ方（挙動が変わっていたら合わせる）
+            SaveShot(PlayerBehaviorPattern.A);
+            MethodInfo apply = typeof(SweeperShooter).GetMethod("ApplySetting", BindingFlags.Instance | BindingFlags.NonPublic);
+            apply.Invoke(shooter, new object[] { false });
+            Assert.That(shooter.Style, Is.EqualTo(SweeperShooter.ShotStyle.Whip), "挙動を A（鞭）にしたのに、鞭になっていない");
+
+            // 合わせるのをやめると、プレハブの撃ち方（Whip）に戻り、挙動を変えても変わらない
+            SaveShot(PlayerBehaviorPattern.B);
+            shooter.FollowSettings = false;
+            Assert.That(shooter.Style, Is.EqualTo(SweeperShooter.ShotStyle.Whip), "合わせるのをやめたのに、プレハブの撃ち方に戻っていない");
+            yield return NextFrame();
+            Assert.That(shooter.Style, Is.EqualTo(SweeperShooter.ShotStyle.Whip));
+        }
+        finally
+        {
+            PlayerBehavior.Save(before);
+            if (player != null)
+            {
+                Object.Destroy(player);
+            }
+        }
+
+        yield return null;
+    }
+
+    /// <summary>このPCに保存したプレイヤー挙動の「狙う」（発射も固定の組で同じになる）を変える。</summary>
+    private static void SaveShot(PlayerBehaviorPattern pattern)
+    {
+        PlayerBehaviorPattern[] values = PlayerBehavior.CopySaved();
+        PlayerBehavior.Assign(values, PlayerBehaviorStep.Aim, pattern);
+        PlayerBehavior.Save(values);
+    }
+
+    /// <summary>中身。再生を始めてから呼ぶ別の関数にしてある（SweeperBendTests と同じ理由）。</summary>
+    private static IEnumerator Run(Vector3 boxPosition, bool swing, bool expectGrab, bool bomb = false)
+    {
+        GameObject prefab = AssetDatabase.LoadAssetAtPath<GameObject>(PlayerPrefabPath);
+        Assert.That(prefab, Is.Not.Null, "新しい体のプレハブが無い（メニューで作る）");
+
+        GameObject ground = GameObject.CreatePrimitive(PrimitiveType.Plane);
+        ground.transform.localScale = new Vector3(10f, 1f, 10f);
+
+        GameObject player = Object.Instantiate(prefab, Vector3.zero, Quaternion.identity);
+        GameObject box = GameObject.CreatePrimitive(PrimitiveType.Cube);
+        try
+        {
+            player.GetComponent<SweeperMover>().enabled = false;
+            player.transform.rotation = Quaternion.identity;
+
+            box.transform.position = boxPosition;
+            box.AddComponent<Rigidbody>();
+            box.AddComponent<HookableObject>();
+            ExplosiveObject explosive = null;
+            if (bomb)
+            {
+                explosive = box.AddComponent<ExplosiveObject>();
+                // 点滅させる見た目は空にしておく（テストの箱には要らない）
+                typeof(ExplosiveObject)
+                    .GetField("blinkRenderers", BindingFlags.Instance | BindingFlags.NonPublic)
+                    .SetValue(explosive, new Renderer[0]);
+            }
+            yield return Wait(0.5f);
+
+            SweeperShooter shooter = player.GetComponent<SweeperShooter>();
+            shooter.Style = SweeperShooter.ShotStyle.Whip;
+
+            // 押した瞬間と同じ（狙いは正面 +Z のまま。体も正面を向く）
+            Invoke(shooter, "BeginWhip");
+            Assert.That(shooter.IsWhipping, Is.True, "押しても鞭の光線が出ていない");
+
+            bool grabbed = false;
+            float startTime = Time.time;
+            float until = Time.realtimeSinceStartup + 4f;
+            while (Time.realtimeSinceStartup < until)
+            {
+                // 光線が伸びきってから、0.3 秒かけて右（+X）へ 90° 振る
+                float elapsed = Time.time - startTime;
+                if (swing && shooter.IsWhipping && elapsed > 0.4f)
+                {
+                    float yaw = Mathf.Clamp01((elapsed - 0.4f) / 0.3f) * 90f;
+                    player.transform.rotation = Quaternion.Euler(0f, yaw, 0f);
+                }
+
+                if (shooter.Phase == SweeperShooter.ShotPhase.Reeling)
+                {
+                    grabbed = true;
+                    break;
+                }
+
+                if (shooter.Phase == SweeperShooter.ShotPhase.Idle)
+                {
+                    break;
+                }
+
+                yield return NextFrame();
+            }
+
+            float seconds = Time.time - startTime;
+            Debug.Log($"[SweeperWhipTests] 箱={boxPosition} 振る={swing} つかんだ={grabbed} 経過={seconds:F2}秒 段階={shooter.Phase}");
+
+            if (expectGrab)
+            {
+                Assert.That(grabbed, Is.True, $"箱をつかめなかった（段階 {shooter.Phase}・光線の先 {shooter.BeamTip}）");
+                Assert.That(seconds, Is.LessThan(1.05f), "出していられる 1 秒を過ぎてからつかんだ");
+                if (explosive != null)
+                {
+                    Assert.That(explosive.FuseLit, Is.True, "爆弾をつかんだのに、導火線に火がついていない");
+                }
+            }
+            else
+            {
+                Assert.That(grabbed, Is.False, "向きを変えていないのに、真横の箱をつかんだ");
+                Assert.That(seconds, Is.InRange(0.9f, 2f), "1 秒で光線が戻っていない");
+            }
+        }
+        finally
+        {
+            Object.Destroy(player);
+            Object.Destroy(box);
+            Object.Destroy(ground);
+        }
+
+        yield return null;
+    }
+
+    private static void Invoke(object target, string method)
+    {
+        MethodInfo info = target.GetType().GetMethod(method, BindingFlags.Instance | BindingFlags.NonPublic);
+        Assert.That(info, Is.Not.Null, method + " が見つからない");
+        info.Invoke(target, null);
+    }
+
+    /// <summary>ゲームのフレームが1つ進むまで待つ（画面なしの Unity では `yield return null` だけだとフレームが進まないため）。</summary>
+    private static IEnumerator NextFrame()
+    {
+        int frame = Time.frameCount;
+        float deadline = Time.realtimeSinceStartup + 5f;
+        while (Time.frameCount == frame && Time.realtimeSinceStartup < deadline) yield return null;
+    }
+
+    /// <summary>実際の時間で待つ。</summary>
+    private static IEnumerator Wait(float seconds)
+    {
+        float until = Time.realtimeSinceStartup + seconds;
+        while (Time.realtimeSinceStartup < until) yield return null;
+    }
+}

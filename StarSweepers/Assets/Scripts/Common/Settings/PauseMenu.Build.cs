@@ -114,7 +114,7 @@ public partial class PauseMenu
     /// 設定の画面の項目を並べる。y は画面の真ん中からの高さ（上が＋）。
     /// 1段目（y＝90）から「項目の高さ＋すき間」（88）の何段ぶん下か（× 2f、× 3f …）で置いている。
     /// ただし2本目のスライダーだけは、1段目から 96 下げた位置に直接置いている。
-    /// 項目を足すときは、下の「もどる」の段の数（× 5f）も1つ増やす。
+    /// 項目を足すときは、下の「もどる」の段の数（× 6f）も1つ増やす。
     /// </summary>
     private void BuildSettingsPage()
     {
@@ -132,6 +132,9 @@ public partial class PauseMenu
 
         CreateMenuItem(settingsPage.transform, ThrowOperationLabel(), 90f - (ItemHeight + ItemGap) * 4f,
             ToggleThrowOperation);
+
+        // 「撃ち方：鞭／溜め」「光線の操作：いつもの／距離で変わる」の項目は 2026/11/18 にやめた。
+        // ロビーコンソールのプレイヤー挙動（ホストが全員ぶん決める。狙う・発射／引っ張る・投げる）に移した
 
         CreateMenuItem(settingsPage.transform, "もどる", 90f - (ItemHeight + ItemGap) * 5f,
             () => ShowSettings(false));
