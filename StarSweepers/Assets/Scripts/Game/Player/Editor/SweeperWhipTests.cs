@@ -44,6 +44,17 @@ public class SweeperWhipTests
         yield return new ExitPlayMode();
     }
 
+    /// <summary>
+    /// 爆弾を鞭でつかむと、導火線に火がつく（2026/11/18。新しい光線では火がつかず、爆弾が爆発しなかった）。
+    /// </summary>
+    [UnityTest]
+    public IEnumerator Bomb_GrabLightsFuse()
+    {
+        yield return new EnterPlayMode();
+        yield return Run(new Vector3(0f, 0.5f, 5f), false, true, true);
+        yield return new ExitPlayMode();
+    }
+
     [UnityTest]
     public IEnumerator Setting_ChangesStyle()
     {
@@ -131,7 +142,7 @@ public class SweeperWhipTests
     }
 
     /// <summary>中身。再生を始めてから呼ぶ別の関数にしてある（SweeperBendTests と同じ理由）。</summary>
-    private static IEnumerator Run(Vector3 boxPosition, bool swing, bool expectGrab)
+    private static IEnumerator Run(Vector3 boxPosition, bool swing, bool expectGrab, bool bomb = false)
     {
         GameObject prefab = AssetDatabase.LoadAssetAtPath<GameObject>(PlayerPrefabPath);
         Assert.That(prefab, Is.Not.Null, "新しい体のプレハブが無い（メニューで作る）");
@@ -149,6 +160,15 @@ public class SweeperWhipTests
             box.transform.position = boxPosition;
             box.AddComponent<Rigidbody>();
             box.AddComponent<HookableObject>();
+            ExplosiveObject explosive = null;
+            if (bomb)
+            {
+                explosive = box.AddComponent<ExplosiveObject>();
+                // 点滅させる見た目は空にしておく（テストの箱には要らない）
+                typeof(ExplosiveObject)
+                    .GetField("blinkRenderers", BindingFlags.Instance | BindingFlags.NonPublic)
+                    .SetValue(explosive, new Renderer[0]);
+            }
             yield return Wait(0.5f);
 
             SweeperShooter shooter = player.GetComponent<SweeperShooter>();
@@ -192,6 +212,10 @@ public class SweeperWhipTests
             {
                 Assert.That(grabbed, Is.True, $"箱をつかめなかった（段階 {shooter.Phase}・光線の先 {shooter.BeamTip}）");
                 Assert.That(seconds, Is.LessThan(1.05f), "出していられる 1 秒を過ぎてからつかんだ");
+                if (explosive != null)
+                {
+                    Assert.That(explosive.FuseLit, Is.True, "爆弾をつかんだのに、導火線に火がついていない");
+                }
             }
             else
             {

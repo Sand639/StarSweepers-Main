@@ -425,6 +425,33 @@ public class SweeperReel : MonoBehaviour
         // 手前まで来たときに、自分の体とぶつかって跳ねないようにする
         ThrowPassThrough.Hold(item.gameObject, playerCollider);
         body.WakeUp();
+
+        LightFuseIfBomb(target);
+    }
+
+    /// <summary>
+    /// **爆弾をつかんだら、導火線に火をつける**（つかんだ瞬間から数え始める）。
+    /// 旧フック（<see cref="HookController"/>）と同じ決まり。新しい光線（溜め撃ち・鞭）の
+    /// どちらでつかんでもここを通る。オンラインでは、火がついたことをホスト経由で全員に配る
+    /// （手元だけで火をつけると、ほかの人には突然爆発したように見えてしまう）。
+    /// </summary>
+    private void LightFuseIfBomb(HookableObject target)
+    {
+        ExplosiveObject bomb = target.GetComponent<ExplosiveObject>();
+        if (bomb == null || bomb.FuseLit)
+        {
+            return;
+        }
+
+        FishingNetBomb netBomb = target.GetComponent<FishingNetBomb>();
+        if (IsOnline && netBomb != null && netBomb.IsSpawned)
+        {
+            netBomb.RequestLightFuse();
+        }
+        else
+        {
+            bomb.LightFuse();
+        }
     }
 
     /// <summary>
