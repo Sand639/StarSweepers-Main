@@ -3,7 +3,8 @@ using UnityEngine;
 using UnityEngine.UI;
 
 /// <summary>
-/// ラウンドイベント「デブリセット」のお題を、物資の画像で横に並べて出す（始まりにスロットの演出、入れた物資にチェック）。
+/// ラウンドイベント「デブリセット」のお題を、腕が持ってくる枠にカードで並べて出す
+/// （腕が画面の外から入る → 枠が開く → カードが上から落ちてくる → 入れた物資にチェック）。
 /// 説明：Documents/スクリプトの説明/Game/UI/DebrisSetUI.md
 /// </summary>
 public sealed class DebrisSetUI : MonoBehaviour
@@ -14,86 +15,177 @@ public sealed class DebrisSetUI : MonoBehaviour
     /// <summary>出せるチームの最大数。</summary>
     public const int MaxTeams = SpaceJunkTeams.MaxTeams;
 
-    /// <summary>1チームのお題の、いちばん多い数（並べるマスの数）。</summary>
+    /// <summary>1チームのお題の、いちばん多い数（並べるカードの数）。</summary>
     public const int MaxSlots = SpaceJunkRound.MaxSetSize;
 
     /// <summary>物資の種類の数（物資1〜5の画像）。</summary>
     public const int ItemKinds = SpaceJunkMaterials.Count;
 
-    /// <summary>お題の1マスの部品。</summary>
+    // スロットの並びの中で「入れ終わったカード（白いカード＋チェック）」を表す印。物資の番号にこれを足す
+    private const int CollectedCode = 100;
+
+    /// <summary>カード1枚の部品（重なり順は 奥から カード → 物資 → 白いカード → チェック）。</summary>
     [Serializable]
-    public sealed class SlotParts
+    public sealed class CardParts
     {
-        [Tooltip("このマス（横並びの1つ）")]
+        [Tooltip("このカードごと動かす物")]
         public RectTransform root;
 
-        [Tooltip("物資の画像（スロット中は、いま真ん中を流れている物資）")]
+        [Tooltip("カードごと薄くするための物")]
+        public CanvasGroup group;
+
+        [Tooltip("カードの地の画像（物資の色に染める）")]
+        public Image background;
+
+        [Tooltip("物資の画像")]
         public Image item;
 
-        [Tooltip("スロット中だけ使う、下から上がってくる次の物資の画像")]
-        public Image nextItem;
+        [Tooltip("入れた物資の上にかぶせる白いカード")]
+        public Image cover;
 
-        [Tooltip("入れた物資の右下に出すチェックマーク")]
+        [Tooltip("入れた物資の上に出すチェックマーク")]
         public Image check;
     }
 
-    /// <summary>1チームぶんの枠の部品。</summary>
+    /// <summary>お題の1マスの部品。スロット中は2枚のカードを上から下へ流す。</summary>
+    [Serializable]
+    public sealed class SlotParts
+    {
+        [Tooltip("このマスごと出し入れする物")]
+        public RectTransform root;
+
+        [Tooltip("いま真ん中にあるカード（止まったらお題のカード）")]
+        public CardParts card;
+
+        [Tooltip("スロット中だけ使う、上から降りてくる次のカード")]
+        public CardParts nextCard;
+    }
+
+    /// <summary>1チームぶんの部品。</summary>
     [Serializable]
     public sealed class PanelParts
     {
-        [Tooltip("このチームの枠ごと出し入れする物")]
+        [Tooltip("このチームの表示ごと出し入れする物（画面の角に付けてある）")]
         public GameObject root;
 
-        [Tooltip("フレームの画像")]
-        public Image frame;
+        [Tooltip("腕（左の金具つき）の画像")]
+        public Image arm;
+
+        [Tooltip("お題を並べる枠の画像")]
+        public Image panel;
+
+        [Tooltip("枠の反対側の金具の画像")]
+        public Image bracket;
+
+        [Tooltip("「特注依頼…」の文字")]
+        public Text title;
 
         [Tooltip("お題のマス。左から順に、最大8つ")]
         public SlotParts[] slots = new SlotParts[MaxSlots];
     }
 
-    [Header("素材（本素材が来たら差し替える。手順は機能ドキュメント「デブリセットのUI」）")]
+    [Header("素材（Assets/Art/Sprites/EventUI/SetDebris）")]
     [Tooltip("物資の画像。上から 物資1＝装甲板、物資2＝回路基板、物資3＝燃料タンク、物資4＝アンテナ、物資5＝エンジン")]
     [SerializeField] private Sprite[] itemSprites = new Sprite[ItemKinds];
 
-    [Tooltip("フレームの画像。空ならプレハブの画像のまま。9スライス（Sprite Editor の Border）を決めておくと、物資の数が変わっても角がつぶれない")]
-    [SerializeField] private Sprite frameSprite;
+    [Tooltip("オンなら、カードの地を物資の色（ゲームの中の物資の色）に染める。物資の画像の本素材が来るまでの目印")]
+    [SerializeField] private bool tintCardByItem = true;
 
-    [Tooltip("チェックマークの画像。空ならプレハブの画像のまま")]
-    [SerializeField] private Sprite checkSprite;
+    [Tooltip("カードの地の画像（染めないとき）")]
+    [SerializeField] private Sprite cardSprite;
+
+    [Tooltip("物資の色に染めるときのカードの地の画像。色がそのまま出るよう、白い画像を使う")]
+    [SerializeField] private Sprite plainCardSprite;
+
+    [Tooltip("文字のフォント。空ならパソコンに入っている日本語のフォントを使う（デザイナーさんの指定のフォントが来たら入れる）")]
+    [SerializeField] private Font titleFont;
+
+    [Tooltip("枠の上に出す文字（後ろに点が増えたり減ったりして付く）")]
+    [SerializeField] private string titleText = "特注依頼";
 
     [Header("部品（プレハブで割り当て済み）")]
     [Tooltip("表示ごと隠すときにオン・オフする子オブジェクト")]
     [SerializeField] private GameObject content;
 
-    [Tooltip("チームの枠。0＝左上、1＝右上、2＝左の2段目、3＝右の2段目")]
+    [Tooltip("チームの表示。0＝左上、1＝右上（左右反対向き）、2＝左の2段目、3＝右の2段目")]
     [SerializeField] private PanelParts[] panels = new PanelParts[MaxTeams];
 
-    [Header("見た目")]
-    [Tooltip("入れた物資の画像にかける色。白ならそのまま、灰色に近いほど暗く灰色っぽくなる")]
-    [SerializeField] private Color collectedTint = new Color(0.55f, 0.55f, 0.55f, 1f);
-
+    [Header("置き方")]
     [Tooltip("オンなら、チームのゴールが画面の左右どちらに見えるかで、枠を置く側を決める（カメラを切り替えても合わせる）")]
     [SerializeField] private bool followGoalSide = true;
 
     [Tooltip("ゴールで決められないとき（検証シーン、2つのゴールが同じくらいの横位置に見えるとき）の並び。オンなら 左＝赤チーム・右＝青チーム")]
     [SerializeField] private bool swapLeftRight = true;
 
+    [Header("並べ方（画像の元の大きさのピクセル。枠ごとの大きさは Panel0〜3 の Scale で変える）")]
+    [Tooltip("腕の左端から、枠の左端までの距離（枠の左端が腕の金具の下に入る）")]
+    [SerializeField] private float panelLeft = 72f;
+
+    [Tooltip("枠の中心の、上からの距離")]
+    [SerializeField] private float bodyCenterY = 82f;
+
+    [Tooltip("枠の右端に、反対側の金具がどれだけかぶるか")]
+    [SerializeField] private float bracketOverlap = 12f;
+
+    [Tooltip("枠の左端から1枚目のカードまでのすき間")]
+    [SerializeField] private float cardMargin = 11f;
+
+    [Tooltip("カードの横の間隔（カードの幅＋すき間）。枠の横幅は「すき間＋この値×お題の数」になる")]
+    [SerializeField] private float cardPitch = 112f;
+
+    [Tooltip("カードの中心の、上からの距離")]
+    [SerializeField] private float cardCenterY = 95f;
+
+    [Tooltip("スロット中に流れるカードの縦の間隔")]
+    [SerializeField] private float reelStep = 124f;
+
+    [Tooltip("文字の左上の位置（枠の左上から）")]
+    [SerializeField] private Vector2 titleOffset = new Vector2(16f, 4f);
+
+    [Tooltip("入ってくる前の腕が、画面の外へどれだけ下がっているか")]
+    [SerializeField] private float armHideDistance = 140f;
+
+    [Header("出てくる・しまう演出")]
+    [Tooltip("腕が画面の外から入ってくる秒数")]
+    [SerializeField, Min(0f)] private float armSlideSeconds = 0.35f;
+
+    [Tooltip("枠が開く秒数。開ききってからカードが落ちてくる")]
+    [SerializeField, Min(0f)] private float openSeconds = 0.25f;
+
+    [Tooltip("イベントが終わったとき、カードが消える秒数（そのあと枠が閉じて腕が出ていく）")]
+    [SerializeField, Min(0f)] private float cardFadeSeconds = 0.15f;
+
+    [Tooltip("チェックが大きく出てから元の大きさに落ち着くまでの秒数")]
+    [SerializeField, Min(0.01f)] private float checkPopSeconds = 0.25f;
+
+    [Tooltip("チェックが出た瞬間の大きさ（1＝元の大きさ）")]
+    [SerializeField, Min(1f)] private float checkPopScale = 1.8f;
+
+    [Tooltip("文字の後ろの点が1つ増える（減る）秒数")]
+    [SerializeField, Min(0.05f)] private float dotSeconds = 0.2f;
+
+    [Tooltip("文字の後ろの点の、いちばん多い数（1個からこの数まで増えて、また減る）")]
+    [SerializeField, Range(1, 12)] private int maxDots = 6;
+
     [Header("スロットの演出")]
-    [Tooltip("いちばん右のマスが止まるまでの秒数。スロットは、ちょうどこの秒数で全部止まる")]
+    [Tooltip("いちばん右のカードが止まるまでの秒数。スロットは、ちょうどこの秒数で全部止まる")]
     [SerializeField, Min(0f)] private float spinSeconds = 1f;
 
-    [Tooltip("いちばん左のマスが止まる時刻（Spin Seconds に対する割合）。そこから右へ、等しい間隔で順に止まる")]
+    [Tooltip("いちばん左のカードが止まる時刻（Spin Seconds に対する割合）。そこから右へ、等しい間隔で順に止まる")]
     [SerializeField, Range(0f, 1f)] private float firstStopRatio = 0.5f;
 
-    [Tooltip("回り始めの速さ（1秒に何個の物資が流れるか）。止まる時刻に向けて、だんだん遅くなる")]
-    [SerializeField, Min(1f)] private float spinStartSpeed = 24f;
+    [Tooltip("回り始めの速さ（1秒に何枚のカードが流れるか）。止まる時刻に向けて、だんだん遅くなる")]
+    [SerializeField, Min(1f)] private float spinStartSpeed = 10f;
 
-    [Tooltip("お題をそろえて次のお題が出たときにも、スロットを回すか")]
+    [Tooltip("お題をそろえて次のお題が出たときにも、スロットを回すか（チェックの付いたカードが下へ流れ、次のお題が上から来る）")]
     [SerializeField] private bool spinOnNewSet = true;
 
     [Header("テスト用（ラウンドが無いときだけ使う）")]
     [Tooltip("オンなら、ラウンドが無くても下の値で出す。検証シーン用。本番（Resources のプレハブ）ではオフ")]
     [SerializeField] private bool testMode;
+
+    [Tooltip("テストで、イベントが起きていることにするか。再生中にオフにすると、しまう演出が見られる。オンに戻すと最初から")]
+    [SerializeField] private bool testEventRunning = true;
 
     [Tooltip("テストのチーム数")]
     [SerializeField, Range(1, MaxTeams)] private int testTeamCount = 2;
@@ -125,8 +217,10 @@ public sealed class DebrisSetUI : MonoBehaviour
         public int size;
         public readonly int[] kinds = new int[MaxSlots];
         public readonly bool[] collected = new bool[MaxSlots];
+        public readonly float[] collectedAt = new float[MaxSlots];
         public int version;
         public bool seen;
+        public float introStart;
         public float spinStart;
         public readonly int[][] reels = new int[MaxSlots][];
 
@@ -140,18 +234,28 @@ public sealed class DebrisSetUI : MonoBehaviour
             size = 0;
             version = -1;
             seen = false;
+            introStart = float.NegativeInfinity;
             spinStart = float.NegativeInfinity;
             Array.Clear(collected, 0, MaxSlots);
             Array.Clear(reels, 0, MaxSlots);
+            for (int n = 0; n < MaxSlots; n++)
+            {
+                collectedAt[n] = float.NegativeInfinity;
+            }
         }
     }
 
     private readonly TeamState[] states = new TeamState[MaxTeams];
     private readonly int[] readKinds = new int[MaxSlots];
     private readonly int[] readProgress = new int[ItemKinds];
+    private readonly bool[] readCollected = new bool[MaxSlots];
     private readonly int[] kindBuffer = new int[ItemKinds];
     private readonly System.Random random = new System.Random();
     private bool hasState;
+    private int shownTeams;
+
+    // しまう演出を始めた時刻（しまっていなければ NaN）
+    private float closeStart = float.NaN;
 
     // 段（上＝チーム0と1、下＝チーム2と3）ごとに、左右を入れ替えているか
     private readonly bool[] rowSwapped = new bool[MaxTeams / 2];
@@ -168,6 +272,9 @@ public sealed class DebrisSetUI : MonoBehaviour
     private bool testStarted;
     private float testEventStart;
     private float testNextAction;
+
+    /// <summary>腕が入ってきてから、カードが落ち始めるまでの秒数。</summary>
+    private float IntroSeconds => armSlideSeconds + openSeconds;
 
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
     private static void CreateOnStart()
@@ -201,13 +308,8 @@ public sealed class DebrisSetUI : MonoBehaviour
         }
 
         Instance = this;
-
-        for (int team = 0; team < MaxTeams; team++)
-        {
-            states[team] = new TeamState();
-        }
-
-        ApplySprites();
+        EnsureStates();
+        ApplyFont();
         SetVisible(false);
     }
 
@@ -229,15 +331,58 @@ public sealed class DebrisSetUI : MonoBehaviour
     {
         if (!TryRead(now, out int teamCount))
         {
+            TickClosing(now);
+            return;
+        }
+
+        // しまう途中でまたイベントが始まったら、最初から出し直す
+        if (!float.IsNaN(closeStart))
+        {
+            closeStart = float.NaN;
+            ResetStates();
+            TryRead(now, out teamCount);
+        }
+
+        SetVisible(true);
+        hasState = true;
+        shownTeams = teamCount;
+        UpdateSides(SpaceJunkRound.Current != null);
+        DrawAll(now, float.NaN);
+    }
+
+    /// <summary>イベントが終わったあと：しまう演出をしてから隠す。</summary>
+    private void TickClosing(float now)
+    {
+        // 表示していなかった・ラウンドごと無くなった（シーンが変わった）ときは、すぐ隠す
+        bool canAnimate = hasState && content != null && content.activeSelf && (SpaceJunkRound.Current != null || testMode);
+        if (!canAnimate)
+        {
+            closeStart = float.NaN;
             SetVisible(false);
             ResetStates();
             return;
         }
 
-        SetVisible(true);
-        hasState = true;
-        UpdateSides(SpaceJunkRound.Current != null);
+        if (float.IsNaN(closeStart))
+        {
+            closeStart = now;
+        }
 
+        float closing = now - closeStart;
+        if (closing >= cardFadeSeconds + IntroSeconds)
+        {
+            closeStart = float.NaN;
+            SetVisible(false);
+            ResetStates();
+            return;
+        }
+
+        DrawAll(now, closing);
+    }
+
+    /// <summary>全チームの表示を描く。closing はしまい始めてからの秒数（しまっていなければ NaN）。</summary>
+    private void DrawAll(float now, float closing)
+    {
         for (int panel = 0; panel < panels.Length; panel++)
         {
             PanelParts parts = panels[panel];
@@ -247,7 +392,7 @@ public sealed class DebrisSetUI : MonoBehaviour
             }
 
             int team = TeamOfPanel(panel);
-            bool used = team >= 0 && team < teamCount;
+            bool used = team >= 0 && team < shownTeams;
 
             if (parts.root.activeSelf != used)
             {
@@ -256,7 +401,7 @@ public sealed class DebrisSetUI : MonoBehaviour
 
             if (used)
             {
-                DrawPanel(parts, states[team], now);
+                DrawPanel(parts, states[team], now, panel % 2 == 1, closing);
             }
         }
     }
@@ -296,7 +441,8 @@ public sealed class DebrisSetUI : MonoBehaviour
                     readProgress[k] = round.SetProgressOf(team, SpaceJunkMaterials.FromIndex(k));
                 }
 
-                MarkCollected(state.kinds, state.size, round.SetOrdered, round.SetStepOf(team), readProgress, state.collected);
+                MarkCollected(state.kinds, state.size, round.SetOrdered, round.SetStepOf(team), readProgress, readCollected);
+                UpdateCollected(state, readCollected, now);
             }
 
             return true;
@@ -305,6 +451,12 @@ public sealed class DebrisSetUI : MonoBehaviour
         teamCount = 0;
         if (!testMode)
         {
+            return false;
+        }
+
+        if (!testEventRunning)
+        {
+            testStarted = false;
             return false;
         }
 
@@ -328,20 +480,36 @@ public sealed class DebrisSetUI : MonoBehaviour
         }
 
         bool first = !state.seen;
+        bool completed = !first && state.version != version;
+
+        // 前のお題を、流れ出ていくカードとして覚えておく（そろえたなら全部チェック付き）
+        Span<int> outgoing = stackalloc int[MaxSlots];
+        for (int n = 0; n < MaxSlots; n++)
+        {
+            outgoing[n] = !first && n < state.size
+                ? state.kinds[n] + (completed || state.collected[n] ? CollectedCode : 0)
+                : -1;
+        }
+
         state.seen = true;
         state.version = version;
         state.size = size;
         Array.Copy(kinds, state.kinds, size);
         Array.Clear(state.collected, 0, MaxSlots);
+        for (int n = 0; n < MaxSlots; n++)
+        {
+            state.collectedAt[n] = float.NegativeInfinity;
+        }
 
         if (first)
         {
-            // イベントの始まりの時刻にそろえる（途中から見え始めたなら、もう止まっている）
-            StartSpin(state, now - Mathf.Max(0f, sinceEventStart), now);
+            // イベントの始まりの時刻にそろえる（途中から見え始めたなら、もう開いて止まっている）
+            state.introStart = now - Mathf.Max(0f, sinceEventStart);
+            StartSpin(state, state.introStart + IntroSeconds, now, outgoing);
         }
         else if (spinOnNewSet)
         {
-            StartSpin(state, now, now);
+            StartSpin(state, now, now, outgoing);
         }
         else
         {
@@ -349,8 +517,8 @@ public sealed class DebrisSetUI : MonoBehaviour
         }
     }
 
-    /// <summary>レーンごとに、流れる物資の並び（最後がお題の物資）を作って回し始める。</summary>
-    private void StartSpin(TeamState state, float start, float now)
+    /// <summary>マスごとに、流れるカードの並び（最初が前のカード、最後がお題のカード）を作って回し始める。</summary>
+    private void StartSpin(TeamState state, float start, float now, Span<int> outgoing)
     {
         state.spinStart = start;
 
@@ -371,10 +539,11 @@ public sealed class DebrisSetUI : MonoBehaviour
             // 減速の曲線（1 − (1 − t)²）の出だしの速さは「流れる数 × 2 ÷ 止まる時刻」なので、そこから流れる数を決める
             int count = Mathf.Max(2, Mathf.RoundToInt(spinStartSpeed * stop / 2f));
             var reel = new int[count + 1];
+            reel[0] = outgoing[n];
             reel[count] = state.kinds[n];
 
             // 隣どうしが同じ物資だと流れて見えないので、違う物資にする
-            for (int i = count - 1; i >= 0; i--)
+            for (int i = count - 1; i >= 1; i--)
             {
                 reel[i] = RandomKind(reel[i + 1]);
             }
@@ -383,9 +552,69 @@ public sealed class DebrisSetUI : MonoBehaviour
         }
     }
 
-    /// <summary>1チームの枠を描く。</summary>
-    private void DrawPanel(PanelParts parts, TeamState state, float now)
+    /// <summary>入れたかどうかを写し、新しく入れたマスは、チェックが出た時刻を覚える。</summary>
+    private static void UpdateCollected(TeamState state, bool[] collected, float now)
     {
+        for (int n = 0; n < MaxSlots; n++)
+        {
+            if (collected[n] && !state.collected[n])
+            {
+                state.collectedAt[n] = now;
+            }
+
+            state.collected[n] = collected[n];
+        }
+    }
+
+    /// <summary>1チームの表示を描く。mirrored なら左右反対（腕が右）。closing はしまい始めてからの秒数（しまっていなければ NaN）。</summary>
+    private void DrawPanel(PanelParts parts, TeamState state, float now, bool mirrored, float closing)
+    {
+        // 出てきてからの秒数。しまうときは、カードが消えたあと逆回しにする
+        bool isClosing = !float.IsNaN(closing);
+        float intro = isClosing ? IntroSeconds - Mathf.Max(0f, closing - cardFadeSeconds) : now - state.introStart;
+        float cardAlpha = isClosing ? 1f - Clamp01Div(closing, cardFadeSeconds) : 1f;
+
+        float slide = EaseOutCubic(Clamp01Div(intro, armSlideSeconds));
+        float open = EaseOutCubic(Clamp01Div(intro - armSlideSeconds, openSeconds));
+        bool opened = open >= 1f;
+
+        float side = mirrored ? -1f : 1f;
+        float armX = (slide - 1f) * armHideDistance;
+        float width = cardMargin + cardPitch * Mathf.Max(1, state.size);
+        float left = armX + panelLeft;
+
+        if (parts.arm != null)
+        {
+            RectTransform arm = parts.arm.rectTransform;
+            Place(arm, side * (armX + arm.rect.width * 0.5f), -bodyCenterY, side);
+        }
+
+        if (parts.panel != null)
+        {
+            RectTransform panel = parts.panel.rectTransform;
+            panel.sizeDelta = new Vector2(width, panel.sizeDelta.y);
+            Place(panel, side * (left + width * 0.5f), -bodyCenterY, 1f);
+            parts.panel.fillOrigin = mirrored ? (int)Image.OriginHorizontal.Right : (int)Image.OriginHorizontal.Left;
+            parts.panel.fillAmount = open;
+        }
+
+        if (parts.bracket != null)
+        {
+            RectTransform bracket = parts.bracket.rectTransform;
+            float x = left + width * open + bracket.rect.width * 0.5f - bracketOverlap;
+            Place(bracket, side * x, -bodyCenterY, side);
+            SetActive(parts.bracket, open > 0f);
+        }
+
+        if (parts.title != null)
+        {
+            // 文字は枠の画面で見て左上（左右反対でも、文字は反転させない）
+            float x = mirrored ? -(left + width) + titleOffset.x : left + titleOffset.x;
+            Place(parts.title.rectTransform, x, -titleOffset.y, 1f);
+            parts.title.text = titleText + new string('.', TitleDots(now - state.introStart, dotSeconds, maxDots));
+            SetActive(parts.title, opened && cardAlpha > 0f);
+        }
+
         float elapsed = now - state.spinStart;
 
         for (int n = 0; n < parts.slots.Length; n++)
@@ -396,7 +625,7 @@ public sealed class DebrisSetUI : MonoBehaviour
                 continue;
             }
 
-            bool used = n < state.size;
+            bool used = n < state.size && opened && cardAlpha > 0f;
             if (slot.root.gameObject.activeSelf != used)
             {
                 slot.root.gameObject.SetActive(used);
@@ -407,42 +636,140 @@ public sealed class DebrisSetUI : MonoBehaviour
                 continue;
             }
 
+            // 画面で見て左から n 番目（左右反対の枠では、腕から遠い側が1枚目）
+            int fromArm = mirrored ? state.size - 1 - n : n;
+            float x = side * (left + cardMargin + cardPitch * (fromArm + 0.5f) - (cardPitch - CardWidth(slot)) * 0.5f);
+            float y = -cardCenterY;
+
             int[] reel = state.reels[n];
             float stop = LaneStopTime(n, state.size, spinSeconds, firstStopRatio);
 
             if (reel != null && elapsed < stop)
             {
-                // 回っている：物資を下から上へ流す
+                // 回っている：カードを上から下へ流す
                 float position = ReelPosition(elapsed, stop, reel.Length - 1);
                 int index = Mathf.Clamp(Mathf.FloorToInt(position), 0, reel.Length - 1);
                 float fraction = position - index;
-                float height = slot.root.rect.height;
 
-                ShowItem(slot.item, reel[index], fraction * height, false);
-                SetActive(slot.nextItem, true);
-                ShowItem(slot.nextItem, reel[Mathf.Min(index + 1, reel.Length - 1)], (fraction - 1f) * height, false);
-                SetActive(slot.check, false);
+                DrawCard(slot.card, reel[index], x, y - fraction * reelStep, cardAlpha, 1f);
+                DrawCard(slot.nextCard, reel[Mathf.Min(index + 1, reel.Length - 1)], x, y + (1f - fraction) * reelStep, cardAlpha, 1f);
             }
             else
             {
-                // 止まっている：お題の物資と、入れたかどうか
-                ShowItem(slot.item, state.kinds[n], 0f, state.collected[n]);
-                SetActive(slot.nextItem, false);
-                SetActive(slot.check, state.collected[n]);
+                // 止まっている：お題のカードと、入れたかどうか
+                int code = state.kinds[n] + (state.collected[n] ? CollectedCode : 0);
+                float pop = Clamp01Div(now - state.collectedAt[n], checkPopSeconds);
+                DrawCard(slot.card, code, x, y, cardAlpha, pop);
+                DrawCard(slot.nextCard, -1, x, y, cardAlpha, 1f);
             }
         }
     }
 
-    private void ShowItem(Image image, int kind, float y, bool collected)
+    /// <summary>カードを1枚描く。code は物資の番号（入れ終わったカードは +100、-1 なら出さない）。pop はチェックの出方（0＝出た瞬間、1＝落ち着いた）。</summary>
+    private void DrawCard(CardParts card, int code, float x, float y, float alpha, float pop)
     {
-        if (image == null)
+        if (card == null || card.root == null)
         {
             return;
         }
 
-        image.sprite = kind >= 0 && kind < itemSprites.Length ? itemSprites[kind] : null;
-        image.color = collected ? collectedTint : Color.white;
-        image.rectTransform.anchoredPosition = new Vector2(0f, y);
+        bool shown = code >= 0;
+        if (card.root.gameObject.activeSelf != shown)
+        {
+            card.root.gameObject.SetActive(shown);
+        }
+
+        if (!shown)
+        {
+            return;
+        }
+
+        int kind = code % CollectedCode;
+        bool collected = code >= CollectedCode;
+
+        card.root.anchoredPosition = new Vector2(x, y);
+        if (card.group != null)
+        {
+            card.group.alpha = alpha;
+        }
+
+        if (card.item != null)
+        {
+            card.item.sprite = kind < itemSprites.Length ? itemSprites[kind] : null;
+        }
+
+        if (card.background != null)
+        {
+            bool tint = tintCardByItem && plainCardSprite != null && kind < ItemKinds;
+            card.background.sprite = tint ? plainCardSprite : cardSprite != null ? cardSprite : card.background.sprite;
+            card.background.color = tint ? SpaceJunkMaterials.Color(SpaceJunkMaterials.FromIndex(kind)) : Color.white;
+        }
+
+        SetActive(card.cover, collected);
+        SetActive(card.check, collected);
+
+        if (!collected)
+        {
+            return;
+        }
+
+        float eased = EaseOutCubic(pop);
+        if (card.cover != null)
+        {
+            Color color = card.cover.color;
+            color.a = eased;
+            card.cover.color = color;
+        }
+
+        if (card.check != null)
+        {
+            float scale = Mathf.Lerp(checkPopScale, 1f, eased);
+            card.check.rectTransform.localScale = new Vector3(scale, scale, 1f);
+        }
+    }
+
+    private static float CardWidth(SlotParts slot)
+    {
+        return slot.card != null && slot.card.root != null ? slot.card.root.rect.width : 0f;
+    }
+
+    private static void Place(RectTransform rect, float x, float y, float flipX)
+    {
+        rect.anchoredPosition = new Vector2(x, y);
+        Vector3 scale = rect.localScale;
+        scale.x = Mathf.Abs(scale.x) * flipX;
+        rect.localScale = scale;
+    }
+
+    private static float Clamp01Div(float value, float duration)
+    {
+        return duration <= 0f ? (value >= 0f ? 1f : 0f) : Mathf.Clamp01(value / duration);
+    }
+
+    private static float EaseOutCubic(float t)
+    {
+        float rest = 1f - Mathf.Clamp01(t);
+        return 1f - rest * rest * rest;
+    }
+
+    /// <summary>
+    /// 文字の後ろの点の数。1個から max 個まで1つずつ増え、また1個まで減るのをくり返す（秒数 t、1段 step 秒）。
+    /// </summary>
+    public static int TitleDots(float t, float step, int max)
+    {
+        if (max <= 1 || step <= 0f)
+        {
+            return Mathf.Max(1, max);
+        }
+
+        int period = (max - 1) * 2;
+        int phase = Mathf.FloorToInt(Mathf.Max(0f, t) / step) % period;
+        if (phase < 0)
+        {
+            phase += period; // とても大きな秒数で int があふれたとき
+        }
+
+        return phase < max ? phase + 1 : period - phase + 1;
     }
 
     /// <summary>
@@ -459,7 +786,7 @@ public sealed class DebrisSetUI : MonoBehaviour
         return spinSeconds * Mathf.Lerp(Mathf.Clamp01(firstStopRatio), 1f, t);
     }
 
-    /// <summary>回り始めてから elapsed 秒で、物資がいくつ流れたか（だんだん遅くなり、止まる時刻に count ちょうど）。</summary>
+    /// <summary>回り始めてから elapsed 秒で、カードが何枚流れたか（だんだん遅くなり、止まる時刻に count ちょうど）。</summary>
     public static float ReelPosition(float elapsed, float stopTime, int count)
     {
         if (stopTime <= 0f || elapsed >= stopTime)
@@ -611,7 +938,7 @@ public sealed class DebrisSetUI : MonoBehaviour
         return true;
     }
 
-    /// <summary>出していたお題を忘れる（次にイベントが始まったら、またスロットから）。</summary>
+    /// <summary>出していたお題を忘れる（次にイベントが始まったら、また腕が入ってくるところから）。</summary>
     private void ResetStates()
     {
         if (!hasState)
@@ -627,32 +954,22 @@ public sealed class DebrisSetUI : MonoBehaviour
         }
     }
 
-    private void ApplySprites()
+    private void EnsureStates()
     {
+        for (int team = 0; team < MaxTeams; team++)
+        {
+            states[team] ??= new TeamState();
+        }
+    }
+
+    private void ApplyFont()
+    {
+        Font font = titleFont != null ? titleFont : UiFont.Find(24);
         foreach (PanelParts parts in panels)
         {
-            if (parts == null)
+            if (parts != null && parts.title != null)
             {
-                continue;
-            }
-
-            if (frameSprite != null && parts.frame != null)
-            {
-                parts.frame.sprite = frameSprite;
-                parts.frame.type = frameSprite.border != Vector4.zero ? Image.Type.Sliced : Image.Type.Simple;
-            }
-
-            if (checkSprite == null || parts.slots == null)
-            {
-                continue;
-            }
-
-            foreach (SlotParts slot in parts.slots)
-            {
-                if (slot != null && slot.check != null)
-                {
-                    slot.check.sprite = checkSprite;
-                }
+                parts.title.font = font;
             }
         }
     }
@@ -673,6 +990,32 @@ public sealed class DebrisSetUI : MonoBehaviour
         }
     }
 
+    /// <summary>
+    /// プレハブを開いたときの見本：全チームが開ききって、お題が3個止まっている形に並べる（エディタのメニューから呼ぶ）。
+    /// </summary>
+    public void LayoutPreview()
+    {
+        EnsureStates();
+        shownTeams = MaxTeams;
+        Array.Clear(rowSwapped, 0, rowSwapped.Length);
+
+        foreach (TeamState state in states)
+        {
+            state.Reset();
+            state.introStart = 0f;
+            state.spinStart = 0f;
+            state.size = Mathf.Min(3, MaxSlots);
+            for (int n = 0; n < state.size; n++)
+            {
+                state.kinds[n] = n % ItemKinds;
+            }
+
+            state.collected[0] = true;
+        }
+
+        DrawAll(1000f, float.NaN);
+    }
+
     // ---------------------------------------------------------------- テスト用
 
     /// <summary>テスト用のお題を進める（最初に全チームのお題を引き、そのあと一定の間隔で1個ずつ入れる）。</summary>
@@ -682,7 +1025,7 @@ public sealed class DebrisSetUI : MonoBehaviour
         {
             testStarted = true;
             testEventStart = now;
-            testNextAction = now + spinSeconds + testCollectInterval;
+            testNextAction = now + IntroSeconds + spinSeconds + testCollectInterval;
 
             for (int team = 0; team < MaxTeams; team++)
             {
@@ -709,8 +1052,10 @@ public sealed class DebrisSetUI : MonoBehaviour
 
             for (int n = 0; n < MaxSlots; n++)
             {
-                state.collected[n] = n < size && testCollected[team, n];
+                readCollected[n] = n < size && testCollected[team, n];
             }
+
+            UpdateCollected(state, readCollected, now);
         }
     }
 
@@ -781,5 +1126,11 @@ public sealed class DebrisSetUI : MonoBehaviour
         {
             TestDraw(team);
         }
+    }
+
+    [ContextMenu("テスト：しまう／出す を切り替える")]
+    private void TestReopen()
+    {
+        testEventRunning = !testEventRunning;
     }
 }

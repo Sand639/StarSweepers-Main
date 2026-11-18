@@ -7,40 +7,39 @@ using UnityEngine.UI;
 using Object = UnityEngine.Object;
 
 /// <summary>
-/// デブリセットのUIの仮の画像・プレハブ・検証シーンを作るメニュー（エディタ専用）。
+/// デブリセットのUIのプレハブ・検証シーン・物資の仮の画像を作るメニュー（エディタ専用）。
 /// 説明：Documents/スクリプトの説明/Game/UI/DebrisSetUI.md
 /// </summary>
 public static class DebrisSetUISetup
 {
     private const string PrefabPath = "Assets/Resources/DebrisSetUI.prefab";
     private const string ScenePath = "Assets/Scenes/Test/DebrisSetUITest.unity";
+    private const string EventSceneName = "EventUI_SetDebris";
+    private const string EventScenePath = "Assets/Scenes/Test/EventUI_SetDebris.unity";
 
-    // 仮の画像。**同じ名前の本素材で上書きすれば、そのまま差し替わる**（無いときだけ描いて作る）
-    private const string FramePath = "Assets/Art/Sprites/DebrisSetFrame.png";
-    private const string CheckPath = "Assets/Art/Sprites/DebrisSetCheck.png";
+    // デザイナーさんの素材（イベント「セット」のUI）。重なり順は 奥から 枠(04) → カード(02) → 白いカード(01) → チェック(00)
+    private const string SpriteFolder = "Assets/Art/Sprites/EventUI/SetDebris/";
+    private const string CheckPath = SpriteFolder + "UI_SET_00.png";
+    private const string CoverPath = SpriteFolder + "UI_SET_01.png";
+    private const string CardPath = SpriteFolder + "UI_SET_02.png";
+    private const string ArmPath = SpriteFolder + "UI_SET_03_01.png";
+    private const string BracketPath = SpriteFolder + "UI_SET_03_02.png";
+    private const string PanelPath = SpriteFolder + "UI_SET_04_01.png";
+
+    // 物資の仮の画像。**同じ名前の本素材で上書きすれば、そのまま差し替わる**（無いときだけ描いて作る）
     private static string ItemPath(int kind) => $"Assets/Art/Sprites/DebrisSetItem{kind + 1}.png";
 
-    // 大きさ（1920×1080 の画面での値。CanvasScaler で画面に合わせて拡大・縮小される）
-    private const float SlotSize = 58f;
-    private const float SlotSpacing = 9f;
-    private const int PaddingX = 12;
-    private const int PaddingY = 10;
-    private const float CheckSize = 30f;
-    private static readonly Vector2 CheckOffset = new Vector2(-6f, 8f);
+    // カードの上に載せる物資の画像の大きさ
+    private const float ItemSize = 72f;
 
-    // プレハブを開いたときに見本として出すマスの数（ゲーム中はお題の数に合わせる。お題の初期値の3個に合わせた）
+    // 1チームの表示の大きさ（画像の元の大きさに対する倍率。1920×1080 の画面での値）と置き場所
+    private const float PanelScale = 0.75f;
+    private const float PanelSide = 10f;
+    private const float PanelTop = 150f;
+    private const float PanelRowGap = 160f;
+
+    // プレハブを開いたときに見本として出すカードの数（ゲーム中はお題の数に合わせる）
     private const int PreviewSlots = 3;
-
-    // 枠の置き場所（左上の枠は画面の左上から、右上の枠は画面の右上から）
-    private const float PanelSide = 90f;
-    private const float PanelTop = 190f;
-    private const float PanelRowGap = 100f;
-
-    // 仮のフレームの画像の大きさと、9スライスの幅
-    private const int FrameWidth = 160;
-    private const int FrameHeight = 80;
-    private const int FrameRadius = 22;
-    private const int FrameBorder = 26;
 
     /// <summary>プレハブを作り直してから、それを置いただけの検証シーンを作って保存する。</summary>
     [MenuItem("Tools/StarSweepers/デブリセットUIの検証シーンを作る")]
@@ -57,13 +56,7 @@ public static class DebrisSetUISetup
         camera.backgroundColor = new Color(0.12f, 0.12f, 0.16f);
         cameraObject.tag = "MainCamera";
 
-        var instance = (GameObject)PrefabUtility.InstantiatePrefab(prefab);
-        instance.name = "DebrisSetUI";
-
-        // 検証シーンでは、ラウンドが無くても動くようにテストモードをオンにする（プレハブ側はオフのまま）
-        var so = new SerializedObject(instance.GetComponent<DebrisSetUI>());
-        so.FindProperty("testMode").boolValue = true;
-        so.ApplyModifiedPropertiesWithoutUndo();
+        PlaceTestInstance(prefab);
 
         EditorSceneManager.SaveScene(scene, ScenePath);
         AssetDatabase.SaveAssets();
@@ -81,17 +74,69 @@ public static class DebrisSetUISetup
         }
     }
 
+    /// <summary>
+    /// EventUI_SetDebris シーン（大槻さんが用意した検証用のシーン）に、テストモードのデブリセットUIを置いて保存する。
+    /// もう置いてあれば何もしない。
+    /// </summary>
+    [MenuItem("Tools/StarSweepers/デブリセットUIをEventUI_SetDebrisシーンに置く")]
+    public static void PlaceInEventScene()
+    {
+        var prefab = AssetDatabase.LoadAssetAtPath<GameObject>(PrefabPath);
+        if (prefab == null)
+        {
+            Debug.LogError($"{PrefabPath} がありません。先に「デブリセットUIのプレハブを更新」を実行してください。");
+            return;
+        }
+
+        var scene = EditorSceneManager.OpenScene(EventScenePath, OpenSceneMode.Single);
+        if (Object.FindAnyObjectByType<DebrisSetUI>(FindObjectsInactive.Include) != null)
+        {
+            Debug.Log($"{EventSceneName} には、もうデブリセットUIが置いてあります。");
+            return;
+        }
+
+        PlaceTestInstance(prefab);
+        EditorSceneManager.SaveScene(scene);
+        Debug.Log($"{EventSceneName} にデブリセットUI（テストモード）を置きました: {EventScenePath}");
+    }
+
+    /// <summary>今のシーンにプレハブを置き、ラウンドが無くても動くようにテストモードをオンにする（プレハブ側はオフのまま）。</summary>
+    private static void PlaceTestInstance(GameObject prefab)
+    {
+        var instance = (GameObject)PrefabUtility.InstantiatePrefab(prefab);
+        instance.name = "DebrisSetUI";
+
+        var so = new SerializedObject(instance.GetComponent<DebrisSetUI>());
+        so.FindProperty("testMode").boolValue = true;
+        so.ApplyModifiedPropertiesWithoutUndo();
+    }
+
     /// <summary>部品を組み立てて、プレハブとして保存する。失敗したら null。</summary>
     private static GameObject BuildPrefab()
     {
-        Sprite frameSprite = EnsureSprite(FramePath, FrameWidth, FrameHeight, DrawFrame, FrameBorder);
-        Sprite checkSprite = EnsureSprite(CheckPath, 128, 128, DrawCheck, 0);
+        Sprite arm = LoadSprite(ArmPath);
+        Sprite bracket = LoadSprite(BracketPath);
+        Sprite panelSprite = LoadSprite(PanelPath);
+        Sprite card = LoadSprite(CardPath);
+        Sprite cover = LoadSprite(CoverPath);
+        Sprite check = LoadSprite(CheckPath);
+        if (arm == null || bracket == null || panelSprite == null || card == null || cover == null || check == null)
+        {
+            Debug.LogError($"デブリセットUIの素材が {SpriteFolder} に足りません（UI_SET_00〜04_01）。");
+            return null;
+        }
+
         var itemSprites = new Sprite[DebrisSetUI.ItemKinds];
         for (int kind = 0; kind < itemSprites.Length; kind++)
         {
             int k = kind;
-            itemSprites[kind] = EnsureSprite(ItemPath(kind), 128, 128, (x, y) => DrawItem(k, x, y), 0);
+            itemSprites[kind] = EnsureSprite(ItemPath(kind), 128, 128, (x, y) => DrawItem(k, x, y));
         }
+
+        var sprites = new PanelSprites
+        {
+            arm = arm, bracket = bracket, panel = panelSprite, card = card, cover = cover, check = check, item = itemSprites,
+        };
 
         // ---- 一番上：画面全体を覆う Canvas ----
         var root = new GameObject("DebrisSetUI", typeof(RectTransform));
@@ -107,10 +152,7 @@ public static class DebrisSetUISetup
         var ui = root.AddComponent<DebrisSetUI>();
 
         RectTransform content = CreateRect("Content", root.transform);
-        content.anchorMin = Vector2.zero;
-        content.anchorMax = Vector2.one;
-        content.offsetMin = Vector2.zero;
-        content.offsetMax = Vector2.zero;
+        Stretch(content);
 
         var so = new SerializedObject(ui);
         SerializedProperty panels = so.FindProperty("panels");
@@ -118,99 +160,139 @@ public static class DebrisSetUISetup
 
         for (int p = 0; p < DebrisSetUI.MaxTeams; p++)
         {
-            BuildPanel(p, content, frameSprite, checkSprite, itemSprites, panels.GetArrayElementAtIndex(p));
+            BuildPanel(p, content, sprites, panels.GetArrayElementAtIndex(p));
         }
 
         so.FindProperty("content").objectReferenceValue = content.gameObject;
-        so.FindProperty("frameSprite").objectReferenceValue = frameSprite;
-        so.FindProperty("checkSprite").objectReferenceValue = checkSprite;
         SetArray(so.FindProperty("itemSprites"), itemSprites);
+        so.FindProperty("cardSprite").objectReferenceValue = card;
+        so.FindProperty("plainCardSprite").objectReferenceValue = cover;
         so.FindProperty("testMode").boolValue = false;
         so.ApplyModifiedPropertiesWithoutUndo();
+
+        // 開いたときに形が分かるよう、開ききった見本の並びにしておく
+        ui.LayoutPreview();
 
         GameObject prefab = PrefabUtility.SaveAsPrefabAsset(root, PrefabPath);
         Object.DestroyImmediate(root);
         return prefab;
     }
 
-    /// <summary>1チームぶんの枠（フレーム＋横並びのマス）を作り、スクリプトの欄に割り当てる。</summary>
-    private static void BuildPanel(int index, Transform parent, Sprite frameSprite, Sprite checkSprite, Sprite[] itemSprites,
-        SerializedProperty property)
+    private sealed class PanelSprites
+    {
+        public Sprite arm, bracket, panel, card, cover, check;
+        public Sprite[] item;
+    }
+
+    /// <summary>1チームぶん（腕・枠・金具・文字・カード）を作り、スクリプトの欄に割り当てる。</summary>
+    private static void BuildPanel(int index, Transform parent, PanelSprites sprites, SerializedProperty property)
     {
         bool right = index % 2 == 1;
         float top = PanelTop + PanelRowGap * (index / 2);
 
-        RectTransform panel = CreateRect($"Panel{index}", parent);
+        // 画面の角に付ける。中の物の位置は DebrisSetUI が毎フレーム決める
+        RectTransform root = CreateRect($"Panel{index}", parent);
         Vector2 corner = right ? new Vector2(1f, 1f) : new Vector2(0f, 1f);
-        panel.anchorMin = corner;
-        panel.anchorMax = corner;
-        panel.pivot = corner; // 物資の数が変わると、右の枠は左へ、左の枠は右へ伸びる
-        panel.anchoredPosition = new Vector2(right ? -PanelSide : PanelSide, -top);
-        panel.sizeDelta = new Vector2(PaddingX * 2 + SlotSize * PreviewSlots + SlotSpacing * (PreviewSlots - 1), PaddingY * 2 + SlotSize);
+        root.anchorMin = corner;
+        root.anchorMax = corner;
+        root.pivot = corner;
+        root.sizeDelta = Vector2.zero;
+        root.anchoredPosition = new Vector2(right ? -PanelSide : PanelSide, -top);
+        root.localScale = new Vector3(PanelScale, PanelScale, 1f);
 
-        Image frame = AddImage(panel, frameSprite);
-        frame.type = Image.Type.Sliced;
+        // 重なり順：枠 → 文字 → カード → 金具 → 腕（あとに作った物ほど手前）
+        Image panel = AddImage(CreateRect("Frame", root), sprites.panel);
+        panel.SetNativeSize();
+        panel.type = Image.Type.Filled;
+        panel.fillMethod = Image.FillMethod.Horizontal;
 
-        var layout = panel.gameObject.AddComponent<HorizontalLayoutGroup>();
-        layout.padding = new RectOffset(PaddingX, PaddingX, PaddingY, PaddingY);
-        layout.spacing = SlotSpacing;
-        layout.childAlignment = TextAnchor.MiddleCenter;
-        layout.childControlWidth = false;
-        layout.childControlHeight = false;
-        layout.childForceExpandWidth = false;
-        layout.childForceExpandHeight = false;
+        RectTransform titleRect = CreateRect("Title", root);
+        titleRect.pivot = new Vector2(0f, 1f);
+        titleRect.sizeDelta = new Vector2(320f, 34f);
+        var title = titleRect.gameObject.AddComponent<Text>();
+        title.text = "特注依頼...";
+        title.fontSize = 24;
+        title.fontStyle = FontStyle.Bold;
+        title.color = Color.white;
+        title.alignment = TextAnchor.UpperLeft;
+        title.horizontalOverflow = HorizontalWrapMode.Overflow;
+        title.verticalOverflow = VerticalWrapMode.Overflow;
+        title.raycastTarget = false;
 
-        var fitter = panel.gameObject.AddComponent<ContentSizeFitter>();
-        fitter.horizontalFit = ContentSizeFitter.FitMode.PreferredSize;
-        fitter.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
-
-        property.FindPropertyRelative("root").objectReferenceValue = panel.gameObject;
-        property.FindPropertyRelative("frame").objectReferenceValue = frame;
+        property.FindPropertyRelative("root").objectReferenceValue = root.gameObject;
+        property.FindPropertyRelative("panel").objectReferenceValue = panel;
+        property.FindPropertyRelative("title").objectReferenceValue = title;
         SerializedProperty slots = property.FindPropertyRelative("slots");
         slots.arraySize = DebrisSetUI.MaxSlots;
 
         for (int n = 0; n < DebrisSetUI.MaxSlots; n++)
         {
-            RectTransform slot = CreateRect($"Slot{n}", panel);
-            slot.sizeDelta = new Vector2(SlotSize, SlotSize);
+            RectTransform slot = CreateRect($"Slot{n}", root);
+            slot.sizeDelta = Vector2.zero;
             slot.gameObject.SetActive(n < PreviewSlots);
-
-            // 流れる物資を、マスの形で切り抜く
-            RectTransform reel = CreateRect("Reel", slot);
-            Stretch(reel);
-            reel.gameObject.AddComponent<RectMask2D>();
-
-            RectTransform item = CreateRect("Item", reel);
-            Stretch(item);
-            Image itemImage = AddImage(item, itemSprites[n % itemSprites.Length]);
-            itemImage.preserveAspect = true;
-
-            RectTransform next = CreateRect("NextItem", reel);
-            Stretch(next);
-            Image nextImage = AddImage(next, null);
-            nextImage.preserveAspect = true;
-            next.gameObject.SetActive(false);
-
-            // チェックは切り抜かない（マスの右下から少しはみ出す）
-            RectTransform check = CreateRect("Check", slot);
-            check.anchorMin = new Vector2(1f, 0f);
-            check.anchorMax = new Vector2(1f, 0f);
-            check.pivot = new Vector2(0.5f, 0.5f);
-            check.sizeDelta = new Vector2(CheckSize, CheckSize);
-            check.anchoredPosition = CheckOffset;
-            Image checkImage = AddImage(check, checkSprite);
-            checkImage.preserveAspect = true;
-            check.gameObject.SetActive(false);
 
             SerializedProperty slotProperty = slots.GetArrayElementAtIndex(n);
             slotProperty.FindPropertyRelative("root").objectReferenceValue = slot;
-            slotProperty.FindPropertyRelative("item").objectReferenceValue = itemImage;
-            slotProperty.FindPropertyRelative("nextItem").objectReferenceValue = nextImage;
-            slotProperty.FindPropertyRelative("check").objectReferenceValue = checkImage;
+            BuildCard("Card", slot, sprites, sprites.item[n % sprites.item.Length], slotProperty.FindPropertyRelative("card"));
+            BuildCard("NextCard", slot, sprites, null, slotProperty.FindPropertyRelative("nextCard")).gameObject.SetActive(false);
         }
+
+        Image bracket = AddImage(CreateRect("Bracket", root), sprites.bracket);
+        bracket.SetNativeSize();
+
+        Image arm = AddImage(CreateRect("Arm", root), sprites.arm);
+        arm.SetNativeSize();
+
+        property.FindPropertyRelative("arm").objectReferenceValue = arm;
+        property.FindPropertyRelative("bracket").objectReferenceValue = bracket;
+    }
+
+    /// <summary>カード1枚（カード → 物資 → 白いカード → チェック）を作り、欄に割り当てる。</summary>
+    private static RectTransform BuildCard(string name, Transform parent, PanelSprites sprites, Sprite item, SerializedProperty property)
+    {
+        RectTransform root = CreateRect(name, parent);
+        root.sizeDelta = new Vector2(sprites.card.rect.width, sprites.card.rect.height);
+        var group = root.gameObject.AddComponent<CanvasGroup>();
+        group.interactable = false;
+        group.blocksRaycasts = false;
+
+        Image background = AddImage(CreateRect("Base", root), sprites.card);
+        background.SetNativeSize();
+
+        RectTransform itemRect = CreateRect("Item", root);
+        itemRect.sizeDelta = new Vector2(ItemSize, ItemSize);
+        Image itemImage = AddImage(itemRect, item);
+        itemImage.preserveAspect = true;
+
+        Image cover = AddImage(CreateRect("Cover", root), sprites.cover);
+        cover.SetNativeSize();
+        cover.gameObject.SetActive(false);
+
+        Image check = AddImage(CreateRect("Check", root), sprites.check);
+        check.SetNativeSize();
+        check.gameObject.SetActive(false);
+
+        property.FindPropertyRelative("root").objectReferenceValue = root;
+        property.FindPropertyRelative("group").objectReferenceValue = group;
+        property.FindPropertyRelative("background").objectReferenceValue = background;
+        property.FindPropertyRelative("item").objectReferenceValue = itemImage;
+        property.FindPropertyRelative("cover").objectReferenceValue = cover;
+        property.FindPropertyRelative("check").objectReferenceValue = check;
+        return root;
     }
 
     // ---------------------------------------------------------------- 部品づくりの手伝い
+
+    private static Sprite LoadSprite(string path)
+    {
+        var sprite = AssetDatabase.LoadAssetAtPath<Sprite>(path);
+        if (sprite == null)
+        {
+            Debug.LogError($"画像が読めません（無いか、Texture Type が Sprite でない）: {path}");
+        }
+
+        return sprite;
+    }
 
     private static RectTransform CreateRect(string name, Transform parent)
     {
@@ -244,10 +326,10 @@ public static class DebrisSetUISetup
         }
     }
 
-    // ---------------------------------------------------------------- 仮の画像
+    // ---------------------------------------------------------------- 物資の仮の画像
 
     /// <summary>画像が無ければ、draw で1ピクセルずつ描いて保存する。**もうあれば（本素材も）そのまま使う。**</summary>
-    private static Sprite EnsureSprite(string path, int width, int height, Func<int, int, Color> draw, int border)
+    private static Sprite EnsureSprite(string path, int width, int height, Func<int, int, Color> draw)
     {
         var existing = AssetDatabase.LoadAssetAtPath<Sprite>(path);
         if (existing != null) return existing;
@@ -270,20 +352,9 @@ public static class DebrisSetUISetup
         importer.spriteImportMode = SpriteImportMode.Single;
         importer.alphaIsTransparency = true;
         importer.mipmapEnabled = false;
-        importer.spriteBorder = new Vector4(border, border, border, border);
         importer.SaveAndReimport();
 
         return AssetDatabase.LoadAssetAtPath<Sprite>(path);
-    }
-
-    /// <summary>仮のフレーム：黄緑の角丸の四角に黒い縁（設計図の SVG と同じ色）。</summary>
-    private static Color DrawFrame(int x, int y)
-    {
-        var p = new Vector2(x + 0.5f, y + 0.5f);
-        var half = new Vector2(FrameWidth * 0.5f - 1f, FrameHeight * 0.5f - 1f);
-        Vector2 q = Abs(p - new Vector2(FrameWidth * 0.5f, FrameHeight * 0.5f)) - half + Vector2.one * FrameRadius;
-        float distance = Vector2.Max(q, Vector2.zero).magnitude + Mathf.Min(Mathf.Max(q.x, q.y), 0f) - FrameRadius;
-        return Outlined(distance, 3f, new Color(0.35f, 0.95f, 0.30f), new Color(0.05f, 0.05f, 0.05f));
     }
 
     /// <summary>仮の物資：素材の色の丸に、物資の番号のぶんだけ点（サイコロの目）。</summary>
@@ -311,17 +382,6 @@ public static class DebrisSetUISetup
         return color;
     }
 
-    /// <summary>仮のチェックマーク：緑のチェックに濃い縁。</summary>
-    private static Color DrawCheck(int x, int y)
-    {
-        var p = new Vector2(x + 0.5f, y + 0.5f);
-        var a = new Vector2(24f, 66f);
-        var b = new Vector2(52f, 34f);
-        var c = new Vector2(106f, 98f);
-        float distance = Mathf.Min(SegmentDistance(p, a, b), SegmentDistance(p, b, c)) - 16f;
-        return Outlined(distance, 6f, new Color(0.30f, 0.95f, 0.40f), new Color(0.03f, 0.22f, 0.08f));
-    }
-
     /// <summary>形の外側からの距離（内側は負）から、縁取りした色を出す（縁は1ピクセルぶんぼかす）。</summary>
     private static Color Outlined(float distance, float outline, Color fill, Color edge)
     {
@@ -331,15 +391,6 @@ public static class DebrisSetUISetup
         color.a = outer;
         return color;
     }
-
-    private static float SegmentDistance(Vector2 p, Vector2 a, Vector2 b)
-    {
-        Vector2 ab = b - a;
-        float t = Mathf.Clamp01(Vector2.Dot(p - a, ab) / ab.sqrMagnitude);
-        return Vector2.Distance(p, a + ab * t);
-    }
-
-    private static Vector2 Abs(Vector2 v) => new Vector2(Mathf.Abs(v.x), Mathf.Abs(v.y));
 
     /// <summary>サイコロの目の位置（1〜5）。</summary>
     private static Vector2[] PipOffsets(int count)
