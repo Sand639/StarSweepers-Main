@@ -17,7 +17,9 @@ public enum PlayerBehaviorStep
 public enum PlayerBehaviorPattern
 {
     A = 0,
-    B = 1
+    B = 1,
+    C = 2, // 2026/11/18：狙う・発射の「先を狙いで曲げる（すぐ向く）」
+    D = 3  // 2026/11/18：狙う・発射の「先を狙いで曲げる（遅れて付いていく）」
 }
 
 /// <summary>
@@ -27,12 +29,14 @@ public enum PlayerBehaviorPattern
 /// <see cref="SpaceJunkSession"/> が全員に配り、全員の体（ボットも）がそれで動く。通信していないとき（検証シーン）は、
 /// このPCに保存した値（最後にホストをしたときの選び方）を使う。
 ///
-/// | 段階 | A | B |
-/// | --- | --- | --- |
-/// | 1 狙う・2 発射 | **鞭**（押した瞬間に狙った向きへ出て、しならせて当てる） | **溜め**（押して長さを決め、離すとまっすぐ伸びる） |
-/// | 3 引っ張る・4 投げる | **しなって引き寄せ、押せば後ろへ投げる／押さなければ前へはじき飛ぶ** | （まだ無い） |
+/// | 段階 | A | B | C | D |
+/// | --- | --- | --- | --- | --- |
+/// | 1 狙う・2 発射 | **鞭**（押した瞬間に狙った向きへ出て、体を振ってしならせて当てる） | **溜め**（押して長さを決め、離すとまっすぐ伸びる） | **曲げ撃ち**（体はあまり回らず、光線の先がすぐ狙いへ曲がる） | **曲げ撃ち（遅れ）**（C と同じで、先が遅れて付いていく） |
+/// | 3 引っ張る・4 投げる | **しなって引き寄せ、押せば後ろへ投げる／押さなければ前へはじき飛ぶ** | （まだ無い） | （まだ無い） | （まだ無い） |
 ///
-/// **「固定の組」**：A の「狙う」と「発射」は1つの流れなので、片方を A にするともう片方も A になる（B も同じ）。
+/// C・D は中身（作り）が同じで、パラメータ（インスペクターの値）をパターンごとに別に持つ（2026/11/18・小野田さん）。
+///
+/// **「固定の組」**：A の「狙う」と「発射」は1つの流れなので、片方を A にするともう片方も A になる（B・C・D も同じ）。
 /// 「引っ張る」と「投げる」の A も同じ。組にしないパターン（段階ごとに別々に選べるもの）を足すときは
 /// <see cref="IsFixedPair"/> で false を返すようにする。
 ///
@@ -48,8 +52,8 @@ public static class PlayerBehavior
     /// <summary>段階ごとに選べるパターン（並びは <see cref="PlayerBehaviorStep"/> の数字の順）。</summary>
     private static readonly PlayerBehaviorPattern[][] Available =
     {
-        new[] { PlayerBehaviorPattern.A, PlayerBehaviorPattern.B }, // 狙う
-        new[] { PlayerBehaviorPattern.A, PlayerBehaviorPattern.B }, // 発射
+        new[] { PlayerBehaviorPattern.A, PlayerBehaviorPattern.B, PlayerBehaviorPattern.C, PlayerBehaviorPattern.D }, // 狙う
+        new[] { PlayerBehaviorPattern.A, PlayerBehaviorPattern.B, PlayerBehaviorPattern.C, PlayerBehaviorPattern.D }, // 発射
         new[] { PlayerBehaviorPattern.A },                          // 引っ張る
         new[] { PlayerBehaviorPattern.A },                          // 投げる
     };
@@ -81,9 +85,13 @@ public static class PlayerBehavior
         bool shot = step == PlayerBehaviorStep.Aim || step == PlayerBehaviorStep.Fire;
         if (shot)
         {
-            return pattern == PlayerBehaviorPattern.B
-                ? "溜め：押して長さを決め、離すとまっすぐ伸びる"
-                : "鞭：押すとすぐ出て、しならせて当てる";
+            switch (pattern)
+            {
+                case PlayerBehaviorPattern.B: return "溜め：押して長さを決め、離すとまっすぐ伸びる";
+                case PlayerBehaviorPattern.C: return "曲げ撃ち：体はあまり回らず、光線の先がすぐ狙いへ曲がる";
+                case PlayerBehaviorPattern.D: return "曲げ撃ち（遅れ）：体はあまり回らず、光線の先が遅れて狙いへ曲がる";
+                default: return "鞭：押すとすぐ出て、体を振ってしならせて当てる";
+            }
         }
 
         return "しなって引き寄せ、押せば後ろへ投げる／押さなければ前へはじき飛ぶ";

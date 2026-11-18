@@ -453,6 +453,23 @@ public class LiquidBeam : MonoBehaviour
     }
 
     /// <summary>
+    /// **両端と「曲がりの目印」を外から決めて、流れを曲げて出し続ける**（2026/11/18。光線の先を狙いで曲げる撃ち方が使う）。
+    /// 根元からは <paramref name="control"/> の方へ出て、先端 <paramref name="end"/> へは control の方から入ってくる（2次ベジェの真ん中の目印）。
+    /// control が根元と先端を結ぶ線の上なら、まっすぐ。
+    /// </summary>
+    public void FollowCurve(Vector3 start, Vector3 end, Vector3 control)
+    {
+        Follow(start, end);
+
+        float length = (end - start).magnitude;
+        if (length > 0.001f)
+        {
+            // Follow と同じく、付けたオブジェクトの向き基準（大きさは掛けない）で、中点からのずれにする
+            bendOffset = Quaternion.Inverse(transform.rotation) * (control - start) - new Vector3(0f, 0f, length * 0.5f);
+        }
+    }
+
+    /// <summary>
     /// **先端から根元へ向かって、新しい色に染めていく。** 先端に物資がついた瞬間などに呼ぶ。
     /// 流れが出ていないときは、すぐその色になる。
     /// </summary>

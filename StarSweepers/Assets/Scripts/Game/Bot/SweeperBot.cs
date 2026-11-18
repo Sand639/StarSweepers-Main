@@ -342,7 +342,7 @@ public partial class SweeperBot : MonoBehaviour
                     PointAt(target.transform.position);
                 }
 
-                // 鞭の光線（撃ち方 Whip。2026/11/17）は押している間だけ出るので、出ている間は押し続ける
+                // 鞭・曲げ撃ちの光線（撃ち方 Whip・SteerSnap・SteerLag）は押している間だけ出るので、出ている間は押し続ける（曲げ撃ちは、素材を指し続けると先が素材へ曲がる）
                 hold = shooter.IsWhipping;
                 break;
         }

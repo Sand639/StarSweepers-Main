@@ -69,6 +69,12 @@ public class SweeperMover : MonoBehaviour
     /// <summary>ON の間は、移動方向ではなく狙う方向（<see cref="SweeperAim.Direction"/>）を向く。</summary>
     public bool FaceAim { get; set; }
 
+    /// <summary>
+    /// ON の間は、この部品は体を回さない（向きは <see cref="SweeperShooter"/> が決める）。
+    /// 光線の先を狙いで曲げる撃ち方（挙動パターン C・D。2026/11/18）で、体を少しだけしか回さないために使う。
+    /// </summary>
+    public bool TurnLocked { get; set; }
+
     /// <summary>歩く速さ（メートル／秒）。</summary>
     public float MoveSpeed
     {
@@ -192,6 +198,12 @@ public class SweeperMover : MonoBehaviour
     /// <summary>狙っている間は狙う方向へ、それ以外は動いている方向へ向き直る。止まっているときは今の向きのまま。</summary>
     private void Turn(Vector3 moveDirection)
     {
+        // 向きをほかの部品が決めている間（光線の先を狙いで曲げる撃ち方。SweeperShooter）は回さない
+        if (TurnLocked)
+        {
+            return;
+        }
+
         Vector3 look = Vector3.zero;
 
         if (FaceAim && aim != null)

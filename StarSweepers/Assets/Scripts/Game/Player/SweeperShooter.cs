@@ -16,8 +16,8 @@ using UnityEngine.InputSystem;
 /// **巻き取り中に向きを変えると、光線が釣り糸のようにしなる**（手元からは体の向きに少し遅れて出て、物資へ曲がってつながる。2026/11/4）。
 /// 撃った瞬間に <see cref="SweeperAnimation.PlayShoot"/>（A_SHOOT → A_AIM_01）を呼ぶ。
 ///
-/// **撃ち方は2つから選べる**（<see cref="shotStyle"/>。2026/11/17・小野田さんの変更案）。2026/11/18 から、ロビーコンソールの
-/// プレイヤー挙動「1 狙う・2 発射」（A＝Whip／B＝Aim）で、ホストが全員ぶん決める（<see cref="PlayerBehavior"/>）。
+/// **撃ち方は4つから選べる**（<see cref="shotStyle"/>。2026/11/17・小野田さんの変更案）。2026/11/18 から、ロビーコンソールの
+/// プレイヤー挙動「1 狙う・2 発射」（A＝Whip／B＝Aim／C＝SteerSnap／D＝SteerLag）で、ホストが全員ぶん決める（<see cref="PlayerBehavior"/>）。
 /// Whip（初期値）：溜めずに、押した瞬間に狙った向きへ光線が出て、最長 1 秒出し続けられる。向きを変えると**鞭のようにしなり**、
 /// 光線のどこかが物資に触れたらつかむ。Aim：上の表のとおり（溜めて長さを決めてから撃つ）。詳しくは `Documents/機能ドキュメント/鞭のように曲がる光線.md`。
 /// </summary>
@@ -26,8 +26,70 @@ public class SweeperShooter : MonoBehaviour
     /// <summary>撃ち方（2026/11/17）。</summary>
     public enum ShotStyle
     {
-        Aim,  // 今まで：押して溜めて長さを決め、離すとまっすぐ伸びる
-        Whip  // 変更案：押すとすぐ出て、最長 1 秒出し続ける。向きを変えると鞭のようにしなる
+        Aim,       // 今まで：押して溜めて長さを決め、離すとまっすぐ伸びる（挙動パターン B）
+        Whip,      // 変更案：押すとすぐ出て、最長 1 秒出し続ける。体を振ると鞭のようにしなる（挙動パターン A）
+        SteerSnap, // 曲げ撃ち：体はあまり回らず、光線の先がすぐ狙いへ曲がる（挙動パターン C。2026/11/18）
+        SteerLag   // 曲げ撃ち（遅れ）：C と同じ作りで、先が遅れて狙いへ付いていく（挙動パターン D。2026/11/18）
+    }
+
+    /// <summary>
+    /// **曲げ撃ち（挙動パターン C・D）の値。** C と D は作りが同じで、この値をパターンごとに別に持つ（2026/11/18・小野田さん）。
+    /// 押すと体の向き（＝狙った向き）にまっすぐ光線の先が飛び出し、飛んでいる間に狙いを動かすと、**体はあまり回らずに、
+    /// 光線の先が狙いの向きへ進路を変えて進む**（光線は、手元から体の向きに出て、先へ曲がってつながる）。
+    /// </summary>
+    [System.Serializable]
+    public class SteerSettings
+    {
+        [Tooltip("光線を出し続けられる秒数")]
+        [Min(0.1f)]
+        public float seconds = 1f;
+
+        [Tooltip("光線の先が飛ぶ速さ（m/秒）。遅いほど、伸びきるまでに長く曲げられる。伸びきったら（Max Reach）先は止まる")]
+        [Min(0.1f)]
+        public float headSpeed = 15f;
+
+        [Tooltip("ON：離したらそこで光線が戻り始める（押している間だけ出る。最長 Seconds 秒）。OFF：1回押せば Seconds 秒出る")]
+        public bool holdToKeep = true;
+
+        [Tooltip("ON：光線の先の進む向きが、狙いの向きへすぐ変わる。OFF：ばね（Tip Stiffness・Tip Damping）で遅れて変わる")]
+        public bool tipSnaps = true;
+
+        [Tooltip("先の進む向きが狙いの向きに追いつく速さ（Tip Snaps が OFF のとき。大きいほどすぐ追いつく）")]
+        [Min(0.5f)]
+        public float tipStiffness = 8f;
+
+        [Tooltip("先の止まりやすさ（Tip Snaps が OFF のとき。1 で行き過ぎない、小さいほど行き過ぎてからビヨンと戻る）")]
+        [Range(0.1f, 1.5f)]
+        public float tipDamping = 0.6f;
+
+        [Tooltip("光線の先の進む向きが、体の向きから曲がれる最大の角度（度）。大きいと手前へ戻ってくるように曲がれる")]
+        [Range(0f, 150f)]
+        public float maxTipAngle = 120f;
+
+        [Tooltip("光線を出している間に、体が撃った向きから狙いの方へ回れる最大の角度（度）。0 で体は回らない")]
+        [Range(0f, 180f)]
+        public float maxBodyTurn = 30f;
+
+        [Tooltip("光線を出している間に、体が回る速さ（度／秒）")]
+        [Min(0f)]
+        public float bodyTurnSpeed = 120f;
+
+        [Tooltip("光線の曲がり方の強さ（0 で手元から先までまっすぐ、1 で手元からは体の向きに出て、先へは進んできた向きから入る＝角ばった曲がり方）")]
+        [Range(0f, 1f)]
+        public float curveStrength = 1f;
+
+        [Tooltip("光線を出している間に歩ける速さ（ふだんの速さに掛ける割合）。0 で歩けない")]
+        [Range(0f, 1f)]
+        public float moveScale = 0f;
+
+        public SteerSettings()
+        {
+        }
+
+        public SteerSettings(bool snaps)
+        {
+            tipSnaps = snaps;
+        }
     }
 
     /// <summary>光線の段階。オンラインでは、ほかの人の画面にこれを配って同じ見た目を出す（<see cref="SweeperNetSync"/>）。</summary>
@@ -55,10 +117,10 @@ public class SweeperShooter : MonoBehaviour
     [SerializeField] private LiquidBeam beamPrefab;
 
     [Header("撃ち方（2026/11/17 の変更案）")]
-    [Tooltip("Whip：押すとすぐ狙った向きへ光線が出て、最長 Whip Seconds 秒出し続けられる。向きを変えると鞭のようにしなり、どこかが物資に触れたらつかむ。\nAim：今までどおり、押して溜めて長さを決め、離すとまっすぐ伸びる")]
+    [Tooltip("Whip：押すとすぐ狙った向きへ光線が出て、最長 Whip Seconds 秒出し続けられる。向きを変えると鞭のようにしなり、どこかが物資に触れたらつかむ。\nAim：今までどおり、押して溜めて長さを決め、離すとまっすぐ伸びる\nSteerSnap・SteerLag（曲げ撃ち）：体はあまり回らず、光線の先が狙いの向きへ曲がる（下の「曲げ撃ち」の値）")]
     [SerializeField] private ShotStyle shotStyle = ShotStyle.Whip;
 
-    [Tooltip("ON：ロビーコンソールでホストが決めたプレイヤー挙動「1 狙う・2 発射」（A＝鞭／B＝溜め）に合わせる。変わると、次に押したときから変わる（インスペクターで変えた Shot Style は、挙動が変わるまでそのまま）。通信なしのときは、このPCに保存した値。\nOFF：いつもインスペクターの Shot Style")]
+    [Tooltip("ON：ロビーコンソールでホストが決めたプレイヤー挙動「1 狙う・2 発射」（A＝鞭／B＝溜め／C・D＝曲げ撃ち）に合わせる。変わると、次に押したときから変わる（インスペクターで変えた Shot Style は、挙動が変わるまでそのまま）。通信なしのときは、このPCに保存した値。\nOFF：いつもインスペクターの Shot Style")]
     [SerializeField] private bool followSettings = true;
 
     [Header("鞭の光線（撃ち方が Whip のとき）")]
@@ -84,6 +146,13 @@ public class SweeperShooter : MonoBehaviour
     [Tooltip("光線を出している間に歩ける速さ（ふだんの速さに掛ける割合）。0 で歩けない（向きは変えられる）")]
     [Range(0f, 1f)]
     [SerializeField] private float whipMoveScale = 0f;
+
+    [Header("曲げ撃ち（撃ち方が SteerSnap＝挙動パターン C／SteerLag＝D のとき。2026/11/18）")]
+    [Tooltip("挙動パターン C（光線の先がすぐ狙いへ向く）の値")]
+    [SerializeField] private SteerSettings steerSnap = new SteerSettings(true);
+
+    [Tooltip("挙動パターン D（光線の先が遅れて狙いへ付いていく）の値")]
+    [SerializeField] private SteerSettings steerLag = new SteerSettings(false);
 
     [Header("伸ばせる長さ（プレイヤーの中心から m）")]
     [Tooltip("押した瞬間の長さ")]
@@ -192,6 +261,13 @@ public class SweeperShooter : MonoBehaviour
     private float whipTipYaw;
     private float whipTipYawSpeed;
 
+    // 曲げ撃ち（2026/11/18）：いま出ている光線の値（鞭・溜めのときは null）、撃った瞬間の体の向き（真上から見た角度・度）、
+    // 光線の先の位置（当たりを見る高さ）と、先が飛んできた道のりの長さ。先の進む向きは whipTipYaw を使う
+    private SteerSettings steer;
+    private float steerLaunchYaw;
+    private Vector3 steerTip;
+    private float steerLength;
+
     /// <summary>鞭の当たりを見る点の数（手元〜先）。多いほど細かく見るが重くなる。</summary>
     private const int WhipSamples = 16;
 
@@ -259,10 +335,33 @@ public class SweeperShooter : MonoBehaviour
         shotStyle = StyleOf(setting);
     }
 
-    /// <summary>プレイヤー挙動「狙う・発射」のパターンにあたる撃ち方（A＝鞭、B＝溜め）。</summary>
+    /// <summary>プレイヤー挙動「狙う・発射」のパターンにあたる撃ち方（A＝鞭、B＝溜め、C＝曲げ撃ち、D＝曲げ撃ち（遅れ））。</summary>
     public static ShotStyle StyleOf(PlayerBehaviorPattern pattern)
     {
-        return pattern == PlayerBehaviorPattern.B ? ShotStyle.Aim : ShotStyle.Whip;
+        switch (pattern)
+        {
+            case PlayerBehaviorPattern.B: return ShotStyle.Aim;
+            case PlayerBehaviorPattern.C: return ShotStyle.SteerSnap;
+            case PlayerBehaviorPattern.D: return ShotStyle.SteerLag;
+            default: return ShotStyle.Whip;
+        }
+    }
+
+    /// <summary>押した瞬間に光線が出る撃ち方（鞭・曲げ撃ち）か。溜め（Aim）だけが false。</summary>
+    public static bool IsWhipFamily(ShotStyle style)
+    {
+        return style != ShotStyle.Aim;
+    }
+
+    /// <summary>その撃ち方の曲げ撃ちの値。曲げ撃ちでなければ null。</summary>
+    private SteerSettings SteerOf(ShotStyle style)
+    {
+        switch (style)
+        {
+            case ShotStyle.SteerSnap: return steerSnap;
+            case ShotStyle.SteerLag: return steerLag;
+            default: return null;
+        }
     }
 
     /// <summary>鞭の光線を出している最中か（ボットは、この間ボタンを押し続ける）。</summary>
@@ -295,9 +394,11 @@ public class SweeperShooter : MonoBehaviour
     /// <summary>光線の先の位置（巻き取り中は物資の引っ掛けた所）。</summary>
     public Vector3 BeamTip => phase == ShotPhase.Reeling && reel != null && reel.Item != null
         ? reel.Item.AnchorPoint
-        : whipShot
-            ? WhipOrigin + YawToDirection(whipTipYaw) * Mathf.Max(0f, traveled)
-            : launchOrigin + launchDirection * Mathf.Max(0f, traveled);
+        : steer != null
+            ? steerTip
+            : whipShot
+                ? WhipOrigin + YawToDirection(whipTipYaw) * Mathf.Max(0f, traveled)
+                : launchOrigin + launchDirection * Mathf.Max(0f, traveled);
 
     /// <summary>巻き取っている物資。巻き取っていなければ null。</summary>
     public HookableObject ReelItem => phase == ShotPhase.Reeling && reel != null ? reel.Item : null;
@@ -479,7 +580,7 @@ public class SweeperShooter : MonoBehaviour
                         ApplySetting(false);
                     }
 
-                    if (shotStyle == ShotStyle.Whip)
+                    if (IsWhipFamily(shotStyle))
                     {
                         BeginWhip();
                     }
@@ -506,11 +607,15 @@ public class SweeperShooter : MonoBehaviour
                 break;
 
             case ShotPhase.Retracting:
-                if (whipShot)
+                if (whipShot && steer == null)
                 {
                     UpdateWhipSpring(Time.deltaTime);
                 }
                 traveled -= retractSpeed * Time.deltaTime;
+                if (steer != null)
+                {
+                    ShrinkSteerTip();
+                }
                 if (traveled <= 0f)
                 {
                     EndShot();
@@ -685,8 +790,13 @@ public class SweeperShooter : MonoBehaviour
         if (beam != null && newPhase != ShotPhase.Idle && !(remoteSnapped && newPhase == ShotPhase.Reeling))
         {
             // 鞭の光線は、届いた光線の先と、この体の向き（通信で届く）から同じ曲がり方を描く
-            if (shotStyle == ShotStyle.Whip && newPhase != ShotPhase.Reeling)
+            if (IsWhipFamily(shotStyle) && newPhase != ShotPhase.Reeling)
             {
+                // 曲げ撃ちは、届いた「先の進む向き」で曲がり方を決める
+                if (SteerOf(shotStyle) != null && direction.sqrMagnitude > 0.0001f)
+                {
+                    whipTipYaw = DirectionToYaw(direction);
+                }
                 FollowWhip(shownTip);
             }
             else
@@ -873,11 +983,19 @@ public class SweeperShooter : MonoBehaviour
         charge = 0f;
         phase = ShotPhase.Extending;
 
+        // 曲げ撃ち（C・D）：体の向きはこの部品が決める（少しだけしか回さない）。鞭（A）：体は狙いへ回り、先が遅れてしなる
+        steer = SteerOf(shotStyle);
+        steerLaunchYaw = whipTipYaw;
+        steerTip = WhipOrigin + direction * handForward;
+        steerLength = 0f;
+        float moveScale = steer != null ? steer.moveScale : whipMoveScale;
+
         if (mover != null)
         {
-            mover.FaceAim = true;
-            mover.MoveLocked = whipMoveScale <= 0f;
-            mover.MoveSpeedScale = whipMoveScale;
+            mover.FaceAim = steer == null;
+            mover.TurnLocked = steer != null;
+            mover.MoveLocked = moveScale <= 0f;
+            mover.MoveSpeedScale = moveScale;
         }
 
         beam?.SetColor(IdleColor);
@@ -889,8 +1007,15 @@ public class SweeperShooter : MonoBehaviour
     {
         float deltaTime = Time.deltaTime;
         whipTime += deltaTime;
-        UpdateWhipSpring(deltaTime);
-        traveled = Mathf.Min(MaxReach, traveled + extendSpeed * deltaTime);
+        if (steer != null)
+        {
+            UpdateSteer(deltaTime);
+        }
+        else
+        {
+            UpdateWhipSpring(deltaTime);
+            traveled = Mathf.Min(MaxReach, traveled + extendSpeed * deltaTime);
+        }
 
         if (TryWhipHit(out HookableObject hookable))
         {
@@ -898,9 +1023,114 @@ public class SweeperShooter : MonoBehaviour
             return;
         }
 
-        if (stunned || whipTime >= whipSeconds || (whipHoldToKeep && released))
+        float seconds = steer != null ? steer.seconds : whipSeconds;
+        bool holdToKeep = steer != null ? steer.holdToKeep : whipHoldToKeep;
+        if (stunned || whipTime >= seconds || (holdToKeep && released))
         {
             phase = ShotPhase.Retracting;
+        }
+    }
+
+    /// <summary>
+    /// **曲げ撃ち（C・D）の1フレーム。** 体は撃った向きから狙いの方へ、最大 <see cref="SteerSettings.maxBodyTurn"/> 度までゆっくり回る。
+    /// 光線の先の進む向きは狙いの向きへ（C はすぐ、D はばねで遅れて）変わる（体の向きからは <see cref="SteerSettings.maxTipAngle"/> 度まで）。
+    /// 先はその向きへ <see cref="SteerSettings.headSpeed"/> で進み、飛んできた道のりが <see cref="MaxReach"/> になったら止まる。
+    /// </summary>
+    private void UpdateSteer(float deltaTime)
+    {
+        if (deltaTime <= 0f)
+        {
+            return;
+        }
+
+        // 処理が一瞬止まったとき（大きな deltaTime）に、ばねが暴れないようにする
+        float springTime = Mathf.Min(deltaTime, 0.05f);
+        SteerHeading(springTime);
+
+        // 先を進める（伸びきったら止まる）
+        float step = Mathf.Min(steer.headSpeed * deltaTime, Mathf.Max(0f, MaxReach - steerLength));
+        if (step > 0f)
+        {
+            steerTip += YawToDirection(whipTipYaw) * step;
+            steerLength += step;
+        }
+
+        SyncSteerTraveled();
+    }
+
+    /// <summary>曲げ撃ちの先の、根元からの水平の距離を traveled に入れる（戻るときは、ここから縮める）。</summary>
+    private void SyncSteerTraveled()
+    {
+        Vector3 offset = steerTip - WhipOrigin;
+        offset.y = 0f;
+        traveled = offset.magnitude;
+        launchDirection = YawToDirection(whipTipYaw);
+    }
+
+    /// <summary>曲げ撃ちの光線が戻る間：先を、根元への向きのまま traveled の距離まで寄せる（曲がりの形は、先の進む向きから描き直される）。</summary>
+    private void ShrinkSteerTip()
+    {
+        Vector3 offset = steerTip - WhipOrigin;
+        offset.y = 0f;
+        Vector3 direction = offset.sqrMagnitude > 0.0001f ? offset.normalized : BodyForward;
+        steerTip = WhipOrigin + direction * Mathf.Max(0f, traveled);
+    }
+
+    /// <summary>曲げ撃ち：体を少しだけ狙いへ回し、光線の先の進む向き（<see cref="whipTipYaw"/>）を狙いへ向ける。</summary>
+    private void SteerHeading(float deltaTime)
+    {
+        float aimYaw = DirectionToYaw(AimDirection);
+
+        // 体：撃った向きから、狙いの方へ少しだけ
+        float bodyTarget = steerLaunchYaw + Mathf.Clamp(Mathf.DeltaAngle(steerLaunchYaw, aimYaw), -steer.maxBodyTurn, steer.maxBodyTurn);
+        float bodyYaw = Mathf.MoveTowardsAngle(DirectionToYaw(BodyForward), bodyTarget, steer.bodyTurnSpeed * deltaTime);
+        transform.rotation = Quaternion.LookRotation(YawToDirection(bodyYaw), Vector3.up);
+
+        // 先：狙いの向き（体の向きから曲がりすぎない所まで）
+        float tipTarget = bodyYaw + Mathf.Clamp(Mathf.DeltaAngle(bodyYaw, aimYaw), -steer.maxTipAngle, steer.maxTipAngle);
+        if (steer.tipSnaps)
+        {
+            whipTipYaw = tipTarget;
+            whipTipYawSpeed = 0f;
+            return;
+        }
+
+        // 減衰するばね（鞭と同じ式。行きたい向きが「体の向き」ではなく「狙いの向き」）
+        float omega = steer.tipStiffness;
+        float gap = Mathf.DeltaAngle(whipTipYaw, tipTarget);
+        float accel = omega * omega * gap - 2f * steer.tipDamping * omega * whipTipYawSpeed;
+        whipTipYawSpeed += accel * deltaTime;
+        whipTipYaw += whipTipYawSpeed * deltaTime;
+
+        float bent = Mathf.DeltaAngle(bodyYaw, whipTipYaw);
+        if (Mathf.Abs(bent) > steer.maxTipAngle)
+        {
+            whipTipYaw = bodyYaw + Mathf.Sign(bent) * steer.maxTipAngle;
+            if (Mathf.Sign(whipTipYawSpeed) == Mathf.Sign(bent))
+            {
+                whipTipYawSpeed = 0f;
+            }
+        }
+    }
+
+    /// <summary>狙っている向き（水平・長さ1）。狙いの部品が無ければ体の向き。</summary>
+    private Vector3 AimDirection
+    {
+        get
+        {
+            Vector3 direction = aim != null ? aim.Direction : BodyForward;
+            direction.y = 0f;
+            return direction.sqrMagnitude > 0.0001f ? direction.normalized : BodyForward;
+        }
+    }
+
+    /// <summary>光線の曲がり方の強さ。曲げ撃ちはパターンごとの値、鞭は巻き取り中のしなりと共通の値。ほかの人の体でも届いた撃ち方で決まる。</summary>
+    private float WhipCurveStrength
+    {
+        get
+        {
+            SteerSettings settings = SteerOf(shotStyle);
+            return settings != null ? settings.curveStrength : bendStrength;
         }
     }
 
@@ -942,14 +1172,23 @@ public class SweeperShooter : MonoBehaviour
     {
         Vector3 forward = BodyForward;
         Vector3 start = WhipOrigin + forward * handForward;
-        Vector3 tip = WhipOrigin + YawToDirection(whipTipYaw) * traveled;
+        Vector3 tip = BeamTip;
         Vector3 toTip = tip - start;
         float length = toTip.magnitude;
 
-        // LiquidBeam.Follow と同じ曲線（2次ベジェ）。真ん中の目印を、根元から体の向きへずらす
-        Vector3 middle = length > 0.001f
-            ? start + toTip * 0.5f + (forward - toTip / length) * (length * 0.5f * bendStrength)
-            : start;
+        // LiquidBeam.Follow と同じ曲線（2次ベジェ）。真ん中の目印を、根元から体の向きへずらす。
+        // 曲げ撃ちは、根元からは体の向き、先へは進んできた向きから入る形（LiquidBeam.FollowCurve と同じ）
+        Vector3 middle;
+        if (steer != null)
+        {
+            middle = SteerControl(start, forward, tip, whipTipYaw, steer.curveStrength);
+        }
+        else
+        {
+            middle = length > 0.001f
+                ? start + toTip * 0.5f + (forward - toTip / length) * (length * 0.5f * WhipCurveStrength)
+                : start;
+        }
 
         int last = points.Length - 1;
         for (int i = 0; i <= last; i++)
@@ -991,6 +1230,15 @@ public class SweeperShooter : MonoBehaviour
                 Vector3 stop = from + along / length * hit.distance - WhipOrigin;
                 stop.y = 0f;
                 traveled = Mathf.Min(traveled, stop.magnitude);
+
+                // 曲げ撃ち：先を当たった所まで戻す（戻したぶんは、まだ飛べる道のりに返す。進む向きを変えれば、また進める）
+                if (steer != null)
+                {
+                    Vector3 stopTip = WhipOrigin + stop;
+                    steerLength = Mathf.Max(0f, steerLength - Vector3.Distance(steerTip, stopTip));
+                    steerTip = stopTip;
+                    SyncSteerTraveled();
+                }
                 break;
             }
 
@@ -1019,6 +1267,14 @@ public class SweeperShooter : MonoBehaviour
     {
         phase = ShotPhase.Reeling;
 
+        // 曲げ撃ちでつかんだら、体の向きはふだんの巻き取りと同じ（狙いへ回る）に戻す。引っ張る・投げるはパターン A のまま
+        if (steer != null && mover != null)
+        {
+            mover.TurnLocked = false;
+            mover.FaceAim = true;
+        }
+        steer = null;
+
         bendActive = true;
         bendYaw = DirectionToYaw(BodyForward);
         bendYawSpeed = 0f;
@@ -1026,6 +1282,40 @@ public class SweeperShooter : MonoBehaviour
         reel.Begin(hookable);
         beam?.ChangeColorFromTip(teamColor);
         PlayWrap(hookable);
+    }
+
+    /// <summary>
+    /// **曲げ撃ちの曲線の「真ん中の目印」**（2次ベジェ）。手元 <paramref name="start"/> から体の向き <paramref name="forward"/> へ延ばした線と、
+    /// 先 <paramref name="tip"/> から進んできた向き（<paramref name="headingYaw"/>）を逆にたどった線の交わる所。
+    /// こうすると、手元からは体の向きに出て、先へは進んできた向きから入る（絵の「まっすぐ出て、曲がって物資へ」の形）。
+    /// 交わらない（平行・後ろ側で交わる）ときは、まっすぐ（中点）にする。<paramref name="strength"/> は中点からどれだけ寄せるか（0〜1）。
+    /// </summary>
+    private static Vector3 SteerControl(Vector3 start, Vector3 forward, Vector3 tip, float headingYaw, float strength)
+    {
+        Vector3 middle = (start + tip) * 0.5f;
+        Vector3 heading = YawToDirection(headingYaw);
+        Vector3 toTip = tip - start;
+        float cross = forward.x * heading.z - forward.z * heading.x;
+        float reach = new Vector2(toTip.x, toTip.z).magnitude;
+
+        if (Mathf.Abs(cross) < 0.01f || reach < 0.01f)
+        {
+            return middle;
+        }
+
+        // start + forward × s ＝ tip − heading × u を解く（真上から見て）
+        float s = (toTip.x * heading.z - toTip.z * heading.x) / cross;
+        float u = (forward.x * toTip.z - forward.z * toTip.x) / cross;
+        if (s <= 0f || u <= 0f)
+        {
+            return middle;
+        }
+
+        // 交わる所が遠すぎる（ほとんど平行）ときに、曲線が大きく外へふくらまないよう、手元から先までの距離までにする
+        s = Mathf.Min(s, reach);
+        Vector3 corner = start + forward * s;
+        corner.y = middle.y;
+        return Vector3.Lerp(middle, corner, Mathf.Clamp01(strength));
     }
 
     /// <summary>鞭の光線を描く。根元からは体の向きに出て、先 <paramref name="tip"/> へ曲がってつながる。</summary>
@@ -1036,7 +1326,16 @@ public class SweeperShooter : MonoBehaviour
         Vector3 flat = toTip;
         flat.y = 0f;
 
-        if (flat.sqrMagnitude < 0.0001f || bendStrength <= 0f)
+        // 曲げ撃ち（C・D）：手元からは体の向きに出て、先へは進んできた向き（whipTipYaw。ほかの人の体では届いた向き）から入る
+        SteerSettings settings = SteerOf(shotStyle);
+        if (settings != null)
+        {
+            beam.FollowCurve(hand, tip, SteerControl(hand, BodyForward, tip, whipTipYaw, settings.curveStrength));
+            return;
+        }
+
+        float curve = WhipCurveStrength;
+        if (flat.sqrMagnitude < 0.0001f || curve <= 0f)
         {
             beam.Follow(hand, tip);
             return;
@@ -1045,7 +1344,7 @@ public class SweeperShooter : MonoBehaviour
         // まっすぐの光線（手元→先。下り坂の傾きを含む）を、先への向きと体の向きの差だけ横に回した向きに出す（巻き取り中のしなりと同じ）
         float turn = Mathf.DeltaAngle(DirectionToYaw(flat), DirectionToYaw(BodyForward));
         Vector3 startDirection = Quaternion.AngleAxis(turn, Vector3.up) * toTip;
-        beam.Follow(hand, tip, startDirection, bendStrength);
+        beam.Follow(hand, tip, startDirection, curve);
     }
 
     /// <summary>
@@ -1111,12 +1410,14 @@ public class SweeperShooter : MonoBehaviour
         charge = 0f;
         whipShot = false;
         whipHasLastPoints = false;
+        steer = null;
 
         if (mover != null)
         {
             mover.MoveLocked = false;
             mover.MoveSpeedScale = 1f;
             mover.FaceAim = false;
+            mover.TurnLocked = false;
         }
 
         StopBeam();

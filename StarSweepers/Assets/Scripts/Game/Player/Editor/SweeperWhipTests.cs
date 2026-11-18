@@ -88,6 +88,133 @@ public class SweeperWhipTests
         PlayerBehavior.Normalize(values);
         Assert.That(values[(int)PlayerBehaviorStep.Fire], Is.EqualTo(PlayerBehaviorPattern.B), "食い違った組が、狙うに合わせて直っていない");
         Assert.That(values[(int)PlayerBehaviorStep.Throw], Is.EqualTo(PlayerBehaviorPattern.A), "投げるに無いパターンが A に直っていない");
+
+        // 曲げ撃ち（C・D。2026/11/18）も、狙う⇔発射で固定の組。撃ち方は C＝SteerSnap、D＝SteerLag
+        PlayerBehavior.Assign(values, PlayerBehaviorStep.Fire, PlayerBehaviorPattern.D);
+        Assert.That(values[(int)PlayerBehaviorStep.Aim], Is.EqualTo(PlayerBehaviorPattern.D), "発射を D にしたのに、狙うが D にならない");
+        Assert.That(SweeperShooter.StyleOf(PlayerBehaviorPattern.C), Is.EqualTo(SweeperShooter.ShotStyle.SteerSnap));
+        Assert.That(SweeperShooter.StyleOf(PlayerBehaviorPattern.D), Is.EqualTo(SweeperShooter.ShotStyle.SteerLag));
+    }
+
+    /// <summary>
+    /// 曲げ撃ち C（先がすぐ狙いへ向く）：正面へ撃ってから狙いを真横へ動かすと、体はあまり回らずに、光線の先が曲がって真横の箱をつかむ（2026/11/18）。
+    /// </summary>
+    [UnityTest]
+    public IEnumerator SteerSnap_SideBox_GrabsWithoutTurningBody()
+    {
+        yield return new EnterPlayMode();
+        yield return RunSteer(SweeperShooter.ShotStyle.SteerSnap);
+        yield return new ExitPlayMode();
+    }
+
+    /// <summary>曲げ撃ち C：狙いを動かさなければ、光線はまっすぐのままで、右前の箱には届かない（2026/11/18）。</summary>
+    [UnityTest]
+    public IEnumerator SteerSnap_NoSteer_Misses()
+    {
+        yield return new EnterPlayMode();
+        yield return RunSteer(SweeperShooter.ShotStyle.SteerSnap, false);
+        yield return new ExitPlayMode();
+    }
+
+    /// <summary>曲げ撃ち D（先が遅れて付いていく）：C と同じく、体はあまり回らずに真横の箱をつかむ（2026/11/18）。</summary>
+    [UnityTest]
+    public IEnumerator SteerLag_SideBox_GrabsWithoutTurningBody()
+    {
+        yield return new EnterPlayMode();
+        yield return RunSteer(SweeperShooter.ShotStyle.SteerLag);
+        yield return new ExitPlayMode();
+    }
+
+    /// <summary>
+    /// 曲げ撃ちの中身（小野田さんの絵と同じ流れ）。体は正面（+Z）。正面へ撃ち、0.3 秒たったら狙いを真横（右・+X）へ動かす。
+    /// 光線の先は進路を右へ変え、右前の縦長の箱（x＝5、z＝3〜9）に入ってつかむ。体は 30° までしか回らない。
+    /// まっすぐ撃っただけでは届かない場所（光線のまっすぐの所から 5m 右）なので、曲がらなければつかめない。
+    /// 狙いは、狙いの部品（SweeperAim）を止めて、向きを直接入れる。体の向きは光線の部品が決める（歩く部品は止めておく）。
+    /// </summary>
+    private static IEnumerator RunSteer(SweeperShooter.ShotStyle style, bool steerAim = true)
+    {
+        GameObject prefab = AssetDatabase.LoadAssetAtPath<GameObject>(PlayerPrefabPath);
+        Assert.That(prefab, Is.Not.Null, "新しい体のプレハブが無い（メニューで作る）");
+
+        GameObject ground = GameObject.CreatePrimitive(PrimitiveType.Plane);
+        ground.transform.localScale = new Vector3(10f, 1f, 10f);
+
+        GameObject player = Object.Instantiate(prefab, Vector3.zero, Quaternion.identity);
+        GameObject box = GameObject.CreatePrimitive(PrimitiveType.Cube);
+        try
+        {
+            player.GetComponent<SweeperMover>().enabled = false;
+            player.transform.rotation = Quaternion.identity;
+
+            SweeperAim aim = player.GetComponent<SweeperAim>();
+            aim.enabled = false;
+            FieldInfo aimDirection = typeof(SweeperAim).GetField("lastDirection", BindingFlags.Instance | BindingFlags.NonPublic);
+            Assert.That(aimDirection, Is.Not.Null, "SweeperAim の lastDirection が見つからない");
+            aimDirection.SetValue(aim, Vector3.forward);
+
+            Vector3 steerTo = Vector3.right;
+            box.transform.position = new Vector3(5f, 0.5f, 6f);
+            box.transform.localScale = new Vector3(1f, 1f, 6f);
+            box.AddComponent<Rigidbody>();
+            box.AddComponent<HookableObject>();
+            yield return Wait(0.5f);
+
+            SweeperShooter shooter = player.GetComponent<SweeperShooter>();
+            shooter.FollowSettings = false;
+            shooter.Style = style;
+
+            Invoke(shooter, "BeginWhip");
+            Assert.That(shooter.IsWhipping, Is.True, "押しても光線が出ていない");
+
+            bool grabbed = false;
+            float maxBodyYaw = 0f;
+            float startTime = Time.time;
+            float until = Time.realtimeSinceStartup + 4f;
+            while (Time.realtimeSinceStartup < until)
+            {
+                float elapsed = Time.time - startTime;
+                if (steerAim && elapsed > 0.3f)
+                {
+                    aimDirection.SetValue(aim, steerTo);
+                }
+
+                maxBodyYaw = Mathf.Max(maxBodyYaw, Mathf.Abs(Mathf.DeltaAngle(0f, player.transform.eulerAngles.y)));
+
+                if (shooter.Phase == SweeperShooter.ShotPhase.Reeling)
+                {
+                    grabbed = true;
+                    break;
+                }
+
+                if (shooter.Phase == SweeperShooter.ShotPhase.Idle)
+                {
+                    break;
+                }
+
+                yield return NextFrame();
+            }
+
+            float seconds = Time.time - startTime;
+            Debug.Log($"[SweeperWhipTests] 曲げ撃ち {style} 曲げる={steerAim} つかんだ={grabbed} 経過={seconds:F2}秒 体が回った最大={maxBodyYaw:F1}° 段階={shooter.Phase}");
+
+            if (!steerAim)
+            {
+                Assert.That(grabbed, Is.False, "狙いを動かしていないのに、右前の箱をつかんだ（まっすぐの光線では届かない場所のはず）");
+                yield break;
+            }
+
+            Assert.That(grabbed, Is.True, $"狙いを右へ動かしたのに、右前の箱をつかめなかった（段階 {shooter.Phase}・光線の先 {shooter.BeamTip}）");
+            Assert.That(seconds, Is.LessThan(1.05f), "出していられる 1 秒を過ぎてからつかんだ");
+            Assert.That(maxBodyYaw, Is.LessThanOrEqualTo(31f), "体が回りすぎている（曲げ撃ちは、体は最大 30° まで）");
+        }
+        finally
+        {
+            Object.Destroy(player);
+            Object.Destroy(box);
+            Object.Destroy(ground);
+        }
+
+        yield return null;
     }
 
     /// <summary>
