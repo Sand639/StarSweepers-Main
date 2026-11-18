@@ -124,6 +124,9 @@ public sealed class DebrisSetUI : MonoBehaviour
     [Tooltip("枠の中心の、上からの距離")]
     [SerializeField] private float bodyCenterY = 82f;
 
+    [Tooltip("閉じているときに見える、枠の幅（腕の金具と反対側の金具の間）。腕はこの閉じた形で入ってくる")]
+    [SerializeField] private float closedWidth = 24f;
+
     [Tooltip("枠の右端に、反対側の金具がどれだけかぶるか")]
     [SerializeField] private float bracketOverlap = 12f;
 
@@ -143,13 +146,13 @@ public sealed class DebrisSetUI : MonoBehaviour
     [SerializeField] private Vector2 titleOffset = new Vector2(16f, 4f);
 
     [Tooltip("入ってくる前の腕が、画面の外へどれだけ下がっているか")]
-    [SerializeField] private float armHideDistance = 140f;
+    [SerializeField] private float armHideDistance = 160f;
 
     [Header("出てくる・しまう演出")]
     [Tooltip("腕が画面の外から入ってくる秒数")]
     [SerializeField, Min(0f)] private float armSlideSeconds = 0.35f;
 
-    [Tooltip("枠が開く秒数。開ききってからカードが落ちてくる")]
+    [Tooltip("枠が開く秒数（反対側の金具が外へ動き、枠が伸びる）。開ききってからカードが落ちてくる")]
     [SerializeField, Min(0f)] private float openSeconds = 0.25f;
 
     [Tooltip("イベントが終わったとき、カードが消える秒数（そのあと枠が閉じて腕が出ていく）")]
@@ -595,15 +598,14 @@ public sealed class DebrisSetUI : MonoBehaviour
             panel.sizeDelta = new Vector2(width, panel.sizeDelta.y);
             Place(panel, side * (left + width * 0.5f), -bodyCenterY, 1f);
             parts.panel.fillOrigin = mirrored ? (int)Image.OriginHorizontal.Right : (int)Image.OriginHorizontal.Left;
-            parts.panel.fillAmount = open;
+            parts.panel.fillAmount = Mathf.Lerp(Mathf.Min(closedWidth, width), width, open) / width;
         }
 
         if (parts.bracket != null)
         {
             RectTransform bracket = parts.bracket.rectTransform;
-            float x = left + width * open + bracket.rect.width * 0.5f - bracketOverlap;
+            float x = left + Mathf.Lerp(Mathf.Min(closedWidth, width), width, open) + bracket.rect.width * 0.5f - bracketOverlap;
             Place(bracket, side * x, -bodyCenterY, side);
-            SetActive(parts.bracket, open > 0f);
         }
 
         if (parts.title != null)
