@@ -161,13 +161,11 @@ public sealed class RoundWinnerResultUI : MonoBehaviour
         {
             stars[team][i].gameObject.SetActive(i < count);
             RectTransform star = stars[team][i].rectTransform;
-            bool followsBadge = team != winner;
-            star.SetParent(followsBadge ? badges[team] : root, false);
+            star.SetParent(badges[team], false);
             star.localScale = Vector3.one;
             star.localRotation = Quaternion.identity;
             star.anchoredPosition = new Vector2(
-                (followsBadge ? 0 : TeamX(team)) + (i - (count - 1) * 0.5f) * spacing,
-                followsBadge ? 265 : 245);
+                (i - (count - 1) * 0.5f) * spacing, 265);
         }
     }
 
@@ -237,7 +235,7 @@ public sealed class RoundWinnerResultUI : MonoBehaviour
         Vector2 destination = new Vector2(TeamX(winner), 245);
         if (totals[winner] > 0)
         {
-            destination = stars[winner][totals[winner] - 1].rectTransform.anchoredPosition;
+            destination = motion.InverseTransformPoint(stars[winner][totals[winner] - 1].rectTransform.position);
         }
         float fall = Ease((time - 0.5f) / 1.5f);
         float aboveScreen = resultCamera.orthographicSize * 100f + 100f;
