@@ -160,8 +160,14 @@ public sealed class RoundWinnerResultUI : MonoBehaviour
         for (int i = 0; i < stars[team].Count; i++)
         {
             stars[team][i].gameObject.SetActive(i < count);
-            stars[team][i].rectTransform.anchoredPosition =
-                new Vector2(TeamX(team) + (i - (count - 1) * 0.5f) * spacing, 245);
+            RectTransform star = stars[team][i].rectTransform;
+            bool followsBadge = team != winner;
+            star.SetParent(followsBadge ? badges[team] : root, false);
+            star.localScale = Vector3.one;
+            star.localRotation = Quaternion.identity;
+            star.anchoredPosition = new Vector2(
+                (followsBadge ? 0 : TeamX(team)) + (i - (count - 1) * 0.5f) * spacing,
+                followsBadge ? 265 : 245);
         }
     }
 
