@@ -10,7 +10,10 @@ public sealed class RoundedStripesTransitionEffect : SceneTransitionEffect
         new Color(0.82f, 0.59f, 0.22f),
         new Color(0.49f, 0.19f, 0.14f),
     };
-    private static readonly float[] Delays = { 0.12f, 0.04f, 0.08f, 0.16f, 0.06f, 0f };
+    private readonly float[] coverDelays = new float[6];
+    private readonly float[] revealDelays = new float[6];
+    private readonly float[] coverDurations = new float[6];
+    private readonly float[] revealDurations = new float[6];
     private readonly RectTransform[] rows = new RectTransform[6];
     private readonly RectTransform[] bodies = new RectTransform[6];
     private readonly RectTransform[] leftCaps = new RectTransform[6];
@@ -20,6 +23,9 @@ public sealed class RoundedStripesTransitionEffect : SceneTransitionEffect
     public override void Build(RectTransform root, Color color)
     {
         parent = root;
+        var random = new System.Random(System.Guid.NewGuid().GetHashCode());
+        RandomizeTiming(random, coverDelays, coverDurations);
+        RandomizeTiming(random, revealDelays, revealDurations);
         for (int i = 0; i < rows.Length; i++)
         {
             rows[i] = new GameObject("RoundedStripe", typeof(RectTransform)).GetComponent<RectTransform>();
@@ -31,6 +37,25 @@ public sealed class RoundedStripesTransitionEffect : SceneTransitionEffect
             bodies[i] = body.rectTransform;
             leftCaps[i] = Cap(rows[i], stripeColor);
             rightCaps[i] = Cap(rows[i], stripeColor);
+        }
+    }
+
+    private static void RandomizeTiming(System.Random random, float[] delays, float[] durations)
+    {
+        int[] order = { 0, 1, 2, 3, 4, 5 };
+        for (int i = order.Length - 1; i > 0; i--)
+        {
+            int other = random.Next(i + 1);
+            int temporary = order[i];
+            order[i] = order[other];
+            order[other] = temporary;
+        }
+        for (int slot = 0; slot < order.Length; slot++)
+        {
+            int row = order[slot];
+            // 出発時刻が固まらないよう、ばらした枠内で時刻と速さを抽選する。
+            delays[row] = slot * 0.12f + (float)random.NextDouble() * 0.08f;
+            durations[row] = 0.24f + (float)random.NextDouble() * 0.08f;
         }
     }
 
@@ -53,7 +78,9 @@ public sealed class RoundedStripesTransitionEffect : SceneTransitionEffect
         float progress = revealing ? 1f - amount : amount;
         for (int i = 0; i < rows.Length; i++)
         {
-            float t = Mathf.Clamp01((progress - Delays[i]) / (1f - Delays[i]));
+            float delay = revealing ? revealDelays[i] : coverDelays[i];
+            float duration = revealing ? revealDurations[i] : coverDurations[i];
+            float t = Mathf.Clamp01((progress - delay) / duration);
             float x = revealing
                 ? Mathf.Lerp(-height, -height - length, t)
                 : Mathf.Lerp(width + height, -height, t);
