@@ -21,6 +21,7 @@
 | `SpaceJunkSession.LobbyZones.cs` | ロビーのチームエリアと開始のカウントダウン |
 | `SpaceJunkSession.LobbyTest.cs` | 検証用ロビーの準備完了、乗る位置、出発時刻 |
 | `SpaceJunkSession.LocalPlayers.cs` | 1台のPCで複数人 |
+| `SpaceJunkSession.ResultPresentation.cs` | 赤青の結果演出の配信と全員の完了待ち |
 | `SpaceJunkSession.Match.cs` | ラウンドの進行（ホストだけ） |
 | `SpaceJunkSession.SlotCheck.cs` | 席の答え合わせ（ホストだけ） |
 
@@ -58,3 +59,7 @@
 | 2026/11/7 | Claude Code | `SpaceJunkSession.Bots.cs`：古い体用のボット（`SpaceJunkBot`）を消したので、ボットの頭を付ける所を `SweeperBot` だけにした。気をつけることに書き足した |
 | 2026/11/10 | Claude Code | `SpaceJunkSession.Match.cs`：試合を始めるとき、トランジション（`SceneTransition`）で全員の画面を覆ってからマップへ移るようにした。気をつけることに書き足した |
 | 2026/11/17 | Codex | 検証ロビーの準備完了と出発の担当ファイル・変数を追記 |
+
+結果演出の変数はResultPresentation.csのresultPlayback・resultViewersFinished・resultPresentationId・roundResultActive。Match.csが演出を待ち、色帯で画面を覆ってから次のStageまたはLobbyへ移る。
+
+| 2026/11/19 | Codex | 結果演出の担当ファイル、同期と完了待ちの変数を追記 |

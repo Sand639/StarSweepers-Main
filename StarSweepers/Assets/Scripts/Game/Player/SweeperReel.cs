@@ -1175,16 +1175,8 @@ public class SweeperReel : MonoBehaviour
         Vector3 landing = BackLanding(from, direction, distance);
         landing.y = from.y;
 
-        float gravity = Mathf.Max(0.1f, -Physics.gravity.y);
         float apexY = Mathf.Max(transform.position.y + arcHeight, from.y + 0.5f);
-
-        // いちばん高い所まで上がる時間と、そこから落ちる時間を足したのが、飛んでいる時間
-        float upSpeed = Mathf.Sqrt(2f * gravity * (apexY - from.y));
-        float flightTime = upSpeed / gravity + Mathf.Sqrt(2f * (apexY - landing.y) / gravity);
-
-        Vector3 across = landing - from;
-        across.y = 0f;
-        Vector3 velocity = (across / flightTime + Vector3.up * upSpeed) * strength;
+        Vector3 velocity = BackThrowVelocity(from, landing, apexY) * strength;
 
         if (critical)
         {
@@ -1193,13 +1185,26 @@ public class SweeperReel : MonoBehaviour
 
         if (critical && hitStopSeconds > 0f)
         {
-            // 案4：白く光ったまま一瞬止めてから飛ばす（手ごたえ）。止めるのはこの物資だけ
             StartCoroutine(LaunchAfterStop(body, supply, velocity, hitStopSeconds));
         }
         else
         {
             Launch(body, supply, velocity);
         }
+    }
+
+    /// <summary>頭上を越えて着地点へ投げる初速。結果画面も同じ計算を使う。</summary>
+    public static Vector3 BackThrowVelocity(Vector3 from, Vector3 landing, float apexY)
+    {
+        float gravity = Mathf.Max(0.1f, -Physics.gravity.y);
+        apexY = Mathf.Max(apexY, Mathf.Max(from.y, landing.y) + 0.01f);
+        // いちばん高い所まで上がる時間と、そこから落ちる時間を足したのが、飛んでいる時間
+        float upSpeed = Mathf.Sqrt(2f * gravity * (apexY - from.y));
+        float flightTime = upSpeed / gravity + Mathf.Sqrt(2f * (apexY - landing.y) / gravity);
+
+        Vector3 across = landing - from;
+        across.y = 0f;
+        return across / flightTime + Vector3.up * upSpeed;
     }
 
     /// <summary>

@@ -385,6 +385,7 @@ public sealed class HighValueRouletteUI : MonoBehaviour
 
     private void SetVisible(bool visible)
     {
+        visible &= !RoundResultPlayback.IsPresenting;
         if (content != null && content.activeSelf != visible)
         {
             content.SetActive(visible);

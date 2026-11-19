@@ -61,7 +61,7 @@ public class SpaceJunkMatchUI : MonoBehaviour
     {
         SpaceJunkRound round = SpaceJunkRound.Current;
 
-        if (!showUi || round == null)
+        if (!showUi || round == null || RoundResultPlayback.IsPresenting)
         {
             return;
         }

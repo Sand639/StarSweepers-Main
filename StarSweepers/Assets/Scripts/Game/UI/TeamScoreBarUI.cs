@@ -188,7 +188,7 @@ public sealed class TeamScoreBarUI : MonoBehaviour
 
     private void Update()
     {
-        if (!TryReadValues(out int teamCount, out float remaining))
+        if (RoundResultPlayback.IsPresenting || !TryReadValues(out int teamCount, out float remaining))
         {
             SetVisible(false);
             wasVisible = false;

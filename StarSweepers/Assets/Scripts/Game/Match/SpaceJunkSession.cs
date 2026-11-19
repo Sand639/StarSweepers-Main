@@ -431,6 +431,8 @@ public partial class SpaceJunkSession : NetworkBehaviour
     /// <summary>係が消えるとき（部屋を閉じた・切断した）。ホストは人の出入りの知らせを受け取るのをやめる。</summary>
     public override void OnNetworkDespawn()
     {
+        if (resultPlayback != null) resultPlayback.HideResult();
+        roundResultActive = false;
         if (IsServer && NetworkManager != null)
         {
             NetworkManager.OnClientConnectedCallback -= OnClientConnected;
