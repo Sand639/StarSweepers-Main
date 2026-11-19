@@ -254,10 +254,20 @@ public sealed class RoundWinnerResultUI : MonoBehaviour
     {
         float approach = Ease((time - 0.5f) / 0.4f);
         float launch = Mathf.Clamp01((time - 1.9f) / 0.8f);
+        bool pushing = time >= 0.9f && time < 1.9f;
+        float pulse = pushing ? Mathf.Sin((time - 0.9f) * Mathf.PI * 12f) : 0f;
+        float contestShift = pushing ? Mathf.Sin((time - 0.9f) * Mathf.PI * 4f) * 18f : 0f;
         for (int team = 0; team < 2; team++)
         {
             float side = team == 1 ? -1 : 1;
             Vector2 position = new Vector2(Mathf.Lerp(TeamX(team), side * 130, approach), -20);
+            if (pushing)
+            {
+                position.x += side * pulse * 12f + contestShift;
+                position.y += Mathf.Abs(pulse) * 7f;
+                badges[team].localRotation = Quaternion.Euler(0, 0, side * pulse * 6f);
+                badges[team].localScale = new Vector3(1f - pulse * 0.055f, 1f + pulse * 0.04f, 1f);
+            }
             if (team == winner)
             {
                 position.x = Mathf.Lerp(position.x, 0, Ease(launch));
@@ -270,6 +280,12 @@ public sealed class RoundWinnerResultUI : MonoBehaviour
             badges[team].anchoredPosition = position;
         }
         Impact(time, 0.9f, 18f, Vector2.zero);
+        if (pushing)
+        {
+            // 押し合いの間も短い衝撃を繰り返す。
+            float hitAt = 0.9f + Mathf.Floor((time - 0.9f) / 0.16f) * 0.16f;
+            Impact(time, hitAt, 10f, new Vector2(contestShift, -20));
+        }
         Impact(time, 1.9f, 30f, new Vector2((winner == 1 ? 1 : -1) * 130, 0));
     }
 
