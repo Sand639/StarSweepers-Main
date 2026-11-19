@@ -330,7 +330,6 @@ MonoBehaviour:
   m_Name:
   m_EditorClassIdentifier: Assembly-CSharp::SquareWinnerTransitionTester
   result: {fileID: 1655098131}
-  nextStage: STAGE_Simple
   resultHoldSeconds: 0.7
 --- !u!114 &1655098131
 MonoBehaviour:

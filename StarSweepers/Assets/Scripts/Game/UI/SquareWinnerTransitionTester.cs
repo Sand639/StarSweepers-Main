@@ -1,13 +1,13 @@
+using System.Collections;
 using UnityEngine;
 using UnityEngine.InputSystem;
-using UnityEngine.SceneManagement;
+using UnityEngine.UI;
 
 /// <summary>赤勝利と青勝利を交互に見せる検証用の入口。</summary>
 public sealed class SquareWinnerTransitionTester : MonoBehaviour
 {
     private SquareWinnerTransitionUI effect;
     [SerializeField] private RoundWinnerResultUI result;
-    [SerializeField] private string nextStage = "STAGE_Simple";
     [SerializeField, Min(0f)] private float resultHoldSeconds = 0.7f;
     private RoundWinnerResultUI.ResultStyle style;
     private int redWins = 1;
@@ -17,7 +17,8 @@ public sealed class SquareWinnerTransitionTester : MonoBehaviour
     private bool started;
     private int lastWinner = 1;
     private double resultFinishedAt = -1;
-    private bool changingStage;
+    private Coroutine stripeRoutine;
+    private GameObject stripeCanvas;
 
     private void Start()
     {
@@ -31,10 +32,6 @@ public sealed class SquareWinnerTransitionTester : MonoBehaviour
 
     private void Update()
     {
-        if (changingStage)
-        {
-            return;
-        }
         Keyboard keyboard = Keyboard.current;
         if (keyboard != null && keyboard.digit1Key.wasPressedThisFrame)
         {
@@ -56,7 +53,7 @@ public sealed class SquareWinnerTransitionTester : MonoBehaviour
         {
             SetStyle(RoundWinnerResultUI.ResultStyle.HookThrow);
         }
-        else if (result.IsFinished && !effect.IsPlaying)
+        else if (result.IsFinished && !effect.IsPlaying && stripeRoutine == null)
         {
             if (resultFinishedAt < 0)
             {
@@ -64,13 +61,7 @@ public sealed class SquareWinnerTransitionTester : MonoBehaviour
             }
             if (Time.unscaledTimeAsDouble >= resultFinishedAt + resultHoldSeconds)
             {
-                if (!SpaceJunkLobbyUI.IsSceneInBuildList(nextStage))
-                {
-                    Debug.LogError($"[RESULT] 次のステージがビルド一覧にありません: {nextStage}");
-                    changingStage = true;
-                    return;
-                }
-                changingStage = SceneTransition.Play(LoadNextStage, SceneTransitionType.RoundedStripes);
+                stripeRoutine = StartCoroutine(PreviewStripes());
             }
         }
         else if (!started && Time.unscaledTimeAsDouble >= nextPlayAt)
@@ -81,6 +72,7 @@ public sealed class SquareWinnerTransitionTester : MonoBehaviour
 
     private void Play(int winner)
     {
+        StopStripePreview();
         started = true;
         resultFinishedAt = -1;
         lastWinner = winner;
@@ -91,6 +83,7 @@ public sealed class SquareWinnerTransitionTester : MonoBehaviour
 
     private void SetStyle(RoundWinnerResultUI.ResultStyle selected)
     {
+        StopStripePreview();
         style = selected;
         resultFinishedAt = -1;
         if (!effect.IsPlaying && started)
@@ -105,10 +98,57 @@ public sealed class SquareWinnerTransitionTester : MonoBehaviour
             blueWins + (lastWinner == 0 ? 1 : 0), 3, style);
     }
 
-    private void LoadNextStage()
+    private IEnumerator PreviewStripes()
     {
+        stripeCanvas = new GameObject("StripePreview", typeof(RectTransform), typeof(Canvas), typeof(CanvasScaler));
+        stripeCanvas.transform.SetParent(transform, false);
+        Canvas canvas = stripeCanvas.GetComponent<Canvas>();
+        canvas.renderMode = RenderMode.ScreenSpaceOverlay;
+        canvas.sortingOrder = short.MaxValue - 1;
+        CanvasScaler scaler = stripeCanvas.GetComponent<CanvasScaler>();
+        scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
+        scaler.referenceResolution = new Vector2(1920, 1080);
+        scaler.matchWidthOrHeight = 1f;
+        var stripes = new RoundedStripesTransitionEffect();
+        stripes.Build(stripeCanvas.GetComponent<RectTransform>(), Color.white);
+        yield return AnimateStripes(stripes, false);
         result.Hide();
-        SceneManager.LoadSceneAsync(nextStage);
+        yield return new WaitForSecondsRealtime(0.2f);
+        yield return AnimateStripes(stripes, true);
+        Destroy(stripeCanvas);
+        stripeCanvas = null;
+        stripeRoutine = null;
     }
 
+    private static IEnumerator AnimateStripes(SceneTransitionEffect stripes, bool revealing)
+    {
+        double startedAt = Time.unscaledTimeAsDouble;
+        float progress;
+        do
+        {
+            progress = Mathf.Clamp01((float)(Time.unscaledTimeAsDouble - startedAt) / 0.5f);
+            stripes.Apply(Mathf.SmoothStep(0, 1, revealing ? 1 - progress : progress), revealing);
+            yield return null;
+        } while (progress < 1);
+    }
+
+    private void StopStripePreview()
+    {
+        if (stripeRoutine != null)
+        {
+            StopCoroutine(stripeRoutine);
+            stripeRoutine = null;
+        }
+        if (stripeCanvas != null)
+        {
+            stripeCanvas.SetActive(false);
+            Destroy(stripeCanvas);
+            stripeCanvas = null;
+        }
+    }
+
+    private void OnDisable()
+    {
+        StopStripePreview();
+    }
 }
