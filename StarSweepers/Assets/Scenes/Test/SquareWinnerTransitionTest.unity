@@ -343,8 +343,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 3e9e79da188a44708df237606779dc80, type: 3}
   m_Name:
   m_EditorClassIdentifier: Assembly-CSharp::RoundWinnerResultUI
-  redCharacter: {fileID: 0}
-  blueCharacter: {fileID: 0}
 --- !u!4 &1655098130
 Transform:
   m_ObjectHideFlags: 0

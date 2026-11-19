@@ -8,8 +8,6 @@ public sealed class RoundWinnerResultUI : MonoBehaviour
 {
     public enum ResultStyle { StarAward, Collision, HookThrow }
 
-    [SerializeField] private Sprite redCharacter;
-    [SerializeField] private Sprite blueCharacter;
 
     private static readonly Color Gold = new Color(1f, 0.78f, 0.25f);
     private readonly RectTransform[] badges = new RectTransform[2];
@@ -128,18 +126,6 @@ public sealed class RoundWinnerResultUI : MonoBehaviour
             WinnerResultSymbol badge = Symbol("TeamBadge", motion, new Vector2(x, -20),
                 280, WinnerResultSymbol.Shape.Circle, Color.Lerp(SpaceJunkTeams.TeamColor(team), Color.white, 0.45f));
             badges[team] = badge.rectTransform;
-            Sprite character = team == 1 ? redCharacter : blueCharacter;
-            if (character != null)
-            {
-                Image image = Rect("Character", badges[team], Vector2.zero, new Vector2(240, 240)).gameObject.AddComponent<Image>();
-                image.sprite = character;
-                image.preserveAspect = true;
-                image.raycastTarget = false;
-            }
-            else
-            {
-                BuildRobot(badges[team], team);
-            }
             hooks[team] = Symbol("Hook", motion, Vector2.zero, 55,
                 WinnerResultSymbol.Shape.Hook, SpaceJunkTeams.TeamColor(team)).rectTransform;
         }
@@ -360,28 +346,6 @@ public sealed class RoundWinnerResultUI : MonoBehaviour
     {
         parent.gameObject.layer = ResultLayer;
         foreach (Transform child in parent) SetLayer(child);
-    }
-
-    private static void BuildRobot(RectTransform parent, int team)
-    {
-        Color suit = new Color(0.95f, 0.94f, 0.87f);
-        Color dark = new Color(0.12f, 0.18f, 0.20f);
-        Color accent = SpaceJunkTeams.TeamColor(team);
-        Symbol("Suit", parent, new Vector2(0, -35), 115, WinnerResultSymbol.Shape.Circle, dark);
-        Symbol("SuitFill", parent, new Vector2(0, -35), 100, WinnerResultSymbol.Shape.Circle, suit);
-        Symbol("HelmetOutline", parent, new Vector2(0, 30), 155, WinnerResultSymbol.Shape.Circle, dark);
-        Symbol("Helmet", parent, new Vector2(0, 30), 140, WinnerResultSymbol.Shape.Circle, suit);
-        WinnerResultSymbol visor = Symbol("Visor", parent, new Vector2(0, 28), 112, WinnerResultSymbol.Shape.Circle, dark);
-        visor.rectTransform.localScale = new Vector3(1, 0.65f, 1);
-        foreach (int sign in new[] { -1, 1 })
-        {
-            Image eye = Rect("Eye", parent, new Vector2(sign * 20, 30), new Vector2(9, 28)).gameObject.AddComponent<Image>();
-            eye.color = new Color(0.45f, 0.95f, 0.9f);
-            eye.raycastTarget = false;
-            Symbol("Glove", parent, new Vector2(sign * 80, -28), 42, WinnerResultSymbol.Shape.Circle, accent);
-            Symbol("Boot", parent, new Vector2(sign * 32, -91), 40, WinnerResultSymbol.Shape.Circle, dark);
-        }
-        Symbol("SuitBadge", parent, new Vector2(0, -40), 28, WinnerResultSymbol.Shape.Circle, accent);
     }
 
     private void OnDisable()
