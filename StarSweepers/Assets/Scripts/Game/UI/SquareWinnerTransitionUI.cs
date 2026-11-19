@@ -6,9 +6,10 @@ using UnityEngine.UI;
 public sealed class SquareWinnerTransitionUI : MonoBehaviour
 {
     [SerializeField, Min(2)] private int columns = 5;
-    [SerializeField, Min(0.1f)] private float layerSeconds = 1.2f;
-    [SerializeField, Min(0f)] private float firstColorHold = 0.15f;
-    [SerializeField, Min(0f)] private float winnerHold = 1f;
+    [SerializeField, Min(0.1f)] private float layerSeconds = 0.65f;
+    [Tooltip("最初の色が出始めてから、勝った色が広がり始めるまでの秒数")]
+    [SerializeField, Min(0f)] private float winnerStartDelay = 0.18f;
+    [SerializeField, Min(0f)] private float winnerHold = 0.45f;
 
     private RectTransform root;
     private RectTransform[] firstTiles;
@@ -128,7 +129,7 @@ public sealed class SquareWinnerTransitionUI : MonoBehaviour
             UpdateLayout();
         }
         Apply(elapsed);
-        if (elapsed >= layerSeconds * 2f + firstColorHold + winnerHold)
+        if (elapsed >= Mathf.Max(layerSeconds, winnerStartDelay + layerSeconds) + winnerHold)
         {
             playing = false;
             root.gameObject.SetActive(false);
@@ -141,7 +142,7 @@ public sealed class SquareWinnerTransitionUI : MonoBehaviour
     private void Apply(float elapsed)
     {
         ApplyLayer(firstTiles, elapsed / layerSeconds, 0);
-        ApplyLayer(winnerTiles, (elapsed - layerSeconds - firstColorHold) / layerSeconds, 43);
+        ApplyLayer(winnerTiles, (elapsed - winnerStartDelay) / layerSeconds, 43);
     }
 
     private static void ApplyLayer(RectTransform[] tiles, float progress, int phase)
