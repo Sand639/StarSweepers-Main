@@ -44,7 +44,8 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 0ebd38253e3d00844b739a9b0c5fd594, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::SpaceJunkGoalVortex
-  style: 0
+  style: 1
+  absorbMotion: 1
   vortexMaterial: {fileID: 2100000, guid: ae3259414a0a2a9468f40b02d777899f, type: 2}
   fill: 0.9
   lift: 0.03
