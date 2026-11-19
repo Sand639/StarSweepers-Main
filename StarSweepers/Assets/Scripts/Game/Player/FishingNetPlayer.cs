@@ -62,9 +62,26 @@ public class FishingNetPlayer : NetworkBehaviour
     private readonly NetworkVariable<int> nameConnectorIndex = new NetworkVariable<int>(-1);
     private readonly NetworkVariable<int> nameSuffixIndex = new NetworkVariable<int>(-1);
 
+    /// <summary>ほかの参加者と重ならない表情番号。サーバーが決めて全員へ配る。</summary>
+    private readonly NetworkVariable<int> expressionIndex = new NetworkVariable<int>(
+        -1, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
+
+    private static readonly FaceExpressionController.Expression[] AvailableExpressions =
+    {
+        FaceExpressionController.Expression.Neutral,
+        FaceExpressionController.Expression.Yes,
+        FaceExpressionController.Expression.No,
+        FaceExpressionController.Expression.Annoyed,
+        FaceExpressionController.Expression.Huh,
+        FaceExpressionController.Expression.Excited,
+    };
+
     public int NamePrefixIndex => namePrefixIndex.Value;
     public int NameConnectorIndex => nameConnectorIndex.Value;
     public int NameSuffixIndex => nameSuffixIndex.Value;
+
+    /// <summary>現在の表情番号。抽選対象は Null を除く6種類。</summary>
+    public int ExpressionIndex => expressionIndex.Value;
 
     private NameDataManager nameDatabase;
 
@@ -212,9 +229,16 @@ public class FishingNetPlayer : NetworkBehaviour
 
         if (IsServer)
         {
+            bool changed = namePrefixIndex.Value != prefix
+                || nameConnectorIndex.Value != connector
+                || nameSuffixIndex.Value != suffix;
             namePrefixIndex.Value = prefix;
             nameConnectorIndex.Value = connector;
             nameSuffixIndex.Value = suffix;
+            if (changed)
+            {
+                AssignUniqueExpression();
+            }
         }
         else
         {
@@ -263,12 +287,15 @@ public class FishingNetPlayer : NetworkBehaviour
             else
             {
                 Debug.LogWarning("[NAME] 名前の前・中・後の候補がそろっていないので、仮の名前を使います。", this);
+                AssignUniqueExpression();
             }
         }
 
         All.Add(this);
 
         playerIndex.OnValueChanged += OnPlayerIndexChanged;
+        expressionIndex.OnValueChanged += OnExpressionIndexChanged;
+        ApplyFaceExpression();
         ApplyTeamColor();
 
         Debug.Log($"[FISH] プレイヤー {OwnerClientId} が出てきました" +
@@ -295,7 +322,85 @@ public class FishingNetPlayer : NetworkBehaviour
     public override void OnNetworkDespawn()
     {
         playerIndex.OnValueChanged -= OnPlayerIndexChanged;
+        expressionIndex.OnValueChanged -= OnExpressionIndexChanged;
         All.Remove(this);
+    }
+
+    /// <summary>表情を選び、現在の参加者と重ならない番号をサーバーから配る。</summary>
+    private void AssignUniqueExpression()
+    {
+        if (!IsServer)
+        {
+            return;
+        }
+
+        List<int> candidates = new List<int>(AvailableExpressions.Length);
+        for (int i = 0; i < AvailableExpressions.Length; i++)
+        {
+            int candidate = (int)AvailableExpressions[i];
+            bool used = false;
+            foreach (FishingNetPlayer player in All)
+            {
+                if (player == null || player == this || !player.IsSpawned
+                    || player.NetworkManager != NetworkManager)
+                {
+                    continue;
+                }
+
+                if (player.expressionIndex.Value == candidate)
+                {
+                    used = true;
+                    break;
+                }
+            }
+
+            // 名前変更時は変更前の自分の表情も候補から外す。
+            if (!used && expressionIndex.Value != candidate)
+            {
+                candidates.Add(candidate);
+            }
+        }
+
+        if (candidates.Count == 0)
+        {
+            // 6人全員が別の表情を使っている場合、変更前の自分を除く空きは無い。
+            // その場合は自分の表情を保ち、既存の重複しない状態を崩さない。
+            if (System.Array.IndexOf(AvailableExpressions,
+                    (FaceExpressionController.Expression)expressionIndex.Value) >= 0)
+            {
+                candidates.Add(expressionIndex.Value);
+            }
+            else
+            {
+                // 初期化途中など自分の表情も無い場合に限り、全6種から選ぶ。
+                foreach (FaceExpressionController.Expression expression in AvailableExpressions)
+                {
+                    candidates.Add((int)expression);
+                }
+            }
+        }
+
+        expressionIndex.Value = candidates[Random.Range(0, candidates.Count)];
+    }
+
+    private void OnExpressionIndexChanged(int before, int after)
+    {
+        ApplyFaceExpression();
+    }
+
+    /// <summary>顔の見た目部品があるプレイヤーに、同期された表情を反映する。</summary>
+    private void ApplyFaceExpression()
+    {
+        if (expressionIndex.Value < 0)
+        {
+            return;
+        }
+
+        FaceExpressionController face = GetComponentInChildren<FaceExpressionController>(true);
+        if (face != null)
+        {
+            face.SetExpressionByIndex(expressionIndex.Value);
+        }
     }
 
     /// <summary>参加者のPCでは、ホストが決めた番号が少し遅れて届く。届いた時点で色を塗り直す。</summary>

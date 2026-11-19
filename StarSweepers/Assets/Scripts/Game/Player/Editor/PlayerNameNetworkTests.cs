@@ -95,6 +95,19 @@ public class PlayerNameNetworkTests
             Assert.That(clientSession.NameOf(extra.PlayerKey), Is.EqualTo("漆黒のウイ"));
             Assert.That(hostPlayer.DisplayName, Is.EqualTo("深淵の勇者"));
 
+            // 6人まで表情が重ならず、満員時の改名でも重複を作らない。
+            for (int seat = 2; seat < 5; seat++)
+            {
+                GameObject additionalObject = Object.Instantiate(template);
+                FishingNetPlayer additional = additionalObject.GetComponent<FishingNetPlayer>();
+                additional.ServerInitLocalSeat(seat);
+                additional.GetComponent<NetworkObject>().SpawnWithOwnership(0);
+                yield return WaitFor(() => FindPlayer(client, 0, seat) != null);
+            }
+            AssertUniqueExpressions(host);
+            Assert.That(SetName(hostPlayer, 2, 0, 0), Is.True);
+            AssertUniqueExpressions(host);
+
             NetworkManager lateClient = CreateManager("NameTestLateClient", template, sessionTemplate);
             managers.Add(lateClient);
             Assert.That(lateClient.StartClient(), Is.True);
@@ -104,6 +117,8 @@ public class PlayerNameNetworkTests
                 && FindPlayer(lateClient, 0, 1).DisplayName == "漆黒のウイ");
             Assert.That(FindSession(lateClient).NameOf(clientPlayer.PlayerKey), Is.EqualTo("最強のアリス"));
             Assert.That(FindSession(lateClient).NameOf(hostPlayer.PlayerKey), Is.EqualTo("深淵の勇者"));
+            yield return WaitFor(() => EnumerablePlayers(lateClient).Count == 6);
+            AssertUniqueExpressions(lateClient);
 
             // 旧設定から2秒ごとに上書きされないことも確かめる。
             yield return new WaitForSeconds(2.2f);
@@ -166,6 +181,30 @@ public class PlayerNameNetworkTests
         return (int)typeof(FishingNetPlayer).GetProperty("NamePrefixIndex").GetValue(player) >= 0
             && (int)typeof(FishingNetPlayer).GetProperty("NameConnectorIndex").GetValue(player) >= 0
             && (int)typeof(FishingNetPlayer).GetProperty("NameSuffixIndex").GetValue(player) >= 0;
+    }
+
+    private static List<FishingNetPlayer> EnumerablePlayers(NetworkManager manager)
+    {
+        var players = new List<FishingNetPlayer>();
+        foreach (FishingNetPlayer player in FishingNetPlayer.All)
+        {
+            if (player != null && player.IsSpawned && player.NetworkManager == manager)
+            {
+                players.Add(player);
+            }
+        }
+        return players;
+    }
+
+    private static void AssertUniqueExpressions(NetworkManager manager)
+    {
+        var expressions = new HashSet<int>();
+        foreach (FishingNetPlayer player in EnumerablePlayers(manager))
+        {
+            Assert.That(player.ExpressionIndex, Is.GreaterThan(0));
+            Assert.That(expressions.Add(player.ExpressionIndex), Is.True,
+                "同じ表情が複数のプレイヤーに割り当てられています");
+        }
     }
 
     private static bool SetName(FishingNetPlayer player, int prefix, int connector, int suffix)
