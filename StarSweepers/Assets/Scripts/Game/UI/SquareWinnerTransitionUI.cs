@@ -5,9 +5,9 @@ using UnityEngine.UI;
 /// <summary>負けたチームの色を敷き、勝ったチームの四角で覆う演出。</summary>
 public sealed class SquareWinnerTransitionUI : MonoBehaviour
 {
-    [SerializeField, Min(2)] private int columns = 10;
-    [SerializeField, Min(0.1f)] private float layerSeconds = 0.85f;
-    [SerializeField, Min(0f)] private float firstColorHold = 0.3f;
+    [SerializeField, Min(2)] private int columns = 5;
+    [SerializeField, Min(0.1f)] private float layerSeconds = 1.2f;
+    [SerializeField, Min(0f)] private float firstColorHold = 0.15f;
     [SerializeField, Min(0f)] private float winnerHold = 1f;
 
     private RectTransform root;
@@ -16,6 +16,8 @@ public sealed class SquareWinnerTransitionUI : MonoBehaviour
     private double startedAt;
     private bool playing;
     private Action completed;
+    private int rows;
+    private Vector2 layoutSize;
 
     public bool IsPlaying => playing;
 
@@ -28,6 +30,7 @@ public sealed class SquareWinnerTransitionUI : MonoBehaviour
         }
 
         EnsureCanvas();
+        UpdateLayout();
         Color winner = SpaceJunkTeams.TeamColor(winnerTeam);
         Color other = SpaceJunkTeams.TeamColor(1 - winnerTeam);
         SetColors(firstTiles, other);
@@ -52,9 +55,11 @@ public sealed class SquareWinnerTransitionUI : MonoBehaviour
         Canvas canvas = canvasObject.GetComponent<Canvas>();
         canvas.renderMode = RenderMode.ScreenSpaceOverlay;
         canvas.sortingOrder = 30000;
-        int rows = Mathf.Max(2, Mathf.RoundToInt(columns * (float)Screen.height / Mathf.Max(1, Screen.width)));
+        columns = Mathf.Max(2, columns);
+        rows = Mathf.Max(2, Mathf.CeilToInt(columns * (float)Screen.height / Mathf.Max(1, Screen.width)));
         firstTiles = BuildLayer("FirstColor", rows);
         winnerTiles = BuildLayer("WinnerColor", rows);
+        Canvas.ForceUpdateCanvases();
     }
 
     private RectTransform[] BuildLayer(string layerName, int rows)
@@ -74,16 +79,31 @@ public sealed class SquareWinnerTransitionUI : MonoBehaviour
                 GameObject tile = new GameObject("Square", typeof(RectTransform), typeof(Image));
                 RectTransform rect = tile.GetComponent<RectTransform>();
                 rect.SetParent(layerRect, false);
-                rect.anchorMin = new Vector2((float)x / columns, (float)y / rows);
-                rect.anchorMax = new Vector2((float)(x + 1) / columns, (float)(y + 1) / rows);
-                // 境界の隙間を防ぐため、覆いきったときだけ隣と少し重ねる。
-                rect.offsetMin = -Vector2.one;
-                rect.offsetMax = Vector2.one;
+                rect.anchorMin = new Vector2(0.5f, 0.5f);
+                rect.anchorMax = rect.anchorMin;
                 tile.GetComponent<Image>().raycastTarget = false;
                 tiles[y * columns + x] = rect;
             }
         }
         return tiles;
+    }
+
+    private void UpdateLayout()
+    {
+        Vector2 size = root.rect.size;
+        float cell = Mathf.Max(size.x / columns, size.y / rows);
+        for (int i = 0; i < firstTiles.Length; i++)
+        {
+            Vector2 position = new Vector2(
+                (i % columns + 0.5f - columns * 0.5f) * cell,
+                (i / columns + 0.5f - rows * 0.5f) * cell);
+            // 画面の比率にかかわらず正方形。外周は画面外まで覆う。
+            firstTiles[i].anchoredPosition = position;
+            winnerTiles[i].anchoredPosition = position;
+            firstTiles[i].sizeDelta = Vector2.one * (cell + 1f);
+            winnerTiles[i].sizeDelta = firstTiles[i].sizeDelta;
+        }
+        layoutSize = size;
     }
 
     private static void SetColors(RectTransform[] tiles, Color color)
@@ -103,6 +123,10 @@ public sealed class SquareWinnerTransitionUI : MonoBehaviour
         }
 
         float elapsed = (float)(Time.unscaledTimeAsDouble - startedAt);
+        if (layoutSize != root.rect.size)
+        {
+            UpdateLayout();
+        }
         Apply(elapsed);
         if (elapsed >= layerSeconds * 2f + firstColorHold + winnerHold)
         {
@@ -116,17 +140,17 @@ public sealed class SquareWinnerTransitionUI : MonoBehaviour
 
     private void Apply(float elapsed)
     {
-        ApplyLayer(firstTiles, elapsed / layerSeconds);
-        ApplyLayer(winnerTiles, (elapsed - layerSeconds - firstColorHold) / layerSeconds);
+        ApplyLayer(firstTiles, elapsed / layerSeconds, 0);
+        ApplyLayer(winnerTiles, (elapsed - layerSeconds - firstColorHold) / layerSeconds, 43);
     }
 
-    private static void ApplyLayer(RectTransform[] tiles, float progress)
+    private static void ApplyLayer(RectTransform[] tiles, float progress, int phase)
     {
         for (int i = 0; i < tiles.Length; i++)
         {
             // 毎回同じ順序でばらけさせ、勝敗を比べやすくする。
-            float delay = ((i * 37 + 17) % 101) / 100f * 0.55f;
-            float amount = Mathf.SmoothStep(0f, 1f, Mathf.Clamp01((progress - delay) / 0.45f));
+            float delay = ((i * 37 + 17 + phase) % 101) / 100f * 0.35f;
+            float amount = Mathf.SmoothStep(0f, 1f, Mathf.Clamp01((progress - delay) / 0.65f));
             tiles[i].localScale = Vector3.one * amount;
         }
     }
