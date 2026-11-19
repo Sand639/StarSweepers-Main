@@ -1,11 +1,14 @@
 using UnityEngine;
 using UnityEngine.InputSystem;
+using UnityEngine.SceneManagement;
 
 /// <summary>赤勝利と青勝利を交互に見せる検証用の入口。</summary>
 public sealed class SquareWinnerTransitionTester : MonoBehaviour
 {
     private SquareWinnerTransitionUI effect;
     [SerializeField] private RoundWinnerResultUI result;
+    [SerializeField] private string nextStage = "STAGE_Simple";
+    [SerializeField, Min(0f)] private float resultHoldSeconds = 0.7f;
     private RoundWinnerResultUI.ResultStyle style;
     private int redWins = 1;
     private int blueWins = 1;
@@ -13,6 +16,8 @@ public sealed class SquareWinnerTransitionTester : MonoBehaviour
     private double nextPlayAt;
     private bool started;
     private int lastWinner = 1;
+    private double resultFinishedAt = -1;
+    private bool changingStage;
 
     private void Start()
     {
@@ -26,6 +31,10 @@ public sealed class SquareWinnerTransitionTester : MonoBehaviour
 
     private void Update()
     {
+        if (changingStage)
+        {
+            return;
+        }
         Keyboard keyboard = Keyboard.current;
         if (keyboard != null && keyboard.digit1Key.wasPressedThisFrame)
         {
@@ -47,11 +56,22 @@ public sealed class SquareWinnerTransitionTester : MonoBehaviour
         {
             SetStyle(RoundWinnerResultUI.ResultStyle.HookThrow);
         }
-        else if (keyboard != null && keyboard.enterKey.wasPressedThisFrame && result.IsFinished && !effect.IsPlaying)
+        else if (result.IsFinished && !effect.IsPlaying)
         {
-            redWins += lastWinner == 1 ? 1 : 0;
-            blueWins += lastWinner == 0 ? 1 : 0;
-            Play(nextWinner);
+            if (resultFinishedAt < 0)
+            {
+                resultFinishedAt = Time.unscaledTimeAsDouble;
+            }
+            if (Time.unscaledTimeAsDouble >= resultFinishedAt + resultHoldSeconds)
+            {
+                if (!SpaceJunkLobbyUI.IsSceneInBuildList(nextStage))
+                {
+                    Debug.LogError($"[RESULT] 次のステージがビルド一覧にありません: {nextStage}");
+                    changingStage = true;
+                    return;
+                }
+                changingStage = SceneTransition.Play(LoadNextStage, SceneTransitionType.RoundedStripes);
+            }
         }
         else if (!started && Time.unscaledTimeAsDouble >= nextPlayAt)
         {
@@ -62,6 +82,7 @@ public sealed class SquareWinnerTransitionTester : MonoBehaviour
     private void Play(int winner)
     {
         started = true;
+        resultFinishedAt = -1;
         lastWinner = winner;
         nextWinner = 1 - winner;
         result.Hide();
@@ -71,6 +92,7 @@ public sealed class SquareWinnerTransitionTester : MonoBehaviour
     private void SetStyle(RoundWinnerResultUI.ResultStyle selected)
     {
         style = selected;
+        resultFinishedAt = -1;
         if (!effect.IsPlaying && started)
         {
             ShowResult();
@@ -81,6 +103,12 @@ public sealed class SquareWinnerTransitionTester : MonoBehaviour
     {
         result.Show(lastWinner, redWins + (lastWinner == 1 ? 1 : 0),
             blueWins + (lastWinner == 0 ? 1 : 0), 3, style);
+    }
+
+    private void LoadNextStage()
+    {
+        result.Hide();
+        SceneManager.LoadSceneAsync(nextStage);
     }
 
 }

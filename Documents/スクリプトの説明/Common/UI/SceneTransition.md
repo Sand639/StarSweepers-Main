@@ -69,3 +69,7 @@
 | --- | --- | --- |
 | 2026/11/10 | Claude Code | 新規作成（大槻さんの依頼。ロビーから試合へ移るときの演出） |
 | 2026/11/17 | Claude Code（依頼：ソウホイチョン） | 次のラウンドへ移るときに、種類「勝ったチームの色」（`RoundWinnerTransitionEffect`）を付けたので、呼び方の表を直した |
+
+丸い色帯はSceneTransitionType.RoundedStripes。RoundedStripesTransitionEffectが6本の帯を右から広げ、次のシーンが届いたら左へ抜く。既存のPlay・PlayForEveryoneで選べる。
+
+| 2026/11/19 | Codex | 丸い色帯の種類と、結果検証からの呼び出しを追記 |
