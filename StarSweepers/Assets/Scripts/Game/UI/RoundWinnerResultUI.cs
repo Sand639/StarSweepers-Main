@@ -38,14 +38,15 @@ public sealed class RoundWinnerResultUI : MonoBehaviour
     /// <summary>勝ち数は今回の勝利を含む値。青=0、赤=1。完了後も表示を保つ。</summary>
     public void Show(int winnerTeam, int redWins, int blueWins, int winsNeeded, ResultStyle animation)
     {
-        if (winnerTeam < 0 || winnerTeam > 1 || redWins < 0 || blueWins < 0 || winsNeeded < 1)
+        if (winnerTeam < -1 || winnerTeam > 1 || redWins < 0 || blueWins < 0 || winsNeeded < 1)
         {
             throw new ArgumentOutOfRangeException(nameof(winnerTeam));
         }
         EnsureUI();
         winner = winnerTeam;
         style = animation;
-        background.color = Color.Lerp(SpaceJunkTeams.TeamColor(winner), new Color(0.10f, 0.11f, 0.15f), 0.4f);
+        background.color = winner < 0 ? new Color(0.2f, 0.22f, 0.26f) :
+            Color.Lerp(SpaceJunkTeams.TeamColor(winner), new Color(0.10f, 0.11f, 0.15f), 0.4f);
         totals[0] = blueWins;
         totals[1] = redWins;
         awarded = false;
@@ -199,6 +200,12 @@ public sealed class RoundWinnerResultUI : MonoBehaviour
         }
         flyingStar.gameObject.SetActive(false);
         burst.gameObject.SetActive(false);
+
+        if (winner < 0)
+        {
+            IsFinished = time >= 2.5f;
+            return;
+        }
 
         switch (style)
         {

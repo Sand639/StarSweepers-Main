@@ -659,6 +659,7 @@ public sealed class DebrisSetUI : MonoBehaviour
 
     private void SetVisible(bool visible)
     {
+        visible &= !RoundResultPlayback.IsPresenting;
         if (content != null && content.activeSelf != visible)
         {
             content.SetActive(visible);

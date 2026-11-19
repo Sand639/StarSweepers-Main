@@ -25,15 +25,15 @@ public sealed class SquareWinnerTransitionUI : MonoBehaviour
     /// <summary>青は0、赤は1。最後まで覆ったあと、画面を消して完了を知らせる。</summary>
     public void Play(int winnerTeam, Action onCompleted = null)
     {
-        if (winnerTeam != 0 && winnerTeam != 1)
+        if (winnerTeam < -1 || winnerTeam > 1)
         {
             throw new ArgumentOutOfRangeException(nameof(winnerTeam));
         }
 
         EnsureCanvas();
         UpdateLayout();
-        Color winner = SpaceJunkTeams.TeamColor(winnerTeam);
-        Color other = SpaceJunkTeams.TeamColor(1 - winnerTeam);
+        Color winner = winnerTeam < 0 ? new Color(0.4f, 0.42f, 0.46f) : SpaceJunkTeams.TeamColor(winnerTeam);
+        Color other = winnerTeam < 0 ? new Color(0.18f, 0.2f, 0.24f) : SpaceJunkTeams.TeamColor(1 - winnerTeam);
         SetColors(firstTiles, other);
         SetColors(winnerTiles, winner);
         completed = onCompleted;
