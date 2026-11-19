@@ -17,7 +17,6 @@ public sealed class RoundWinnerResultUI : MonoBehaviour
     private readonly TextMeshProUGUI[] scores = new TextMeshProUGUI[2];
     private readonly List<WinnerResultSymbol>[] stars =
         { new List<WinnerResultSymbol>(), new List<WinnerResultSymbol>() };
-    private readonly RectTransform[] lines = new RectTransform[2];
     private readonly RectTransform[] hooks = new RectTransform[2];
     private readonly int[] totals = new int[2];
     private RectTransform root;
@@ -30,6 +29,13 @@ public sealed class RoundWinnerResultUI : MonoBehaviour
     private int winner;
     private ResultStyle style;
     private bool awarded;
+    private Camera resultCamera;
+    private Vector3 cameraHome;
+    private readonly LiquidBeam[] beams = new LiquidBeam[2];
+    private Rigidbody thrownBody;
+    private bool released;
+    private const int ResultLayer = 30;
+    private static readonly Vector3 ResultOrigin = new Vector3(0, 0, -1000);
 
     public bool IsVisible => root != null && root.gameObject.activeSelf;
     public bool IsFinished { get; private set; }
@@ -49,6 +55,9 @@ public sealed class RoundWinnerResultUI : MonoBehaviour
         totals[1] = redWins;
         awarded = false;
         IsFinished = false;
+        released = false;
+        thrownBody.isKinematic = true;
+        foreach (LiquidBeam beam in beams) beam.gameObject.SetActive(false);
         title.text = "ROUND RESULT";
         title.color = Color.white;
         for (int team = 0; team < 2; team++)
@@ -67,6 +76,12 @@ public sealed class RoundWinnerResultUI : MonoBehaviour
         if (root != null)
         {
             root.gameObject.SetActive(false);
+            if (resultCamera != null) resultCamera.gameObject.SetActive(false);
+            if (thrownBody != null) thrownBody.isKinematic = true;
+            foreach (LiquidBeam beam in beams)
+            {
+                if (beam != null) beam.gameObject.SetActive(false);
+            }
         }
         IsFinished = false;
     }
@@ -81,8 +96,24 @@ public sealed class RoundWinnerResultUI : MonoBehaviour
         canvasObject.transform.SetParent(transform, false);
         root = canvasObject.GetComponent<RectTransform>();
         Canvas canvas = canvasObject.GetComponent<Canvas>();
-        canvas.renderMode = RenderMode.ScreenSpaceOverlay;
-        canvas.sortingOrder = 29999;
+        canvas.renderMode = RenderMode.WorldSpace;
+        canvas.sortingOrder = 0;
+        root.sizeDelta = new Vector2(1920, 1080);
+        root.position = ResultOrigin;
+        root.localScale = Vector3.one * 0.01f;
+        GameObject cameraObject = new GameObject("ResultCamera");
+        cameraObject.transform.SetParent(transform, false);
+        resultCamera = cameraObject.AddComponent<Camera>();
+        resultCamera.orthographic = true;
+        resultCamera.orthographicSize = Mathf.Max(5.4f, 9.6f / Mathf.Max(0.1f, (float)Screen.width / Screen.height));
+        resultCamera.clearFlags = CameraClearFlags.SolidColor;
+        resultCamera.backgroundColor = new Color(0.10f, 0.11f, 0.15f);
+        resultCamera.cullingMask = 1 << ResultLayer;
+        resultCamera.depth = 100;
+        resultCamera.farClipPlane = 50;
+        cameraHome = ResultOrigin + Vector3.back * 20;
+        cameraObject.transform.position = cameraHome;
+        canvas.worldCamera = resultCamera;
         CanvasScaler scaler = canvasObject.GetComponent<CanvasScaler>();
         scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
         scaler.referenceResolution = new Vector2(1920, 1080);
@@ -117,19 +148,29 @@ public sealed class RoundWinnerResultUI : MonoBehaviour
             }
             else
             {
-                TextMeshProUGUI placeholder = Text("CharacterPlaceholder", badges[team], Vector2.zero, new Vector2(250, 150), 52);
-                placeholder.text = team == 1 ? "RED" : "BLUE";
-                placeholder.color = new Color(0.12f, 0.14f, 0.18f);
+                BuildRobot(badges[team], team);
             }
-            lines[team] = Rect("HookLine", motion, Vector2.zero, Vector2.one);
-            Image line = lines[team].gameObject.AddComponent<Image>();
-            line.color = SpaceJunkTeams.TeamColor(team);
-            line.raycastTarget = false;
             hooks[team] = Symbol("Hook", motion, Vector2.zero, 55,
                 WinnerResultSymbol.Shape.Hook, SpaceJunkTeams.TeamColor(team)).rectTransform;
         }
         flyingStar = Symbol("AwardStar", motion, Vector2.zero, 80, WinnerResultSymbol.Shape.Star, Gold);
         burst = Symbol("Impact", motion, Vector2.zero, 200, WinnerResultSymbol.Shape.Burst, Gold);
+        SetLayer(root);
+        GameObject bodyObject = new GameObject("ThrownResultBody");
+        bodyObject.transform.SetParent(transform, false);
+        thrownBody = bodyObject.AddComponent<Rigidbody>();
+        thrownBody.isKinematic = true;
+        thrownBody.constraints = RigidbodyConstraints.FreezePositionZ;
+        for (int team = 0; team < 2; team++)
+        {
+            GameObject beamObject = new GameObject("ResultLiquidBeam");
+            beamObject.transform.SetParent(transform, false);
+            beams[team] = beamObject.AddComponent<LiquidBeam>();
+            beams[team].UseHeadLight = false;
+            beams[team].SetColor(SpaceJunkTeams.TeamColor(team));
+            SetLayer(beamObject.transform);
+            beamObject.SetActive(false);
+        }
     }
 
     private void EnsureStars(int team, int count)
@@ -137,6 +178,7 @@ public sealed class RoundWinnerResultUI : MonoBehaviour
         while (stars[team].Count < count)
         {
             stars[team].Add(Symbol("ScoreStar", root, Vector2.zero, 55, WinnerResultSymbol.Shape.Star, Gold));
+            SetLayer(stars[team][stars[team].Count - 1].transform);
         }
         float spacing = Mathf.Min(70f, 470f / Mathf.Max(1, count));
         for (int i = 0; i < stars[team].Count; i++)
@@ -167,12 +209,13 @@ public sealed class RoundWinnerResultUI : MonoBehaviour
     private void Draw(float time)
     {
         motion.anchoredPosition = Vector2.zero;
+        resultCamera.transform.position = cameraHome;
+        resultCamera.gameObject.SetActive(true);
         for (int team = 0; team < 2; team++)
         {
             badges[team].anchoredPosition = new Vector2(TeamX(team), -20);
             badges[team].localRotation = Quaternion.identity;
             badges[team].localScale = Vector3.one * Pop(time / 0.5f);
-            lines[team].gameObject.SetActive(false);
             hooks[team].gameObject.SetActive(false);
         }
         flyingStar.gameObject.SetActive(false);
@@ -184,7 +227,7 @@ public sealed class RoundWinnerResultUI : MonoBehaviour
             case ResultStyle.Collision: DrawCollision(time); break;
             case ResultStyle.HookThrow: DrawHookThrow(time); break;
         }
-        float awardAt = style == ResultStyle.StarAward ? 2f : 2.7f;
+        float awardAt = style == ResultStyle.StarAward ? 2f : 4.5f;
         if (!awarded && time >= awardAt)
         {
             awarded = true;
@@ -192,10 +235,13 @@ public sealed class RoundWinnerResultUI : MonoBehaviour
             title.text = winner == 1 ? "RED WINS!" : "BLUE WINS!";
             title.color = SpaceJunkTeams.TeamColor(winner);
         }
-        if (time >= 3.6f)
+        if (time >= (style == ResultStyle.HookThrow ? 5.2f : 4.8f))
         {
             IsFinished = true;
             motion.anchoredPosition = Vector2.zero;
+            resultCamera.transform.position = cameraHome;
+            thrownBody.isKinematic = true;
+            foreach (LiquidBeam beam in beams) beam.gameObject.SetActive(false);
         }
     }
 
@@ -244,28 +290,46 @@ public sealed class RoundWinnerResultUI : MonoBehaviour
     {
         float cast = Ease((time - 0.5f) / 0.45f);
         float launch = Mathf.Clamp01((time - 1.95f) / 0.75f);
-        float side = winner == 1 ? 1 : -1;
+        float side = winner == 1 ? -1 : 1;
         float struggle = time >= 0.95f && time < 1.95f ? Mathf.Sin(time * 55f) * 9f : 0;
         for (int team = 0; team < 2; team++)
         {
             badges[team].anchoredPosition += Vector2.right * (team == 1 ? struggle : -struggle);
         }
-        badges[1 - winner].anchoredPosition += new Vector2(side * 1500 * launch * launch, Mathf.Sin(launch * Mathf.PI * 0.7f) * 520);
-        badges[1 - winner].localRotation = Quaternion.Euler(0, 0, -side * launch * 620);
+        if (time >= 1.95f && !released)
+        {
+            released = true;
+            Vector3 from = ResultOrigin + (Vector3)(badges[1 - winner].anchoredPosition * 0.01f) + Vector3.back;
+            Vector3 landing = ResultOrigin + new Vector3(side * 16, from.y, -1);
+            thrownBody.position = from;
+            thrownBody.rotation = Quaternion.identity;
+            thrownBody.isKinematic = false;
+            thrownBody.linearVelocity = SweeperReel.BackThrowVelocity(from, landing, 5.5f);
+            thrownBody.angularVelocity = new Vector3(0, 0, -side * 9);
+        }
+        if (released)
+        {
+            Vector3 position = thrownBody.position - ResultOrigin;
+            badges[1 - winner].anchoredPosition = new Vector2(position.x, position.y) * 100;
+            badges[1 - winner].localRotation = Quaternion.Euler(0, 0, thrownBody.rotation.eulerAngles.z);
+        }
         badges[winner].localRotation = Quaternion.Euler(0, 0, side * Mathf.Sin(launch * Mathf.PI) * 22);
         for (int team = 0; team < 2; team++)
         {
-            bool visible = time >= 0.5f && launch < 0.35f;
-            lines[team].gameObject.SetActive(visible);
+            bool visible = time >= 0.5f && (team == winner ? time < 2.55f : time < 1.95f);
             hooks[team].gameObject.SetActive(visible);
+            beams[team].gameObject.SetActive(visible);
             Vector2 start = badges[team].anchoredPosition + Vector2.up * (team == 1 ? 30 : -30);
             Vector2 target = badges[1 - team].anchoredPosition + Vector2.up * (team == 1 ? 30 : -30);
             Vector2 end = Vector2.Lerp(start, target, cast);
-            Vector2 delta = end - start;
-            lines[team].anchoredPosition = (start + end) * 0.5f;
-            lines[team].sizeDelta = new Vector2(delta.magnitude, 7);
-            lines[team].localRotation = Quaternion.Euler(0, 0, Mathf.Atan2(delta.y, delta.x) * Mathf.Rad2Deg);
             hooks[team].anchoredPosition = end;
+            if (visible)
+            {
+                Vector3 a = ResultOrigin + (Vector3)(start * 0.01f) + Vector3.back;
+                Vector3 b = ResultOrigin + (Vector3)(end * 0.01f) + Vector3.back;
+                Vector3 control = (a + b) * 0.5f + Vector3.up * (released ? 2.5f : 0.25f + Mathf.Abs(struggle) * 0.03f);
+                beams[team].FollowCurve(a, b, control);
+            }
         }
         Impact(time, 1.95f, 28f, badges[winner].anchoredPosition);
     }
@@ -278,7 +342,8 @@ public sealed class RoundWinnerResultUI : MonoBehaviour
             return;
         }
         float remaining = 1 - age / 0.32f;
-        motion.anchoredPosition = new Vector2(Mathf.Sin(age * 190), Mathf.Cos(age * 157)) * strength * remaining;
+        resultCamera.transform.position = cameraHome +
+            new Vector3(Mathf.Sin(age * 190), Mathf.Cos(age * 157), 0) * strength * remaining * 0.01f;
         burst.gameObject.SetActive(true);
         burst.rectTransform.anchoredPosition = position;
         burst.rectTransform.localScale = Vector3.one * (0.5f + age * 5);
@@ -286,6 +351,48 @@ public sealed class RoundWinnerResultUI : MonoBehaviour
     }
 
     private static float TeamX(int team) => team == 1 ? -360 : 360;
+    private static void SetLayer(Transform parent)
+    {
+        parent.gameObject.layer = ResultLayer;
+        foreach (Transform child in parent) SetLayer(child);
+    }
+
+    private static void BuildRobot(RectTransform parent, int team)
+    {
+        Color suit = new Color(0.95f, 0.94f, 0.87f);
+        Color dark = new Color(0.12f, 0.18f, 0.20f);
+        Color accent = SpaceJunkTeams.TeamColor(team);
+        Symbol("Suit", parent, new Vector2(0, -35), 115, WinnerResultSymbol.Shape.Circle, dark);
+        Symbol("SuitFill", parent, new Vector2(0, -35), 100, WinnerResultSymbol.Shape.Circle, suit);
+        Symbol("HelmetOutline", parent, new Vector2(0, 30), 155, WinnerResultSymbol.Shape.Circle, dark);
+        Symbol("Helmet", parent, new Vector2(0, 30), 140, WinnerResultSymbol.Shape.Circle, suit);
+        WinnerResultSymbol visor = Symbol("Visor", parent, new Vector2(0, 28), 112, WinnerResultSymbol.Shape.Circle, dark);
+        visor.rectTransform.localScale = new Vector3(1, 0.65f, 1);
+        foreach (int sign in new[] { -1, 1 })
+        {
+            Image eye = Rect("Eye", parent, new Vector2(sign * 20, 30), new Vector2(9, 28)).gameObject.AddComponent<Image>();
+            eye.color = new Color(0.45f, 0.95f, 0.9f);
+            eye.raycastTarget = false;
+            Symbol("Glove", parent, new Vector2(sign * 80, -28), 42, WinnerResultSymbol.Shape.Circle, accent);
+            Symbol("Boot", parent, new Vector2(sign * 32, -91), 40, WinnerResultSymbol.Shape.Circle, dark);
+        }
+        Symbol("SuitBadge", parent, new Vector2(0, -40), 28, WinnerResultSymbol.Shape.Circle, accent);
+    }
+
+    private void OnDisable()
+    {
+        Hide();
+    }
+
+    private void OnDestroy()
+    {
+        if (resultCamera != null) Destroy(resultCamera.gameObject);
+        if (thrownBody != null) Destroy(thrownBody.gameObject);
+        foreach (LiquidBeam beam in beams)
+        {
+            if (beam != null) Destroy(beam.gameObject);
+        }
+    }
     private static float Ease(float t) => Mathf.SmoothStep(0, 1, Mathf.Clamp01(t));
     private static float Pop(float t)
     {

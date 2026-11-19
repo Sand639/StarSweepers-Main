@@ -87,6 +87,6 @@ public sealed class SquareWinnerTransitionTester : MonoBehaviour
     {
         GUI.Label(new Rect(20, 20, 1050, 35),
             "1: RED wins  2: BLUE wins  |  3: Star  4: Collision  5: Hook throw  |  Enter: Next preview");
-        GUI.Label(new Rect(20, 50, 600, 35), $"Mode: {style}    Character art: placeholder");
+        GUI.Label(new Rect(20, 50, 600, 35), $"Mode: {style}    Character art: robot prototype");
     }
 }
