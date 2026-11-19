@@ -240,10 +240,10 @@ public sealed class RoundWinnerResultUI : MonoBehaviour
         {
             destination = stars[winner][totals[winner] - 1].rectTransform.anchoredPosition;
         }
-        float fall = Ease((time - 0.5f) / 0.7f);
-        Vector2 from = Vector2.Lerp(new Vector2(0, 620), new Vector2(0, 160), fall);
-        float fly = Ease((time - 1.2f) / 0.8f);
-        flyingStar.rectTransform.anchoredPosition = Vector2.Lerp(from, destination, fly) + Vector2.up * Mathf.Sin(fly * Mathf.PI) * 140;
+        float fall = Ease((time - 0.5f) / 1.5f);
+        float aboveScreen = resultCamera.orthographicSize * 100f + 100f;
+        Vector2 from = new Vector2(0, aboveScreen);
+        flyingStar.rectTransform.anchoredPosition = Vector2.Lerp(from, destination, fall);
         flyingStar.rectTransform.localRotation = Quaternion.Euler(0, 0, Mathf.Lerp(120, 0, fall));
         float settle = Ease((time - 2f) / 0.8f);
         badges[winner].localScale *= Mathf.Lerp(1, 1.3f, settle);
