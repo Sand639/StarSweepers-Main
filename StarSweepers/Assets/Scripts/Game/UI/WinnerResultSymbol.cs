@@ -2,6 +2,7 @@ using UnityEngine;
 using UnityEngine.UI;
 
 /// <summary>結果画面で使う円・星・フック・衝撃の仮表示。</summary>
+[RequireComponent(typeof(CanvasRenderer))]
 public sealed class WinnerResultSymbol : MaskableGraphic
 {
     public enum Shape { Circle, Star, Hook, Burst }

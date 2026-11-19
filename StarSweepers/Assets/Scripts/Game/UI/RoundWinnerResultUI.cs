@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
 
@@ -14,7 +13,6 @@ public sealed class RoundWinnerResultUI : MonoBehaviour
 
     private static readonly Color Gold = new Color(1f, 0.78f, 0.25f);
     private readonly RectTransform[] badges = new RectTransform[2];
-    private readonly TextMeshProUGUI[] scores = new TextMeshProUGUI[2];
     private readonly List<WinnerResultSymbol>[] stars =
         { new List<WinnerResultSymbol>(), new List<WinnerResultSymbol>() };
     private readonly RectTransform[] hooks = new RectTransform[2];
@@ -23,7 +21,6 @@ public sealed class RoundWinnerResultUI : MonoBehaviour
     private RectTransform motion;
     private WinnerResultSymbol flyingStar;
     private WinnerResultSymbol burst;
-    private TextMeshProUGUI title;
     private Image background;
     private double startTime;
     private int winner;
@@ -58,8 +55,6 @@ public sealed class RoundWinnerResultUI : MonoBehaviour
         released = false;
         thrownBody.isKinematic = true;
         foreach (LiquidBeam beam in beams) beam.gameObject.SetActive(false);
-        title.text = "ROUND RESULT";
-        title.color = Color.white;
         for (int team = 0; team < 2; team++)
         {
             int displayed = Mathf.Max(0, totals[team] - (team == winner ? 1 : 0));
@@ -126,15 +121,10 @@ public sealed class RoundWinnerResultUI : MonoBehaviour
         background.rectTransform.anchorMax = Vector2.one;
         background.rectTransform.sizeDelta = Vector2.zero;
 
-        title = Text("ResultTitle", root, new Vector2(0, 420), new Vector2(1400, 100), 62);
         motion = Rect("Animation", root, Vector2.zero, new Vector2(1920, 1080));
         for (int team = 0; team < 2; team++)
         {
             float x = TeamX(team);
-            scores[team] = Text("Score", root, new Vector2(x, -330), new Vector2(520, 90), 60);
-            TextMeshProUGUI teamName = Text("Team", root, new Vector2(x, 335), new Vector2(500, 65), 40);
-            teamName.text = team == 1 ? "RED" : "BLUE";
-            teamName.color = SpaceJunkTeams.TeamColor(team);
             WinnerResultSymbol badge = Symbol("TeamBadge", motion, new Vector2(x, -20),
                 280, WinnerResultSymbol.Shape.Circle, Color.Lerp(SpaceJunkTeams.TeamColor(team), Color.white, 0.45f));
             badges[team] = badge.rectTransform;
@@ -191,7 +181,6 @@ public sealed class RoundWinnerResultUI : MonoBehaviour
 
     private void SetScore(int team, int score)
     {
-        scores[team].text = score.ToString("00");
         for (int i = 0; i < stars[team].Count; i++)
         {
             stars[team][i].color = i < score ? Gold : new Color(0.35f, 0.37f, 0.43f);
@@ -232,8 +221,6 @@ public sealed class RoundWinnerResultUI : MonoBehaviour
         {
             awarded = true;
             SetScore(winner, totals[winner]);
-            title.text = winner == 1 ? "RED WINS!" : "BLUE WINS!";
-            title.color = SpaceJunkTeams.TeamColor(winner);
         }
         if (time >= (style == ResultStyle.HookThrow ? 5.2f : 4.8f))
         {
@@ -409,16 +396,6 @@ public sealed class RoundWinnerResultUI : MonoBehaviour
         rect.anchoredPosition = position;
         rect.sizeDelta = size;
         return rect;
-    }
-
-    private static TextMeshProUGUI Text(string name, RectTransform parent, Vector2 position, Vector2 size, float fontSize)
-    {
-        TextMeshProUGUI text = Rect(name, parent, position, size).gameObject.AddComponent<TextMeshProUGUI>();
-        text.fontSize = fontSize;
-        text.alignment = TextAlignmentOptions.Center;
-        text.color = Color.white;
-        text.raycastTarget = false;
-        return text;
     }
 
     private static WinnerResultSymbol Symbol(string name, RectTransform parent, Vector2 position, float size,
