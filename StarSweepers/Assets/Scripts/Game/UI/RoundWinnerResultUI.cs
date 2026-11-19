@@ -270,7 +270,9 @@ public sealed class RoundWinnerResultUI : MonoBehaviour
             }
             if (team == winner)
             {
-                position.x = Mathf.Lerp(position.x, 0, Ease(launch));
+                position = Vector2.Lerp(position, Vector2.zero, Ease(launch));
+                float celebration = Pop((time - 2.7f) / 0.55f);
+                badges[team].localScale *= Mathf.LerpUnclamped(1f, 1.5f, celebration);
             }
             else
             {
