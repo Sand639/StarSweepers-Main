@@ -122,7 +122,7 @@ public class DebrisSetUITests
         for (int p = 0; p < panels.arraySize; p++)
         {
             UnityEditor.SerializedProperty panel = panels.GetArrayElementAtIndex(p);
-            foreach (string part in new[] { "root", "arm", "panel", "bracket", "title" })
+            foreach (string part in new[] { "root", "body", "arm", "panel", "bracket", "title" })
             {
                 Assert.That(panel.FindPropertyRelative(part).objectReferenceValue, Is.Not.Null, $"枠{p}の {part} が空");
             }

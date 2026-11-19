@@ -33,10 +33,10 @@ public static class DebrisSetUISetup
     private const float ItemSize = 72f;
 
     // 1チームの表示の大きさ（画像の元の大きさに対する倍率。1920×1080 の画面での値）と置き場所
-    private const float PanelScale = 0.75f;
-    private const float PanelSide = 10f;
+    private const float PanelScale = 0.825f;
+    private const float PanelSide = -20f; // マイナス＝画面の外。腕の付け根（棒の先）が画面に見えないように
     private const float PanelTop = 150f;
-    private const float PanelRowGap = 160f;
+    private const float PanelRowGap = 176f;
 
     // プレハブを開いたときに見本として出すカードの数（ゲーム中はお題の数に合わせる）
     private const int PreviewSlots = 3;
@@ -200,13 +200,18 @@ public static class DebrisSetUISetup
         root.anchoredPosition = new Vector2(right ? -PanelSide : PanelSide, -top);
         root.localScale = new Vector3(PanelScale, PanelScale, 1f);
 
+        // 腕・枠・カードをまとめて回す・動かす物（腕が回りながら入ってくる演出）
+        RectTransform body = CreateRect("Body", root);
+        body.sizeDelta = Vector2.zero;
+        property.FindPropertyRelative("body").objectReferenceValue = body;
+
         // 重なり順：枠 → 文字 → カード → 金具 → 腕（あとに作った物ほど手前）
-        Image panel = AddImage(CreateRect("Frame", root), sprites.panel);
+        Image panel = AddImage(CreateRect("Frame", body), sprites.panel);
         panel.SetNativeSize();
         panel.type = Image.Type.Filled;
         panel.fillMethod = Image.FillMethod.Horizontal;
 
-        RectTransform titleRect = CreateRect("Title", root);
+        RectTransform titleRect = CreateRect("Title", body);
         titleRect.pivot = new Vector2(0f, 1f);
         titleRect.sizeDelta = new Vector2(320f, 34f);
         var title = titleRect.gameObject.AddComponent<Text>();
@@ -227,7 +232,7 @@ public static class DebrisSetUISetup
 
         for (int n = 0; n < DebrisSetUI.MaxSlots; n++)
         {
-            RectTransform slot = CreateRect($"Slot{n}", root);
+            RectTransform slot = CreateRect($"Slot{n}", body);
             slot.sizeDelta = Vector2.zero;
             slot.gameObject.SetActive(n < PreviewSlots);
 
@@ -237,10 +242,10 @@ public static class DebrisSetUISetup
             BuildCard("NextCard", slot, sprites, null, slotProperty.FindPropertyRelative("nextCard")).gameObject.SetActive(false);
         }
 
-        Image bracket = AddImage(CreateRect("Bracket", root), sprites.bracket);
+        Image bracket = AddImage(CreateRect("Bracket", body), sprites.bracket);
         bracket.SetNativeSize();
 
-        Image arm = AddImage(CreateRect("Arm", root), sprites.arm);
+        Image arm = AddImage(CreateRect("Arm", body), sprites.arm);
         arm.SetNativeSize();
 
         property.FindPropertyRelative("arm").objectReferenceValue = arm;

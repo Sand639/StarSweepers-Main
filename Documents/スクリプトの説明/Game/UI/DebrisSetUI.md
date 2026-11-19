@@ -25,8 +25,9 @@
 ## 並べ方（`DrawPanel`）
 
 - 位置はすべて「画像の元の大きさのピクセル」で計算し、チームの表示ごとの Scale（プレハブで 0.75）で縮める。Panel0〜3 は画面の角に付いていて、中の物の位置は毎フレームここで決める（**シーンで動かしても次のフレームで戻る**。変えたいときは「並べ方」の欄）
-- 出てきてからの秒数 `intro` から、腕の入り具合 `slide`（0〜Arm Slide Seconds）と、枠の開き具合 `open`（そのあと Open Seconds）を出す（どちらも 3乗の減速）。しまうときは `intro` を逆に減らす
-- 腕：画面の端から Arm Hide Distance だけ外にいた所から入る。枠の見える幅は `Closed Width → 枠の横幅` を `open` で補間し、`Image.Type.Filled`（横）の `fillAmount` で腕の側から見せる（伸び縮みさせないので、角の丸みがつぶれない）。金具：見えている枠の端に付いて動き、**閉じている間も出す**（閉じた形のまま入ってくる）。文字・カードは開ききってから出す
+- 出てきてからの秒数 `intro` から、腕の入り具合（0〜Arm Slide Seconds）と、枠の開き具合 `open`（そのあと Open Seconds。3乗の減速）を出す。しまうときは `intro` を逆に減らす
+- 腕の入り方：腕・枠・カードはチームごとの `Body` の下にあり、`Body` を**腕の付け根（Arm Root）を中心に回す**（付け根が動かないよう、`位置 = ずらし ＋ 付け根 − 回転 × 付け根`）。Arm Slide Seconds の前半（`ArmMoveEnd`＝0.5）で横に入り（3乗の減速）、0.3（`ArmSwingStart`）の所から Arm Swing Angle → 0 度へ回る（`EaseOutBack`。Arm Swing Overshoot だけ行き過ぎてから戻る）。右の枠は角度も逆
+- 腕：`Body` の中では動かさない（入ってくる動きは `Body` で付ける）。枠の見える幅は `Closed Width → 枠の横幅` を `open` で補間し、`Image.Type.Filled`（横）の `fillAmount` で腕の側から見せる（伸び縮みさせないので、角の丸みがつぶれない）。金具：見えている枠の端に付いて動き、**閉じている間も出す**（閉じた形のまま入ってくる）。文字・カードは開ききってから出す
 - 枠の横幅は `Card Margin ＋ Card Pitch × お題の数`（3個で素材の幅 347）
 - **右の枠（Panel1・3）は x を反転**し、腕と金具の画像だけ `localScale.x = -1` で左右反転する。文字とカードは反転しない。カードは画面で見て左から1枚目（腕から遠い側）がお題の1個目になるように並べる（順番どおりのお題が、どちらの枠でも左から読める）
 
@@ -75,18 +76,19 @@ Test Event Running をオフにすると「イベントが終わった」扱い�
 ```
 DebrisSetUI（Canvas：画面に重ねる・並び順 20、CanvasScaler：1920×1080 基準、DebrisSetUI）
 └ Content（表示ごと隠す）
-   ├ Panel0（左上の角。Scale 0.75）
-   │  ├ Frame（枠 UI_SET_04_01。Filled・横）
-   │  ├ Title（Text「特注依頼...」。左上が基準）
-   │  ├ Slot0〜7
-   │  │  ├ Card（CanvasGroup。101×112）
-   │  │  │  ├ Base（カードの地 UI_SET_02。物資の色に染めるときは UI_SET_01）
-   │  │  │  ├ Item（物資の画像 72×72）
-   │  │  │  ├ Cover（白いカード UI_SET_01）
-   │  │  │  └ Check（チェック UI_SET_00）
-   │  │  └ NextCard（同じ作り。スロット中だけ）
-   │  ├ Bracket（反対側の金具 UI_SET_03_02）
-   │  └ Arm（腕 UI_SET_03_01）
+   ├ Panel0（左上の角。Scale 0.825。画面の端から -20 ＝付け根を画面の外に）
+   │  └ Body（腕・枠・カードをまとめて回す）
+   │     ├ Frame（枠 UI_SET_04_01。Filled・横）
+   │     ├ Title（Text「特注依頼...」。左上が基準）
+   │     ├ Slot0〜7
+   │     │  ├ Card（CanvasGroup。101×112）
+   │     │  │  ├ Base（カードの地 UI_SET_02。物資の色に染めるときは UI_SET_01）
+   │     │  │  ├ Item（物資の画像 72×72）
+   │     │  │  ├ Cover（白いカード UI_SET_01）
+   │     │  │  └ Check（チェック UI_SET_00）
+   │     │  └ NextCard（同じ作り。スロット中だけ）
+   │     ├ Bracket（反対側の金具 UI_SET_03_02）
+   │     └ Arm（腕 UI_SET_03_01）
    ├ Panel1（右上の角）
    ├ Panel2（左の2段目）
    └ Panel3（右の2段目）
@@ -115,3 +117,4 @@ DebrisSetUI（Canvas：画面に重ねる・並び順 20、CanvasScaler：1920×
 | 2026/11/12 | Claude Code | デブリセットのお題を3個にしたのに合わせて、テストのお題の数（Test Set Size）とプレハブの見本のマスを3個にしたことを書いた（大槻さんの依頼） |
 | 2026/11/18 | Claude Code | デザイナーさんの素材と設計図の動き（腕 → 枠が開く → カードが落ちる → チェック → しまう）に作り替えたのに合わせて、ほぼ全部を書き直した（大槻さんの依頼）。カードの地を物資の色に染めること、`TitleDots`・`TickClosing`・`LayoutPreview`・`PlaceInEventScene` を書いた |
 | 2026/11/18 | Claude Code | 閉じた形（細い枠＋反対側の金具）で入ってくるようにしたのに合わせて、枠と金具の動きの説明を直した（大槻さんの依頼） |
+| 2026/11/19 | Claude Code | 腕が付け根を中心に回りながら入ってくる（`Body` を回す）こと、大きさ 0.825・置き場所 -20 にしたことを書いた（大槻さんの依頼） |

@@ -68,6 +68,9 @@ public sealed class DebrisSetUI : MonoBehaviour
         [Tooltip("このチームの表示ごと出し入れする物（画面の角に付けてある）")]
         public GameObject root;
 
+        [Tooltip("腕・枠・カードをまとめて回す・動かす物（腕が回りながら入ってくる演出に使う）")]
+        public RectTransform body;
+
         [Tooltip("腕（左の金具つき）の画像")]
         public Image arm;
 
@@ -148,9 +151,18 @@ public sealed class DebrisSetUI : MonoBehaviour
     [Tooltip("入ってくる前の腕が、画面の外へどれだけ下がっているか")]
     [SerializeField] private float armHideDistance = 160f;
 
+    [Tooltip("腕の付け根（棒の先）の位置。腕はここを中心に回りながら入ってくる（腕の画像の左上から。下はマイナス）")]
+    [SerializeField] private Vector2 armRoot = new Vector2(1f, -117f);
+
+    [Tooltip("入ってくる前の腕の傾き（度）。ここから 0 度へ回りながら入ってくる")]
+    [SerializeField] private float armSwingAngle = 40f;
+
+    [Tooltip("回り終わりの行き過ぎ（0＝行き過ぎない。大きいほど、いちど行き過ぎてから戻る）")]
+    [SerializeField, Min(0f)] private float armSwingOvershoot = 1.2f;
+
     [Header("出てくる・しまう演出")]
-    [Tooltip("腕が画面の外から入ってくる秒数")]
-    [SerializeField, Min(0f)] private float armSlideSeconds = 0.35f;
+    [Tooltip("腕が画面の外から回りながら入ってくる秒数")]
+    [SerializeField, Min(0f)] private float armSlideSeconds = 0.5f;
 
     [Tooltip("枠が開く秒数（反対側の金具が外へ動き、枠が伸びる）。開ききってからカードが落ちてくる")]
     [SerializeField, Min(0f)] private float openSeconds = 0.25f;
@@ -275,6 +287,10 @@ public sealed class DebrisSetUI : MonoBehaviour
     private bool testStarted;
     private float testEventStart;
     private float testNextAction;
+
+    // 腕が入ってくる時間（Arm Slide Seconds）のうち、横に動き終わる割合と、回り始める割合
+    private const float ArmMoveEnd = 0.5f;
+    private const float ArmSwingStart = 0.3f;
 
     /// <summary>腕が入ってきてから、カードが落ち始めるまでの秒数。</summary>
     private float IntroSeconds => armSlideSeconds + openSeconds;
@@ -577,19 +593,31 @@ public sealed class DebrisSetUI : MonoBehaviour
         float intro = isClosing ? IntroSeconds - Mathf.Max(0f, closing - cardFadeSeconds) : now - state.introStart;
         float cardAlpha = isClosing ? 1f - Clamp01Div(closing, cardFadeSeconds) : 1f;
 
-        float slide = EaseOutCubic(Clamp01Div(intro, armSlideSeconds));
+        float slideTime = Clamp01Div(intro, armSlideSeconds);
         float open = EaseOutCubic(Clamp01Div(intro - armSlideSeconds, openSeconds));
         bool opened = open >= 1f;
 
         float side = mirrored ? -1f : 1f;
-        float armX = (slide - 1f) * armHideDistance;
         float width = cardMargin + cardPitch * Mathf.Max(1, state.size);
-        float left = armX + panelLeft;
+        float left = panelLeft;
+
+        // 腕・枠・カードをまとめて、付け根を中心に回しながら画面の外から入れる
+        if (parts.body != null)
+        {
+            // 前半で傾いたまま入ってきて、少し遅れて回り始め、起き上がる（回るところが画面の中で見えるように）
+            float move = EaseOutCubic(Mathf.Clamp01(slideTime / ArmMoveEnd));
+            float swing = EaseOutBack(Mathf.Clamp01((slideTime - ArmSwingStart) / (1f - ArmSwingStart)), armSwingOvershoot);
+            Quaternion rotation = Quaternion.Euler(0f, 0f, (1f - swing) * armSwingAngle * side);
+            var pivot = new Vector2(side * armRoot.x, armRoot.y);
+            var slideOffset = new Vector2((move - 1f) * armHideDistance * side, 0f);
+            parts.body.localRotation = rotation;
+            parts.body.anchoredPosition = slideOffset + pivot - (Vector2)(rotation * pivot);
+        }
 
         if (parts.arm != null)
         {
             RectTransform arm = parts.arm.rectTransform;
-            Place(arm, side * (armX + arm.rect.width * 0.5f), -bodyCenterY, side);
+            Place(arm, side * arm.rect.width * 0.5f, -bodyCenterY, side);
         }
 
         if (parts.panel != null)
@@ -746,6 +774,13 @@ public sealed class DebrisSetUI : MonoBehaviour
     private static float Clamp01Div(float value, float duration)
     {
         return duration <= 0f ? (value >= 0f ? 1f : 0f) : Mathf.Clamp01(value / duration);
+    }
+
+    /// <summary>終わりで少し行き過ぎてから 1 に戻る（overshoot が 0 なら行き過ぎない）。</summary>
+    private static float EaseOutBack(float t, float overshoot)
+    {
+        float u = Mathf.Clamp01(t) - 1f;
+        return 1f + (overshoot + 1f) * u * u * u + overshoot * u * u;
     }
 
     private static float EaseOutCubic(float t)
