@@ -216,6 +216,13 @@ public sealed class RoundWinnerResultUI : MonoBehaviour
             case ResultStyle.Collision: DrawCollision(time); break;
             case ResultStyle.HookThrow: DrawHookThrow(time); break;
         }
+        float centerAt = style == ResultStyle.StarAward ? 2.8f :
+            style == ResultStyle.HookThrow ? 3.5f : 1.9f;
+        float centerProgress = Ease((time - centerAt) / 0.8f);
+        badges[winner].anchoredPosition = Vector2.Lerp(badges[winner].anchoredPosition, Vector2.zero, centerProgress);
+        badges[winner].localRotation = Quaternion.Lerp(badges[winner].localRotation, Quaternion.identity, centerProgress);
+        float celebration = Pop((time - centerAt - 0.8f) / 0.55f);
+        badges[winner].localScale *= Mathf.LerpUnclamped(1f, 1.5f, celebration);
         float awardAt = style == ResultStyle.StarAward ? 2f : 4.5f;
         if (!awarded && time >= awardAt)
         {
@@ -246,7 +253,6 @@ public sealed class RoundWinnerResultUI : MonoBehaviour
         flyingStar.rectTransform.anchoredPosition = Vector2.Lerp(from, destination, fall);
         flyingStar.rectTransform.localRotation = Quaternion.Euler(0, 0, Mathf.Lerp(120, 0, fall));
         float settle = Ease((time - 2f) / 0.8f);
-        badges[winner].localScale *= Mathf.Lerp(1, 1.3f, settle);
         badges[1 - winner].localScale *= 1f - settle;
     }
 
@@ -268,13 +274,7 @@ public sealed class RoundWinnerResultUI : MonoBehaviour
                 badges[team].localRotation = Quaternion.Euler(0, 0, side * pulse * 6f);
                 badges[team].localScale = new Vector3(1f - pulse * 0.055f, 1f + pulse * 0.04f, 1f);
             }
-            if (team == winner)
-            {
-                position = Vector2.Lerp(position, Vector2.zero, Ease(launch));
-                float celebration = Pop((time - 2.7f) / 0.55f);
-                badges[team].localScale *= Mathf.LerpUnclamped(1f, 1.5f, celebration);
-            }
-            else
+            if (team != winner)
             {
                 position += new Vector2(side * 1500 * launch * launch, 420 * launch);
                 badges[team].localRotation = Quaternion.Euler(0, 0, -side * launch * 540);
