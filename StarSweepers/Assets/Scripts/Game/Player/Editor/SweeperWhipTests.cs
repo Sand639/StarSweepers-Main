@@ -93,11 +93,16 @@ public class SweeperWhipTests
         Assert.That(values[(int)PlayerBehaviorStep.Fire], Is.EqualTo(PlayerBehaviorPattern.B), "食い違った組が、狙うに合わせて直っていない");
         Assert.That(values[(int)PlayerBehaviorStep.Throw], Is.EqualTo(PlayerBehaviorPattern.A), "投げるに無いパターンが A に直っていない");
 
-        // 曲げ撃ち（C・D。2026/11/18）も、狙う⇔発射で固定の組。撃ち方は C＝SteerSnap、D＝SteerLag
+        // 曲げ撃ち（C。2026/11/18）・溜め鞭（D。2026/11/21）も、狙う⇔発射で固定の組。撃ち方は C＝SteerSnap、D＝ChargeWhip
         PlayerBehavior.Assign(values, PlayerBehaviorStep.Fire, PlayerBehaviorPattern.D);
         Assert.That(values[(int)PlayerBehaviorStep.Aim], Is.EqualTo(PlayerBehaviorPattern.D), "発射を D にしたのに、狙うが D にならない");
         Assert.That(SweeperShooter.StyleOf(PlayerBehaviorPattern.C), Is.EqualTo(SweeperShooter.ShotStyle.SteerSnap));
-        Assert.That(SweeperShooter.StyleOf(PlayerBehaviorPattern.D), Is.EqualTo(SweeperShooter.ShotStyle.SteerLag));
+        Assert.That(SweeperShooter.StyleOf(PlayerBehaviorPattern.D), Is.EqualTo(SweeperShooter.ShotStyle.ChargeWhip));
+
+        // 溜め鞭は「まず溜める」「光線は鞭の形」。数字 3 は通信で使うので変えない（前の SteerLag と同じ番号）
+        Assert.That(SweeperShooter.ChargesFirst(SweeperShooter.ShotStyle.ChargeWhip), Is.True);
+        Assert.That(SweeperShooter.IsWhipFamily(SweeperShooter.ShotStyle.ChargeWhip), Is.True);
+        Assert.That((int)SweeperShooter.ShotStyle.ChargeWhip, Is.EqualTo(3));
     }
 
     /// <summary>
@@ -120,13 +125,120 @@ public class SweeperWhipTests
         yield return new ExitPlayMode();
     }
 
-    /// <summary>曲げ撃ち D（先が遅れて付いていく）：C と同じく、体はあまり回らずに真横の箱をつかむ（2026/11/18）。</summary>
+    /// <summary>溜め鞭 D：長く溜めて離すと、鞭の光線が遠く（8m 先）の箱まで届いてつかむ（2026/11/21）。</summary>
     [UnityTest]
-    public IEnumerator SteerLag_SideBox_GrabsWithoutTurningBody()
+    public IEnumerator ChargeWhip_FullCharge_GrabsFar()
     {
         yield return new EnterPlayMode();
-        yield return RunSteer(SweeperShooter.ShotStyle.SteerLag);
+        yield return RunChargeWhip(1f, false, true);
         yield return new ExitPlayMode();
+    }
+
+    /// <summary>溜め鞭 D：すぐ離すと、光線は短いまま（最短 3m）で、8m 先の箱には届かない（2026/11/21）。</summary>
+    [UnityTest]
+    public IEnumerator ChargeWhip_ShortCharge_Misses()
+    {
+        yield return new EnterPlayMode();
+        yield return RunChargeWhip(0f, false, false);
+        yield return new ExitPlayMode();
+    }
+
+    /// <summary>溜め鞭 D：離したあとに体を振ると、A と同じくしなって真横の箱に触れてつかむ（2026/11/21）。</summary>
+    [UnityTest]
+    public IEnumerator ChargeWhip_Swing_GrabsSide()
+    {
+        yield return new EnterPlayMode();
+        yield return RunChargeWhip(1f, true, true);
+        yield return new ExitPlayMode();
+    }
+
+    /// <summary>
+    /// 溜め鞭の中身。体は正面（+Z）。溜め始め（BeginCharge）、溜めた量を <paramref name="charge"/> にしてから離す（UpdateCharge に「離した」を渡す）。
+    /// 振らないときは正面 8m 先の箱、振るときは右 5m の箱を置く。振るときは、離して 0.3 秒たってから 0.3 秒かけて右へ 90° 回す。
+    /// </summary>
+    private static IEnumerator RunChargeWhip(float charge, bool swing, bool expectGrab)
+    {
+        GameObject prefab = AssetDatabase.LoadAssetAtPath<GameObject>(PlayerPrefabPath);
+        Assert.That(prefab, Is.Not.Null, "新しい体のプレハブが無い（メニューで作る）");
+
+        GameObject ground = GameObject.CreatePrimitive(PrimitiveType.Plane);
+        ground.transform.localScale = new Vector3(10f, 1f, 10f);
+
+        GameObject player = Object.Instantiate(prefab, Vector3.zero, Quaternion.identity);
+        GameObject box = GameObject.CreatePrimitive(PrimitiveType.Cube);
+        try
+        {
+            player.GetComponent<SweeperMover>().enabled = false;
+            player.transform.rotation = Quaternion.identity;
+
+            box.transform.position = swing ? new Vector3(5f, 0.5f, 0f) : new Vector3(0f, 0.5f, 8f);
+            box.AddComponent<Rigidbody>();
+            box.AddComponent<HookableObject>();
+            yield return Wait(0.5f);
+
+            SweeperShooter shooter = player.GetComponent<SweeperShooter>();
+            shooter.FollowSettings = false;
+            shooter.Style = SweeperShooter.ShotStyle.ChargeWhip;
+
+            Invoke(shooter, "BeginCharge");
+            Assert.That(shooter.IsCharging, Is.True, "溜め鞭なのに、押しても溜めにならない");
+
+            typeof(SweeperShooter).GetField("charge", BindingFlags.Instance | BindingFlags.NonPublic).SetValue(shooter, charge);
+            Invoke(shooter, "UpdateCharge", true, false);
+            Assert.That(shooter.IsWhipping, Is.True, "溜めて離しても、鞭の光線が出ていない");
+
+            bool grabbed = false;
+            float farthest = 0f;
+            float startTime = Time.time;
+            float until = Time.realtimeSinceStartup + 4f;
+            while (Time.realtimeSinceStartup < until)
+            {
+                float elapsed = Time.time - startTime;
+                if (swing && shooter.IsWhipping && elapsed > 0.3f)
+                {
+                    float yaw = Mathf.Clamp01((elapsed - 0.3f) / 0.3f) * 90f;
+                    player.transform.rotation = Quaternion.Euler(0f, yaw, 0f);
+                }
+
+                Vector3 tip = shooter.BeamTip;
+                tip.y = 0f;
+                farthest = Mathf.Max(farthest, tip.magnitude);
+
+                if (shooter.Phase == SweeperShooter.ShotPhase.Reeling)
+                {
+                    grabbed = true;
+                    break;
+                }
+
+                if (shooter.Phase == SweeperShooter.ShotPhase.Idle)
+                {
+                    break;
+                }
+
+                yield return NextFrame();
+            }
+
+            float seconds = Time.time - startTime;
+            Debug.Log($"[SweeperWhipTests] 溜め鞭 溜め={charge} 振る={swing} つかんだ={grabbed} 経過={seconds:F2}秒 先の最遠={farthest:F2}m 段階={shooter.Phase}");
+
+            Assert.That(grabbed, Is.EqualTo(expectGrab), expectGrab ? "溜め鞭で箱をつかめなかった" : "すぐ離したのに、遠くの箱をつかんだ（溜めた長さより伸びている）");
+            if (!expectGrab)
+            {
+                Assert.That(farthest, Is.LessThan(4f), "すぐ離したのに、光線が最短の長さより伸びている");
+            }
+            else
+            {
+                Assert.That(seconds, Is.LessThan(1.05f), "出していられる 1 秒を過ぎてからつかんだ");
+            }
+        }
+        finally
+        {
+            Object.Destroy(player);
+            Object.Destroy(box);
+            Object.Destroy(ground);
+        }
+
+        yield return null;
     }
 
     /// <summary>
@@ -167,7 +279,7 @@ public class SweeperWhipTests
             shooter.FollowSettings = false;
             shooter.Style = style;
 
-            Invoke(shooter, "BeginWhip");
+            BeginWhip(shooter);
             Assert.That(shooter.IsWhipping, Is.True, "押しても光線が出ていない");
 
             bool grabbed = false;
@@ -306,7 +418,7 @@ public class SweeperWhipTests
             shooter.Style = SweeperShooter.ShotStyle.Whip;
 
             // 押した瞬間と同じ（狙いは正面 +Z のまま。体も正面を向く）
-            Invoke(shooter, "BeginWhip");
+            BeginWhip(shooter);
             Assert.That(shooter.IsWhipping, Is.True, "押しても鞭の光線が出ていない");
 
             bool grabbed = false;
@@ -364,11 +476,17 @@ public class SweeperWhipTests
         yield return null;
     }
 
-    private static void Invoke(object target, string method)
+    private static void Invoke(object target, string method, params object[] args)
     {
         MethodInfo info = target.GetType().GetMethod(method, BindingFlags.Instance | BindingFlags.NonPublic);
         Assert.That(info, Is.Not.Null, method + " が見つからない");
-        info.Invoke(target, null);
+        info.Invoke(target, args.Length > 0 ? args : null);
+    }
+
+    /// <summary>押した瞬間と同じく、鞭の光線を出し始める（鞭・曲げ撃ちは最長まで伸びられる）。</summary>
+    private static void BeginWhip(SweeperShooter shooter)
+    {
+        Invoke(shooter, "BeginWhip", shooter.MaxReach, false);
     }
 
     /// <summary>ゲームのフレームが1つ進むまで待つ（画面なしの Unity では `yield return null` だけだとフレームが進まないため）。</summary>
