@@ -78,6 +78,36 @@ public class FishingNetBomb : NetworkBehaviour
         }
     }
 
+    /// <summary>
+    /// **いますぐ爆発させたいとホストへ頼む。**（2026/11/21）
+    /// 引っ張られている爆弾が人にぶつかったとき、ぶつかられた人のPCから呼ばれる（<see cref="SweeperPulledHit"/>）。
+    /// ホストが認めると、ホスト自身も含めた全員のPCで同時に爆発する（被害の計算は今までどおり各PC）。
+    /// </summary>
+    public void RequestDetonate()
+    {
+        RequestDetonateServerRpc();
+    }
+
+    [ServerRpc(RequireOwnership = false)]
+    private void RequestDetonateServerRpc()
+    {
+        // 何人かが同時にぶつかって何度も頼んできても、1回だけ配る。
+        // 火のついていない（もう爆発して火が消えた）爆弾は爆発させない
+        if (!lit.Value && !explosive.FuseLit)
+        {
+            return;
+        }
+
+        lit.Value = false;
+        DetonateClientRpc();
+    }
+
+    [ClientRpc]
+    private void DetonateClientRpc()
+    {
+        explosive.ExplodeNow();
+    }
+
     /// <summary>爆発したあと、また使えるように火を消す。**ホストだけが呼べる。**</summary>
     public void ServerResetFuse()
     {

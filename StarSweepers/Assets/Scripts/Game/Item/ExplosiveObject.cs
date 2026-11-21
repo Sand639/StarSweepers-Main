@@ -161,6 +161,22 @@ public class ExplosiveObject : MonoBehaviour
     }
 
     /// <summary>
+    /// **導火線を待たずに、いますぐ爆発させる。**（2026/11/21）
+    /// 引っ張られている爆弾が人にぶつかったときに呼ばれる（<see cref="SweeperPulledHit"/>）。
+    /// オンラインでは直接呼ばず、<see cref="FishingNetBomb.RequestDetonate"/> を通して全員の画面で呼ぶ。
+    /// もう消えている（爆発した・ゴールに入った）爆弾では何もしない。
+    /// </summary>
+    public void ExplodeNow()
+    {
+        if (hookable == null || hookable.IsVanished)
+        {
+            return;
+        }
+
+        Explode();
+    }
+
+    /// <summary>
     /// 爆発する。見た目を出す → 範囲内に効果を与える → 火を消して見た目を戻す → 消える、の順。
     /// オンラインでも**各PCが自分で導火線を数えて、自分の画面で爆発させる**
     /// （<see cref="FishingNetBomb"/>。配っているのは「火がついた」ことだけ）。
