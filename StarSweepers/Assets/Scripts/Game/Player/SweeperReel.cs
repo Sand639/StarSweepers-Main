@@ -451,6 +451,12 @@ public class SweeperReel : MonoBehaviour
         input = PlayerInputSource.Get(this);
         windowStart = criticalStart;
         windowLength = criticalLength;
+
+        // 引っ張っている物にぶつかった人を吹き飛ばす部品（2026/11/21）。プレハブに無ければここで付ける
+        if (GetComponent<SweeperPulledHit>() == null)
+        {
+            gameObject.AddComponent<SweeperPulledHit>();
+        }
     }
 
     /// <summary>巻き取りを始める。物資の Rigidbody の物理はそのまま使う（床の上を引きずる）。</summary>
