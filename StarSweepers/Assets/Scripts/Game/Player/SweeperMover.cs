@@ -71,7 +71,7 @@ public class SweeperMover : MonoBehaviour
 
     /// <summary>
     /// ON の間は、この部品は体を回さない（向きは <see cref="SweeperShooter"/> が決める）。
-    /// 光線の先を狙いで曲げる撃ち方（挙動パターン C・D。2026/11/18）で、体を少しだけしか回さないために使う。
+    /// 光線の先を狙いで曲げる撃ち方（挙動パターン C。2026/11/18）で、体を少しだけしか回さないために使う。
     /// </summary>
     public bool TurnLocked { get; set; }
 

@@ -342,8 +342,9 @@ public partial class SweeperBot : MonoBehaviour
                     PointAt(target.transform.position);
                 }
 
-                // 鞭・曲げ撃ちの光線（撃ち方 Whip・SteerSnap・SteerLag）は押している間だけ出るので、出ている間は押し続ける（曲げ撃ちは、素材を指し続けると先が素材へ曲がる）
-                hold = shooter.IsWhipping;
+                // 鞭・曲げ撃ちの光線（撃ち方 Whip・SteerSnap）は押している間だけ出るので、出ている間は押し続ける（曲げ撃ちは、素材を指し続けると先が素材へ曲がる）。
+                // 溜め鞭（ChargeWhip）は、溜めて離したら秒数で戻るので押さない
+                hold = shooter.IsWhipping && !SweeperShooter.ChargesFirst(shooter.Style);
                 break;
         }
 
