@@ -63,7 +63,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d5a57f767e5e46a458fc5d3c628d0cbb, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Unity.Netcode.Runtime::Unity.Netcode.NetworkObject
-  GlobalObjectIdHash: 4185652134
+  GlobalObjectIdHash: 3160497423
   InScenePlacedSourceGlobalObjectIdHash: 0
   m_InScenePlacedDisabledByDefault: 0
   DeferredDespawnTick: 0
@@ -320,12 +320,12 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: ace12652a1ddf004fa7d6dcca86eaa06, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::SweeperReel
-  reelSeconds: 1.5
-  stopDistance: 1.4
+  reelSeconds: 2
+  stopDistance: 1.9
   noGravityWhileHeld: 1
   spinDamping: 6
   maxSwingSpeed: 540
-  maxDragSpeed: 20
+  maxDragSpeed: 40
   snapStrain: 2
   strainRecovery: 2
   strainOnlyOnKinematic: 1
@@ -337,13 +337,13 @@ MonoBehaviour:
     m_Bits: 4294967295
   backDistance: 6
   backArcHeight: 3.2
-  throwFollowMotion: 0.5
-  throwFollowNear: 0.15
-  throwFollowSwitch: 0.8
+  throwFollowMotion: 0.777
+  throwFollowNear: 1
+  throwFollowSwitch: 0
   forwardSpeed: 12
   forwardLift: 1.5
   heavyDragDistance: 4
-  heavyDragMinDistance: 0.8
+  heavyDragMinDistance: 1.4
   heavyDragSpeed: 3
   heavyStopDistance: 2
   throwZoneEnd: 0.18
@@ -434,13 +434,13 @@ MonoBehaviour:
     moveScale: 0
   chargeWhip:
     minReach: 3
-    maxReach: 12
+    maxReach: 9
     chargeSeconds: 1
     chargeMoveScale: 1
     seconds: 1
     moveScale: 0
   minReach: 3
-  maxReach: 12
+  maxReach: 9
   chargeSeconds: 1
   extendSpeed: 30
   retractSpeed: 40
