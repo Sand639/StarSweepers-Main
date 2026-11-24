@@ -13,6 +13,7 @@ using UnityEngine;
 /// | 動けなくなる | <see cref="PlayerStun"/> で Stun Seconds 秒。移動も、光線を出すこと（溜め・伸ばす）もできない |
 /// | 持っている物を落とす | 自分が巻き取り中なら、投げずにその場で離す（<see cref="SweeperShooter.CancelShot"/>） |
 /// | **ぶつかった物が爆弾なら** | **その場ですぐ爆発する**（<see cref="ExplosiveObject.ExplodeNow"/>）。ぶつからなければ今までどおり時限式 |
+/// | **ぶつかった物が電気のデブリなら** | <see cref="ElectricDebris"/> の値を使う（**長く痺れる・ほぼ吹き飛ばない**）。痺れている間、体に電気が走る |
 ///
 /// 引っ張っている本人には当たらない。投げたあと（飛んでいる物）は対象外（「引っ張っている最中」だけ）。
 ///
@@ -226,10 +227,21 @@ public class SweeperPulledHit : MonoBehaviour
             shooter.CancelShot();
         }
 
+        // 電気のデブリなら、そちらの値（長く痺れる・ほぼ吹き飛ばない）を使う
+        ElectricDebris electric = item.GetComponent<ElectricDebris>();
+        float hitStun = electric != null ? electric.StunSeconds : stunSeconds;
+        float hitSpeed = electric != null ? electric.KnockbackSpeed : knockbackSpeed;
+        float hitLift = electric != null ? electric.KnockbackLift : knockbackLift;
+
         Vector3 from = item.Body != null ? item.Body.worldCenterOfMass : item.transform.position;
-        Vector3 velocity = KnockbackVelocity(from, transform.position, transform.forward, knockbackSpeed, knockbackLift);
-        MeteorStrikeEvent.ApplyPlayerImpact(controller, stun, velocity, stunSeconds);
-        immuneUntil = Time.time + stunSeconds + rehitGrace;
+        Vector3 velocity = KnockbackVelocity(from, transform.position, transform.forward, hitSpeed, hitLift);
+        MeteorStrikeEvent.ApplyPlayerImpact(controller, stun, velocity, hitStun);
+        immuneUntil = Time.time + hitStun + rehitGrace;
+
+        if (electric != null)
+        {
+            electric.PlayShock(transform, hitStun);
+        }
 
         if (bombsExplodeOnHit)
         {
