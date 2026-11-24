@@ -72,3 +72,4 @@
 | 2026/11/18 | Claude Code | ボットも撃ち方をロビーコンソールのプレイヤー挙動に合わせるようにしたことを足した（前はプレハブの撃ち方のまま） |
 | 2026/11/18 | Claude Code | 曲げ撃ち（挙動パターン C・D）でも、光線が出ている間は押し続けて素材を指し続ける（先が素材の方へ曲がる）。コードはコメントだけ直した |
 | 2026/11/21 | Claude Code | 挙動パターン D を溜め鞭（溜めて離すと鞭の光線）に置き換えた。溜めている間は溜め（B）と同じく必要な長さまで押し続け、離したあとは押さない（溜め鞭は離してから秒数で戻るため）。`hold = shooter.IsWhipping && !SweeperShooter.ChargesFirst(shooter.Style)` |
+| 2026/11/24 | Claude Code（依頼：小野田 喬） | 投げ方の変更に合わせた：押さなければ手前で後ろへ引っ張り切るようになったので、**後ろへ投げるときは押さない**（`ChoosePressTime` が -1）。前へ投げたいとき・爆弾は、両手で持つ距離に入ったら押す（`PressWhenNear`。押す時刻は `DuePressTime` が `SweeperReel.NearThrowStartTime` から出す）。クリティカルに失敗したときも押さない。リキャスト中は押さない（`shooter.RecastReady`）。使わなくなった `pressAfterWindow` を消した |
