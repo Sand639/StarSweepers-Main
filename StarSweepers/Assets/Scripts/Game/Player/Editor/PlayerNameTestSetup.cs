@@ -69,7 +69,7 @@ public static class PlayerNameTestSetup
         }
 
         GameObject player = AssetDatabase.LoadAssetAtPath<GameObject>(
-            "Assets/Prefabs/Player/SpaceJunkPlayer.prefab");
+            "Assets/Prefabs/Player/SweeperPlayer.prefab");
         GameObject session = AssetDatabase.LoadAssetAtPath<GameObject>(
             "Assets/Prefabs/System/SpaceJunkSession.prefab");
         if (player == null || session == null) throw new System.InvalidOperationException("検証に使うプレハブがありません。");

@@ -186,24 +186,10 @@ public class SpaceJunkLobbyTerminal : MonoBehaviour
                 continue;
             }
 
-            FishingPlayerController move = player.GetComponent<FishingPlayerController>();
+            SweeperMover move = player.GetComponent<SweeperMover>();
             if (move != null)
             {
                 move.enabled = enabledState;
-            }
-
-            HookController hook = player.GetComponent<HookController>();
-            if (hook != null)
-            {
-                hook.enabled = enabledState;
-            }
-
-            // **オートエイムも止める。** 狙い方の切り替えに数字の 1・2・3 を使っているので、
-            // 止めないと、設定に「120」と打ち込んだだけで狙い方が切り替わってしまう
-            HookAimAssist aimAssist = player.GetComponent<HookAimAssist>();
-            if (aimAssist != null)
-            {
-                aimAssist.enabled = enabledState;
             }
         }
     }

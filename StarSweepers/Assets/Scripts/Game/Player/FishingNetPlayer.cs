@@ -1,19 +1,18 @@
 using System.Collections.Generic;
-using Unity.Collections;
 using Unity.Netcode;
 using UnityEngine;
 
 /// <summary>
-/// **オンラインの釣りプレイヤー1人分。**
+/// **オンラインのプレイヤー1人分の「参加者としての情報」。**
 ///
 /// 役割は3つ。
-///   ① **参加番号とチームを決める**（ホストが決めて全員に配る）
-///   ② **自分の1人だけが操作できるようにする**（他の人のぶんは操作スクリプトを止める）
-///   ③ **フックと糸を他の人にも見せる**（自分のフックの位置を送り、他の人はそれを再現する）
+///   ① **参加番号・名前を決める**（ホストが決めて全員に配る）
+///   ② **自分の1人だけが操作できるようにする**（他の人のぶんは当たり判定を切り、操作スクリプトを止める）
+///   ③ 生まれたときに、出てくる場所とカメラを合わせる
 ///
-/// 移動そのものは既存の <see cref="FishingPlayerController"/> がそのまま動かし、
-/// 位置は `NetworkTransform` が配る（`動きは本人` の形）。
-/// このスクリプトは通信のための上乗せだけを持つ。
+/// チームはロビーでホストが決めたもの（<see cref="SpaceJunkSession"/>）を使う（<see cref="TeamIndex"/>）。
+/// 移動そのものは <see cref="SweeperMover"/> が動かし、位置は `NetworkTransform` が配る（`動きは本人` の形）。
+/// 光線の様子を配るのは <see cref="SweeperNetSync"/>。このスクリプトは参加者の情報だけを持つ。
 /// </summary>
 [RequireComponent(typeof(NetworkObject))]
 public class FishingNetPlayer : NetworkBehaviour
@@ -28,22 +27,8 @@ public class FishingNetPlayer : NetworkBehaviour
     [Tooltip("他の人のぶんでは切る CharacterController（切らないと送られてきた位置に移せない）")]
     [SerializeField] private CharacterController characterController;
 
-    [Header("見た目")]
-    [Tooltip("チームの色に塗る見た目")]
-    [SerializeField] private Renderer[] teamRenderers;
-
-    [Header("フックと糸")]
-    [Tooltip("フックの先端。他の人のぶんは、送られてきた位置に置くだけ")]
-    [SerializeField] private Transform hookVisual;
-
-    [Tooltip("糸の見た目")]
-    [SerializeField] private HookLine line;
-
-    [Tooltip("糸の起点（手元）")]
-    [SerializeField] private Transform handPoint;
-
     [Header("出てくる場所")]
-    [Tooltip("中心からどれだけ離れた場所に出てくるか（メートル）")]
+    [Tooltip("中心からどれだけ離れた場所に出てくるか（メートル）。宇宙ごみでは SpaceJunkPlayerSetup がこのあと置き直す")]
     [SerializeField] private float spawnRadius = 6f;
 
     // ---- ホストが決めて全員に配るもの ----
@@ -68,84 +53,6 @@ public class FishingNetPlayer : NetworkBehaviour
 
     private NameDataManager nameDatabase;
 
-    // ---- 本人が送るもの（他の人が見るため） ----
-
-    /// <summary>フックの先端の位置。**本人が送る。**</summary>
-    private readonly NetworkVariable<Vector3> hookPosition = new NetworkVariable<Vector3>(
-        Vector3.zero, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Owner);
-
-    /// <summary>糸が出ているか。**本人が送る。**</summary>
-    private readonly NetworkVariable<bool> lineVisible = new NetworkVariable<bool>(
-        false, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Owner);
-
-    /// <summary>物資をつかんでいるか（糸の色を濃くする）。**本人が送る。**</summary>
-    private readonly NetworkVariable<bool> lineGrabbing = new NetworkVariable<bool>(
-        false, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Owner);
-
-    /// <summary>「狙っている物資が無い」を表す値。</summary>
-    private const ulong NoAimTarget = ulong.MaxValue;
-
-    /// <summary>
-    /// オートエイムで狙っている物資（の通信上の番号）。**本人が送る。**
-    /// 他の人の画面でも、その物資の上に目印を出すために使う（<see cref="HookAimAssist"/>）。
-    /// </summary>
-    private readonly NetworkVariable<ulong> aimTargetId = new NetworkVariable<ulong>(
-        NoAimTarget, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Owner);
-
-    // ---- ロビーで選んでいるマップ（ホストのプレイヤーの値だけを使う） ----
-
-    /// <summary>
-    /// ホストがロビーで選んでいるマップのシーン名。**ホストが書き、全員が読む。**
-    ///
-    /// ロビーの画面（<see cref="FishingLobbyUI"/>）は通信の部品ではないので、
-    /// 参加者へ配る値を持てない。そこで**ロビーの時点ですでに全員の画面にいる
-    /// ホストのプレイヤー**に持たせている。あとから入った人にも自動で届く。
-    /// </summary>
-    private readonly NetworkVariable<FixedString64Bytes> lobbyMapName =
-        new NetworkVariable<FixedString64Bytes>(default);
-
-    /// <summary>
-    /// ホストがロビーで選んでいるマップのシーン名。まだ分からなければ空文字。
-    /// </summary>
-    public static string HostSelectedMap
-    {
-        get
-        {
-            // 「ホストのPCの1人目」のプレイヤーが値を持っている
-            // （1台で複数人のときはホストのPCに何人もいるので、席 0 の人に決めている）
-            foreach (FishingNetPlayer player in All)
-            {
-                if (player != null && player.OwnerClientId == NetworkManager.ServerClientId && player.LocalSeat == 0)
-                {
-                    return player.lobbyMapName.Value.ToString();
-                }
-            }
-
-            return string.Empty;
-        }
-    }
-
-    /// <summary>
-    /// ホストが選んだマップを全員へ配る。**ホストのPCからだけ呼ぶこと。**
-    /// </summary>
-    public static void ServerSetSelectedMap(string sceneName)
-    {
-        // 書き込む先は HostSelectedMap と同じ「ホストのPCの1人目」のプレイヤー
-        foreach (FishingNetPlayer player in All)
-        {
-            if (player != null && player.IsServer && player.OwnerClientId == NetworkManager.ServerClientId && player.LocalSeat == 0)
-            {
-                // 同じ値を入れ直すと無駄な通信になるので、変わったときだけ書く
-                FixedString64Bytes value = new FixedString64Bytes(sceneName ?? string.Empty);
-                if (player.lobbyMapName.Value != value)
-                {
-                    player.lobbyMapName.Value = value;
-                }
-                return;
-            }
-        }
-    }
-
     /// <summary>参加番号（0から）。まだ決まっていなければ -1。</summary>
     public int PlayerIndex => playerIndex.Value;
 
@@ -164,8 +71,37 @@ public class FishingNetPlayer : NetworkBehaviour
         localSeat.Value = Mathf.Max(0, seat);
     }
 
-    /// <summary>所属チーム。</summary>
-    public int TeamIndex => FishingTeams.TeamOf(playerIndex.Value);
+    /// <summary>
+    /// 所属チーム。**ロビーでホストが決めたチーム**（<see cref="SpaceJunkSession"/>）。
+    /// まとめ役がいない場面（検証用のシーンなど）では、参加番号 2 人ずつで分ける。
+    /// </summary>
+    public int TeamIndex
+    {
+        get
+        {
+            SpaceJunkSession session = SpaceJunkSession.Current;
+            if (session != null)
+            {
+                return session.TeamOf(PlayerKey);
+            }
+
+            return Mathf.Clamp(Mathf.Max(0, playerIndex.Value) / 2, 0, SpaceJunkTeams.MaxTeams - 1);
+        }
+    }
+
+    /// <summary>参加番号 <paramref name="index"/> の人のチーム。その人が見つからなければ -1。</summary>
+    public static int TeamOfPlayerIndex(int index)
+    {
+        foreach (FishingNetPlayer player in All)
+        {
+            if (player != null && player.PlayerIndex == index)
+            {
+                return player.TeamIndex;
+            }
+        }
+
+        return -1;
+    }
 
     /// <summary>画面に出す名前。</summary>
     public string DisplayName
@@ -230,12 +166,10 @@ public class FishingNetPlayer : NetworkBehaviour
         SetName(prefix, connector, suffix);
     }
 
-    private HookController hookController;
     private PlayerInputSource input;
 
     private void Awake()
     {
-        hookController = GetComponent<HookController>();
         input = PlayerInputSource.Get(this);
 
         if (characterController == null)
@@ -268,10 +202,7 @@ public class FishingNetPlayer : NetworkBehaviour
 
         All.Add(this);
 
-        playerIndex.OnValueChanged += OnPlayerIndexChanged;
-        ApplyTeamColor();
-
-        Debug.Log($"[FISH] プレイヤー {OwnerClientId} が出てきました" +
+        Debug.Log($"[PLAYER] プレイヤー {OwnerClientId} が出てきました" +
                   $"（参加番号 {playerIndex.Value} ／ 自分が操作する：{IsOwner}）");
 
         if (IsOwner)
@@ -294,14 +225,7 @@ public class FishingNetPlayer : NetworkBehaviour
 
     public override void OnNetworkDespawn()
     {
-        playerIndex.OnValueChanged -= OnPlayerIndexChanged;
         All.Remove(this);
-    }
-
-    /// <summary>参加者のPCでは、ホストが決めた番号が少し遅れて届く。届いた時点で色を塗り直す。</summary>
-    private void OnPlayerIndexChanged(int before, int after)
-    {
-        ApplyTeamColor();
     }
 
     /// <summary>
@@ -316,7 +240,7 @@ public class FishingNetPlayer : NetworkBehaviour
     /// </summary>
     private static int FirstFreeIndex()
     {
-        for (int index = 0; index < FishingTeams.MaxPlayers; index++)
+        for (int index = 0; index < SpaceJunkTeams.MaxPlayers; index++)
         {
             bool used = false;
 
@@ -336,12 +260,9 @@ public class FishingNetPlayer : NetworkBehaviour
         }
 
         // 満員のときの保険。ふだんは人数で先に断られるので、ここには来ない
-        Debug.LogWarning("[FISH] 参加番号がすべて使われています。一番大きい番号を使います。");
-        return FishingTeams.MaxPlayers - 1;
+        Debug.LogWarning("[PLAYER] 参加番号がすべて使われています。一番大きい番号を使います。");
+        return SpaceJunkTeams.MaxPlayers - 1;
     }
-
-    /// <summary>釣り会場に入って、配置とカメラを合わせ終わったか。</summary>
-    private bool placedInMatch;
 
     private void Update()
     {
@@ -349,152 +270,6 @@ public class FishingNetPlayer : NetworkBehaviour
         {
             // 1台で複数人なら、そのPCの何人目かの席（P1・P2…）の機器だけで動かす。1人なら今までどおり
             input.SeatIndex = LocalMultiplayer.IsActive ? localSeat.Value : -1;
-
-            // **プレイヤーはシーンをまたいで生き続ける**（ロビーで生まれた本体がそのまま来る）ので、
-            // 釣り会場に着いたことに気づいたら、そこで出てくる場所とカメラを合わせ直す。
-            // ホストからの合図を待つ形にすると、読み込みの速さで順番が変わって取りこぼすため、
-            // **試合のまとめ役がこのPCに現れたかどうか**で判断している
-            bool inMatch = FishingMatch.Current != null;
-
-            if (inMatch && !placedInMatch)
-            {
-                placedInMatch = true;
-                MoveToSpawnPoint();
-                FollowWithCamera();
-            }
-            else if (!inMatch && placedInMatch)
-            {
-                // ロビーへ戻ったとき（次にまた会場へ入れるようにしておく）
-                placedInMatch = false;
-            }
-
-            SendHookState();
-        }
-        else
-        {
-            ShowRemoteHookState();
-        }
-    }
-
-    // ------------------------------------------------------------
-    // フックと糸の共有
-    // ------------------------------------------------------------
-
-    /// <summary>自分のフックの位置と、糸が出ているかを送る。</summary>
-    private void SendHookState()
-    {
-        if (hookController == null || hookVisual == null)
-        {
-            return;
-        }
-
-        hookPosition.Value = hookVisual.position;
-
-        // 待機中・溜めている間は糸が無い。それ以外（飛んでいる・引っ掛けている・戻っている）は糸が出ている
-        lineVisible.Value = hookController.Phase != HookController.HookPhase.Idle
-                         && hookController.Phase != HookController.HookPhase.Charging;
-        lineGrabbing.Value = hookController.IsGrabbing;
-    }
-
-    /// <summary>他の人のフックと糸を、送られてきた値で再現する。</summary>
-    private void ShowRemoteHookState()
-    {
-        if (hookVisual != null)
-        {
-            hookVisual.position = hookPosition.Value;
-        }
-
-        if (line != null && handPoint != null)
-        {
-            line.SetGrabbing(lineGrabbing.Value);
-            line.Show(lineVisible.Value);
-            if (lineVisible.Value)
-            {
-                line.SetEnds(handPoint.position, hookPosition.Value);
-            }
-        }
-    }
-
-    // ------------------------------------------------------------
-    // オートエイムの目印の共有
-    // ------------------------------------------------------------
-
-    /// <summary>
-    /// 狙っている物資を他の人へ配る。**本人のPCからだけ呼ぶ**（<see cref="HookAimAssist"/>）。
-    /// 値が変わったときだけ送られる。
-    /// </summary>
-    public void SetAimTarget(HookableObject target)
-    {
-        if (!IsSpawned || !IsOwner)
-        {
-            return;
-        }
-
-        ulong id = NoAimTarget;
-        if (target != null)
-        {
-            NetworkObject networkObject = target.GetComponent<NetworkObject>();
-            if (networkObject != null && networkObject.IsSpawned)
-            {
-                id = networkObject.NetworkObjectId;
-            }
-        }
-
-        if (aimTargetId.Value != id)
-        {
-            aimTargetId.Value = id;
-        }
-    }
-
-    /// <summary>この人がオートエイムで狙っている物資。狙っていなければ null。</summary>
-    public HookableObject AimTarget
-    {
-        get
-        {
-            if (!IsSpawned || aimTargetId.Value == NoAimTarget || NetworkManager == null)
-            {
-                return null;
-            }
-
-            if (NetworkManager.SpawnManager.SpawnedObjects.TryGetValue(aimTargetId.Value, out NetworkObject networkObject)
-                && networkObject != null)
-            {
-                return networkObject.GetComponent<HookableObject>();
-            }
-
-            return null;
-        }
-    }
-
-    // ------------------------------------------------------------
-    // 見た目と出てくる場所
-    // ------------------------------------------------------------
-
-    /// <summary>
-    /// チームの色に塗る。
-    /// **参加番号から計算で決めているので、色を通信で送る必要がない**
-    /// （どのPCで見ても同じ人が同じ色になる）。
-    /// </summary>
-    private void ApplyTeamColor()
-    {
-        if (teamRenderers == null || playerIndex.Value < 0)
-        {
-            return;
-        }
-
-        Color color = FishingTeams.TeamColor(TeamIndex);
-
-        if (line != null)
-        {
-            line.SetTeamColor(color);
-        }
-
-        foreach (Renderer renderer in teamRenderers)
-        {
-            if (renderer != null)
-            {
-                renderer.material.color = color;
-            }
         }
     }
 
@@ -520,7 +295,7 @@ public class FishingNetPlayer : NetworkBehaviour
     {
         // 円周を最大人数で等分し、参加番号ぶんだけ回した場所に出す。向きは +180° で円の中心のほう
         int index = Mathf.Max(0, playerIndex.Value);
-        float angle = index * (360f / FishingTeams.MaxPlayers);
+        float angle = index * (360f / SpaceJunkTeams.MaxPlayers);
         Vector3 position = Quaternion.Euler(0f, angle, 0f) * (Vector3.forward * spawnRadius);
 
         if (characterController != null)
@@ -537,30 +312,11 @@ public class FishingNetPlayer : NetworkBehaviour
     }
 
     /// <summary>
-    /// **シーンに置いてあるもの（カメラ・UI）と自分を結びつける。**
-    ///
-    /// プレイヤーはプレハブから生まれるので、**シーンの中身をあらかじめ入れておけない。**
-    /// 自分のぶんが生まれた時点で、ここで探して渡す。
+    /// **シーンに置いてあるカメラと自分を結びつける。**
+    /// プレイヤーはプレハブから生まれるので、シーンの中身をあらかじめ入れておけない。
     /// </summary>
     private void FollowWithCamera()
     {
-        // 狙いの計算に使うカメラ（1台で複数人のときも、全員が同じ画面のカメラを使う）
-        PlayerAimController aim = GetComponent<PlayerAimController>();
-        if (aim != null && Camera.main != null)
-        {
-            aim.SetCamera(Camera.main);
-        }
-
-        // チャージ量とスキルチェックのゲージは、人ごとに頭の上に出す（1台で複数人のときも全員に出る）
-        if (hookController != null)
-        {
-            HookChargeUI ui = HookChargeUI.CreateOverhead(transform);
-            if (ui != null && hookController.UI != ui)
-            {
-                hookController.SetUI(ui);
-            }
-        }
-
         // カメラは画面に1つしか無いので、そのPCの1人目にだけ結びつける
         if (localSeat.Value != 0)
         {

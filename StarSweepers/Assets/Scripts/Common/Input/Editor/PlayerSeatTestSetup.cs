@@ -11,7 +11,7 @@ using UnityEngine;
 /// Unityのメニュー「Tools > StarSweepers > 1台のPCで複数人の検証シーンを作る」から実行できる。
 /// 作られるシーン：`Assets/Scenes/Test/PlayerSeatTest.unity`
 ///
-/// 宇宙ごみのプレイヤー（`SpaceJunkPlayer.prefab`）を2人置き、<see cref="PlayerInputSource"/> の席を
+/// プレイヤーの体（`SweeperPlayer.prefab`）を2人置き、<see cref="PlayerInputSource"/> の席を
 /// P1・P2 にしてある。通信はつながないので、再生するだけで2人を別々のキーボード＋マウス／コントローラで動かせる。
 ///
 /// ※ 何度実行しても作り直せる（シーンを上書きする）。
@@ -19,7 +19,7 @@ using UnityEngine;
 public static class PlayerSeatTestSetup
 {
     private const string ScenePath = "Assets/Scenes/Test/PlayerSeatTest.unity";
-    private const string PlayerPrefabPath = "Assets/Prefabs/Player/SpaceJunkPlayer.prefab";
+    private const string PlayerPrefabPath = "Assets/Prefabs/Player/SweeperPlayer.prefab";
     private const string SupplyPrefabPath = "Assets/Prefabs/Item/FishingSupply.prefab";
 
     /// <summary>正方形の床の一辺（m）。四方の壁もこの長さで、床の縁に立てる。</summary>
@@ -78,7 +78,7 @@ public static class PlayerSeatTestSetup
         CreatePlayer(playerPrefab, 0, new Vector3(-4f, 1f, 0f));
         CreatePlayer(playerPrefab, 1, new Vector3(4f, 1f, 0f));
 
-        // フックで引っ掛ける物（無くても動きは確かめられる）
+        // 光線で引っ掛ける物（無くても動きは確かめられる）
         GameObject supplyPrefab = AssetDatabase.LoadAssetAtPath<GameObject>(SupplyPrefabPath);
         if (supplyPrefab != null)
         {
@@ -104,7 +104,7 @@ public static class PlayerSeatTestSetup
             "1台のPCで複数人の検証シーンを作りました。\n" +
             "シーン: " + ScenePath + "\n" +
             "・キーボードのキーを押す／マウスを動かす／コントローラのボタンを押すと、P1・P2 の順に入る\n" +
-            "・WASD／左スティックで移動、マウス／右スティックで狙い、左クリック（LT）・右クリック（RT）でフック\n" +
+            "・WASD／左スティックで移動、マウス／右スティックで狙い、左クリック／RT で光線\n" +
             "・F6 で固定登録（キーボード P1→P2、マウス P1→P2 の順に押す）");
     }
 

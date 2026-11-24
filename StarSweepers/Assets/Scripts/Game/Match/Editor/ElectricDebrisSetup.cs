@@ -11,7 +11,7 @@ public static class ElectricDebrisSetup
 {
     private const string CircuitPrefabPath = "Assets/Prefabs/Item/SpaceJunkCircuit.prefab";
     private const string PlatePrefabPath = "Assets/Prefabs/Item/SpaceJunkPlate.prefab";
-    private const string ScenePath = FishingSceneBuilder.SceneFolder + "/ElectricDebrisTest.unity";
+    private const string ScenePath = SceneBuildTools.SceneFolder + "/ElectricDebrisTest.unity";
 
     [MenuItem("Tools/StarSweepers/電気のデブリの検証シーンを作る")]
     public static void CreateTestScene()
@@ -31,8 +31,8 @@ public static class ElectricDebrisSetup
 
         var scene = EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
 
-        FishingSceneBuilder.CreateLight();
-        FishingSceneBuilder.CreateGround();
+        SceneBuildTools.CreateLight();
+        SceneBuildTools.CreateGround();
 
         // 手前に回路基板（電気）を3つ、奥に比べる用の装甲板を2つ
         for (int i = 0; i < 3; i++)
@@ -55,7 +55,7 @@ public static class ElectricDebrisSetup
 
         var driverObject = new GameObject("ElectricDebrisTestDriver");
         ElectricDebrisTestDriver driver = driverObject.AddComponent<ElectricDebrisTestDriver>();
-        FishingSceneBuilder.SetRef(driver, "victim", victim.transform);
+        SceneBuildTools.SetRef(driver, "victim", victim.transform);
 
         var cameraObject = new GameObject("Main Camera");
         cameraObject.tag = "MainCamera";

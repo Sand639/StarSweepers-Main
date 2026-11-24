@@ -246,7 +246,7 @@ public class SpaceJunkTrain : MonoBehaviour
 
         foreach (Collider hit in hits)
         {
-            FishingPlayerController player = hit.GetComponentInParent<FishingPlayerController>();
+            SweeperMover player = hit.GetComponentInParent<SweeperMover>();
             if (player != null)
             {
                 if (hitThisRun.Add(player.gameObject))
@@ -285,7 +285,7 @@ public class SpaceJunkTrain : MonoBehaviour
             return;
         }
 
-        ThrowController.ReleaseTargetForExplosion(item);
+        item.SetHooked(false);
         item.Body.isKinematic = false;
         item.Body.AddForce(velocity, ForceMode.VelocityChange);
     }

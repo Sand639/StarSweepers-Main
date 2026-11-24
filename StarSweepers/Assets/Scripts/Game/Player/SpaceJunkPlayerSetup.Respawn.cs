@@ -51,17 +51,12 @@ public partial class SpaceJunkPlayerSetup
         }
     }
 
-    /// <summary>移動とフックを止める／戻す。</summary>
+    /// <summary>移動（と、それに合わせて狙う・撃つ）を止める／戻す。</summary>
     private void SetControlEnabled(bool enabledState)
     {
         if (mover != null)
         {
             mover.enabled = enabledState;
-        }
-
-        if (hookController != null)
-        {
-            hookController.enabled = enabledState;
         }
     }
 }

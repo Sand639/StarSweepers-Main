@@ -65,7 +65,7 @@ public class SweeperPulledHit : MonoBehaviour
     private static readonly Collider[] Overlaps = new Collider[32];
 
     private CharacterController characterController;
-    private FishingPlayerController controller;
+    private SweeperMover controller;
     private SweeperReel reel;
     private SweeperShooter shooter;
     private PlayerStun stun;
@@ -83,7 +83,7 @@ public class SweeperPulledHit : MonoBehaviour
     private void Awake()
     {
         characterController = GetComponent<CharacterController>();
-        controller = GetComponent<FishingPlayerController>();
+        controller = GetComponent<SweeperMover>();
         reel = GetComponent<SweeperReel>();
         shooter = GetComponent<SweeperShooter>();
         stun = GetComponent<PlayerStun>();
@@ -125,7 +125,7 @@ public class SweeperPulledHit : MonoBehaviour
             return false;
         }
 
-        // 吹き飛ばしの受け口（FishingPlayerController）が止まっている体には効かせられない
+        // 吹き飛ばしの受け口（SweeperMover）が止まっている体には効かせられない
         return controller != null && controller.isActiveAndEnabled;
     }
 
@@ -210,7 +210,9 @@ public class SweeperPulledHit : MonoBehaviour
 
         if (!hitByTeammates && online && pullerIndex >= 0)
         {
-            return FishingTeams.TeamOf(pullerIndex) != netPlayer.TeamIndex;
+            // チームはロビーでホストが決めたもの（参加番号の並びとは関係ない）
+            int pullerTeam = FishingNetPlayer.TeamOfPlayerIndex(pullerIndex);
+            return pullerTeam < 0 || pullerTeam != netPlayer.TeamIndex;
         }
 
         return true;

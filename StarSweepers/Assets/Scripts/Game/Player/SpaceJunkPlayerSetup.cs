@@ -108,16 +108,10 @@ public partial class SpaceJunkPlayerSetup : MonoBehaviour
     private CharacterController characterController;
 
     /// <summary>歩く部品。動けなくするときに enabled を切る。</summary>
-    private FishingPlayerController mover;
-
-    /// <summary>フックの部品。動けなくするときに enabled を切り、出てくる場所へ戻すときにフックを戻す。</summary>
-    private HookController hookController;
+    private SweeperMover mover;
 
     /// <summary>キー／コントローラーの入力（1台で複数人のとき、自分の担当だけを読む）。</summary>
     private PlayerInputSource input;
-
-    /// <summary>フックの糸（液体）。チームの色を渡す。</summary>
-    private HookLine hookLine;
 
     /// <summary>復活までの残り秒数（自分のぶんだけ使う）。</summary>
     private float respawnRemaining;
@@ -159,9 +153,7 @@ public partial class SpaceJunkPlayerSetup : MonoBehaviour
     {
         netPlayer = GetComponent<FishingNetPlayer>();
         characterController = GetComponent<CharacterController>();
-        mover = GetComponent<FishingPlayerController>();
-        hookController = GetComponent<HookController>();
-        hookLine = GetComponentInChildren<HookLine>(true);
+        mover = GetComponent<SweeperMover>();
         input = PlayerInputSource.Get(this);
 
         baseScale = transform.localScale;
@@ -229,8 +221,6 @@ public partial class SpaceJunkPlayerSetup : MonoBehaviour
             LocalResetKeyName = $"{resetKey}／{GamepadInput.Label(resetButton)}";
             EnsureRadar();
         }
-
-        EnsureLocalStateCheck();
 
         TickPlacement();
         TickRespawnLock();
@@ -324,15 +314,6 @@ public partial class SpaceJunkPlayerSetup : MonoBehaviour
         nameplate.Attach(netPlayer);
     }
 
-    /// <summary>自分のぶんにだけ、答え合わせの部品を付ける。</summary>
-    private void EnsureLocalStateCheck()
-    {
-        if (GetComponent<SpaceJunkLocalStateCheck>() == null)
-        {
-            gameObject.AddComponent<SpaceJunkLocalStateCheck>();
-        }
-    }
-
     /// <summary>
     /// **落ちて戻れなくなったときの立て直し。**
     ///
@@ -423,11 +404,6 @@ public partial class SpaceJunkPlayerSetup : MonoBehaviour
         lastAppliedTeam = team;
         Color color = SpaceJunkTeams.TeamColor(team);
 
-        if (hookLine != null)
-        {
-            hookLine.SetTeamColor(color);
-        }
-
         foreach (Renderer renderer in teamRenderers)
         {
             if (renderer != null)
@@ -438,28 +414,11 @@ public partial class SpaceJunkPlayerSetup : MonoBehaviour
     }
 
     /// <summary>
-    /// **シーンに置いてあるもの（カメラ・ゲージ）と自分を結びつける。**
+    /// **シーンに置いてあるカメラと自分を結びつける。**
     /// プレイヤーはプレハブから生まれるので、シーンの中身をあらかじめ入れておけない。
     /// </summary>
     private void FollowWithCamera()
     {
-        PlayerAimController aim = GetComponent<PlayerAimController>();
-        if (aim != null && Camera.main != null)
-        {
-            aim.SetCamera(Camera.main);
-        }
-
-        // チャージ量とスキルチェックのゲージは、人ごとに頭の上に出す（1台で複数人のときも全員に出る）
-        HookController hook = GetComponent<HookController>();
-        if (hook != null)
-        {
-            HookChargeUI ui = HookChargeUI.CreateOverhead(transform);
-            if (ui != null && hook.UI != ui)
-            {
-                hook.SetUI(ui);
-            }
-        }
-
         // カメラは画面に1つしか無いので、そのPCの1人目にだけ結びつける（1台で複数人のとき）
         if (!IsFirstLocalPlayer)
         {

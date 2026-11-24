@@ -215,7 +215,7 @@ public static class SpaceJunkMeteorSetup
     /// </summary>
     public static void CreateMeteorPrefabs()
     {
-        FishingSceneBuilder.EnsureFolder(PrefabFolder);
+        SceneBuildTools.EnsureFolder(PrefabFolder);
 
         GameObject meteor = CreateMeteorVisual();
         GameObject warning = CreateWarningVisual();
@@ -224,7 +224,7 @@ public static class SpaceJunkMeteorSetup
         CreateAreaPrefab();
         CreateManagerPrefab(strike);
 
-        SpaceJunkPrefabBuilder.RegisterNetworkPrefab(strike);
+        SceneBuildTools.RegisterNetworkPrefab(strike);
         AssetDatabase.SaveAssets();
         AssetDatabase.Refresh();
     }
@@ -354,9 +354,9 @@ public static class SpaceJunkMeteorSetup
         GameObject root = new GameObject("MeteorStrikeEvent");
         root.AddComponent<NetworkObject>();
         MeteorStrikeEvent strike = root.AddComponent<MeteorStrikeEvent>();
-        FishingSceneBuilder.SetRef(strike, "meteorPrefab", meteor);
-        FishingSceneBuilder.SetRef(strike, "warningPrefab", warning);
-        FishingSceneBuilder.SetRef(strike, "impactVfxPrefab", impactVfx);
+        SceneBuildTools.SetRef(strike, "meteorPrefab", meteor);
+        SceneBuildTools.SetRef(strike, "warningPrefab", warning);
+        SceneBuildTools.SetRef(strike, "impactVfxPrefab", impactVfx);
 
         GameObject saved = PrefabUtility.SaveAsPrefabAsset(root, StrikePrefabPath);
         Object.DestroyImmediate(root);
@@ -400,7 +400,7 @@ public static class SpaceJunkMeteorSetup
 
         GameObject root = new GameObject("MeteorManager");
         MeteorManager manager = root.AddComponent<MeteorManager>();
-        FishingSceneBuilder.SetRef(manager, "strikePrefab", strikePrefab.GetComponent<MeteorStrikeEvent>());
+        SceneBuildTools.SetRef(manager, "strikePrefab", strikePrefab.GetComponent<MeteorStrikeEvent>());
 
         GameObject saved = PrefabUtility.SaveAsPrefabAsset(root, ManagerPrefabPath);
         Object.DestroyImmediate(root);

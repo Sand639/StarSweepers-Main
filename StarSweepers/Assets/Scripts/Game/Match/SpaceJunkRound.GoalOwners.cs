@@ -72,25 +72,10 @@ public partial class SpaceJunkRound
                 continue;
             }
 
-            FishingPlayerController move = player.GetComponent<FishingPlayerController>();
+            SweeperMover move = player.GetComponent<SweeperMover>();
             if (move != null)
             {
                 move.enabled = enabledState;
-            }
-
-            HookController hook = player.GetComponent<HookController>();
-            if (hook != null)
-            {
-                hook.enabled = enabledState;
-            }
-
-            // **オートエイムも一緒に戻す。** ロビーの設定端末は、開いている間これを止める。
-            // ホストは設定を開いたまま「ゲーム開始」を押すので、ここで戻さないと
-            // **ホストだけマップでオートエイムが効かない**ままになる
-            HookAimAssist aimAssist = player.GetComponent<HookAimAssist>();
-            if (aimAssist != null)
-            {
-                aimAssist.enabled = enabledState;
             }
         }
     }

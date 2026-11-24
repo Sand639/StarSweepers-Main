@@ -11,7 +11,7 @@ using UnityEngine;
 /// 3. true が返ったら（着いた・壁で進めない）引っ張りを終え、フックが手元へ戻る
 ///
 /// 引っ張っている間、プレイヤーの入力移動と重力は
-/// <see cref="FishingPlayerController.SetAnchorPulling"/> で止めてある。
+/// <see cref="SweeperMover.SetAnchorPulling"/> で止めてある。
 ///
 /// 検証シーン：`Assets/Scenes/Test/FishingAnchorTest.unity`
 /// （`Tools > StarSweepers > 釣りのアンカー検証シーンを作る` で作れる）。

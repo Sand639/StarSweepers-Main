@@ -85,8 +85,8 @@ public partial class SpaceJunkSession
             player.NetworkObject.Despawn(true);
         }
 
-        // ボットも人と同じ体で出す（2026/11/5 から新しい体。頭は体に合わせて付け替える。下の AttachBotBrain）
-        GameObject prefab = SweeperOnlineSwitch.BotPrefabOr(NetworkManager.NetworkConfig.PlayerPrefab);
+        // ボットも人と同じ体で出す（頭は下の AttachBotBrain で付ける）
+        GameObject prefab = NetworkManager.NetworkConfig.PlayerPrefab;
         if (prefab == null)
         {
             Debug.LogError("[JUNK] NetworkManager に Player Prefab が入っていないので、ボットを出せません。");

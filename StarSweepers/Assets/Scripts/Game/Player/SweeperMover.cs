@@ -10,14 +10,15 @@ using UnityEngine.InputSystem;
 /// ・光線を撃ってから物資に当たるまで（伸びている・戻っている間）は、<see cref="SweeperShooter"/> が <see cref="MoveLocked"/> を ON にして止める
 /// ・物資を巻き取っている間は止めずに、<see cref="MoveSpeedScale"/> で**ゆっくり歩ける**ようにする（2026/11/10）
 ///
-/// 釣り・宇宙ごみのプレイヤー（<see cref="FishingPlayerController"/>）とは別の部品。あちらは変えていない。
+/// ・**重力と、外から与えられた勢い（ベルトコンベア・爆弾・隕石・列車などの吹き飛ばし。<see cref="Launch"/>）**もここで受け持つ
+///   （2026/11/24 までは釣りから持ってきた別の部品 FishingPlayerController が受け持っていた）
 ///
-/// **同じ体に <see cref="FishingPlayerController"/> が付いているとき**（宇宙ごみのオンラインの体 `SpaceJunkSweeperPlayer.prefab`。2026/10/28）は、
-/// 重力と吹き飛ばし（ベルトコンベア・爆弾など）はあちらに任せ、ここは**歩くことと向きだけ**を受け持つ（重力が二重にかからないように）。
+/// **この部品を止める（enabled を切る）と、体が止まる。** 試合の進行役・ロビーの端末・復活待ちはこれで体を止め、
+/// <see cref="SweeperNetSync"/> がそれに合わせて狙う・撃つも止める。
 /// </summary>
 [DefaultExecutionOrder(-20)]
 [RequireComponent(typeof(CharacterController))]
-public class SweeperMover : MonoBehaviour
+public class SweeperMover : MonoBehaviour, ILaunchable
 {
     [Header("移動")]
     [Tooltip("歩く速さ（メートル／秒）")]
@@ -26,6 +27,11 @@ public class SweeperMover : MonoBehaviour
 
     [Tooltip("重力（下向きの加速度。マイナスの値）")]
     [SerializeField] private float gravity = -20f;
+
+    [Header("外から与えられた勢い")]
+    [Tooltip("吹き飛ばされた横方向の勢いが弱まる速さ。大きいほど早く止まる")]
+    [Min(0f)]
+    [SerializeField] private float launchDamping = 4f;
 
     [Header("向き")]
     [Tooltip("向き直る速さ（度／秒）。大きいほどすぐ向く")]
@@ -45,11 +51,12 @@ public class SweeperMover : MonoBehaviour
     private InputActionMap playerMap;
     private InputAction moveAction;
 
-    /// <summary>重力と吹き飛ばしを任せる相手（宇宙ごみのオンラインの体）。いなければ null で、重力もここでかける。</summary>
-    private FishingPlayerController sharedBody;
 
-    /// <summary>上下方向の速さ（メートル／秒）。</summary>
+    /// <summary>上下方向の速さ（メートル／秒）。重力で減り、吹き飛ばしで上向きになる。</summary>
     private float verticalVelocity;
+
+    /// <summary>吹き飛ばされた横方向の勢い（メートル／秒）。歩く速さに足され、時間で弱まる。</summary>
+    private Vector3 launchVelocity;
 
     /// <summary>ON の間は横に動かない（向きを変えることと、落ちることはできる）。</summary>
     public bool MoveLocked { get; set; }
@@ -101,7 +108,6 @@ public class SweeperMover : MonoBehaviour
         characterController = GetComponent<CharacterController>();
         stun = GetComponent<PlayerStun>();
         input = PlayerInputSource.Get(this);
-        sharedBody = GetComponent<FishingPlayerController>();
 
         if (aim == null)
         {
@@ -134,10 +140,20 @@ public class SweeperMover : MonoBehaviour
         playerMap?.Enable();
     }
 
+    private void Start()
+    {
+        // 見下ろしでマウスを狙いに使うので、カーソルは固定せず表示したままにする
+        Cursor.lockState = CursorLockMode.None;
+        Cursor.visible = true;
+    }
+
     private void OnDisable()
     {
         playerMap?.Disable();
+
+        // 止められたときに勢いを残さない（次に動き出した瞬間に飛んでいかないように）
         verticalVelocity = 0f;
+        launchVelocity = Vector3.zero;
         CurrentSpeed = 0f;
     }
 
@@ -169,30 +185,51 @@ public class SweeperMover : MonoBehaviour
             }
         }
 
-        if (sharedBody != null)
+        // 地面に着いているときは少し下向きに押し付けておく（段差で isGrounded がちらつかないように）
+        if (characterController.isGrounded && verticalVelocity < 0f)
         {
-            // 重力は FishingPlayerController がかける。ここでは少しだけ下へ押して、地面に着いているかが正しく分かるようにする
-            // （このあとあちらが isGrounded を見るので、横にだけ動かすと「浮いている」と思われて重力がたまり続ける）
             verticalVelocity = -2f;
         }
-        else
+        verticalVelocity += gravity * Time.deltaTime;
+
+        // 横＝歩く速さ＋吹き飛ばされた勢い、縦＝重力。1回の Move にまとめて渡す
+        float speed = moveSpeed * moveSpeedScale;
+        Vector3 velocity = direction * speed + launchVelocity;
+        velocity.y = verticalVelocity;
+        CollisionFlags collisions = characterController.Move(velocity * Time.deltaTime);
+
+        // 上に飛ばされて天井に頭をぶつけたら、上向きの勢いを消す（天井に張り付かないように）
+        if ((collisions & CollisionFlags.Above) != 0 && verticalVelocity > 0f)
         {
-            // 地面に着いているときは少し下向きに押し付けておく（段差で isGrounded がちらつかないように）
-            if (characterController.isGrounded && verticalVelocity < 0f)
-            {
-                verticalVelocity = -2f;
-            }
-            verticalVelocity += gravity * Time.deltaTime;
+            verticalVelocity = 0f;
         }
 
-        float speed = moveSpeed * moveSpeedScale;
-        Vector3 velocity = direction * speed;
-        velocity.y = verticalVelocity;
-        characterController.Move(velocity * Time.deltaTime);
+        // 吹き飛ばされた横の勢いを、フレームレートに依らず同じ速さで弱めていく
+        launchVelocity = Vector3.Lerp(launchVelocity, Vector3.zero, 1f - Mathf.Exp(-launchDamping * Time.deltaTime));
 
         CurrentSpeed = direction.magnitude * speed;
 
         Turn(direction);
+    }
+
+    /// <summary>
+    /// **スタンせずに吹き飛ばす。** ベルトコンベア・爆弾・隕石・列車などから呼ばれる。
+    /// 横の勢いは上書き（連続で巻き込まれたら新しいほう）、上の勢いは上向きのときだけ受け取る。
+    /// 止められている体や、オンラインの他人の体（当たり判定が切ってある）には効かない
+    /// （動かしている本人のPCだけが受け取り、位置は通信で配られる）。
+    /// </summary>
+    public void Launch(Vector3 velocity)
+    {
+        if (!isActiveAndEnabled || characterController == null || !characterController.enabled)
+        {
+            return;
+        }
+
+        launchVelocity = new Vector3(velocity.x, 0f, velocity.z);
+        if (velocity.y > 0f)
+        {
+            verticalVelocity = velocity.y;
+        }
     }
 
     /// <summary>狙っている間は狙う方向へ、それ以外は動いている方向へ向き直る。止まっているときは今の向きのまま。</summary>

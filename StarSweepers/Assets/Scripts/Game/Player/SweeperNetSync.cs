@@ -18,8 +18,8 @@ using UnityEngine;
 ///
 /// ### 体の止め方について
 ///
-/// 試合の係などは、今の体の歩く部品（<see cref="FishingPlayerController"/>）の ON/OFF で体を止める。
-/// 新しい体にもその部品を「重力と吹き飛ばしの受け口」として残してあるので、**その ON/OFF を見て、Sweeper の操作（歩く・狙う・撃つ）も同じにする。**
+/// 試合の係などは、歩く部品（<see cref="SweeperMover"/>）の ON/OFF で体を止める。
+/// **その ON/OFF を見て、狙う・撃つも同じにする。**
 /// 止まった瞬間に、出していた光線はしまう（つかんでいた物資は投げずに離す）。
 /// </summary>
 [RequireComponent(typeof(FishingNetPlayer))]
@@ -66,9 +66,6 @@ public class SweeperNetSync : NetworkBehaviour
     private SweeperShooter shooter;
     private SweeperReel reel;
 
-    /// <summary>重力と吹き飛ばしを受け持つ、今の体の歩く部品。これの ON/OFF に Sweeper の操作を合わせる。</summary>
-    private FishingPlayerController body;
-
     private bool controlAllowed = true;
     private Vector3 lastPosition;
     private float profileTimer;
@@ -93,7 +90,6 @@ public class SweeperNetSync : NetworkBehaviour
         aim = GetComponent<SweeperAim>();
         shooter = GetComponent<SweeperShooter>();
         reel = GetComponent<SweeperReel>();
-        body = GetComponent<FishingPlayerController>();
     }
 
     public override void OnNetworkSpawn()
@@ -228,10 +224,10 @@ public class SweeperNetSync : NetworkBehaviour
     // 体が止められたとき（自分のぶん）
     // ------------------------------------------------------------
 
-    /// <summary>今の体の歩く部品が止められていたら、Sweeper の操作（歩く・狙う・撃つ）も止める。戻ったら戻す。</summary>
+    /// <summary>歩く部品が止められていたら、狙う・撃つも止める。戻ったら戻す。</summary>
     private void FollowBodyLock()
     {
-        bool allowed = body == null || body.enabled;
+        bool allowed = mover == null || mover.enabled;
         if (allowed == controlAllowed)
         {
             return;
@@ -241,7 +237,6 @@ public class SweeperNetSync : NetworkBehaviour
 
         // 撃つ部品は止まるときに光線をしまう（つかんでいた物資は投げずに離す）
         if (shooter != null) shooter.enabled = allowed;
-        if (mover != null) mover.enabled = allowed;
         if (aim != null) aim.enabled = allowed;
     }
 

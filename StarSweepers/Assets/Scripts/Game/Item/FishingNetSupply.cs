@@ -13,7 +13,7 @@ using UnityEngine;
 /// | 二重に引っ掛けられないか | **ホスト** | 早い者勝ちをホストが決める |
 ///
 /// 引っ掛けた瞬間に**持ち主をその人へ移す**（`ChangeOwnership`）ので、
-/// 引き寄せの動きは既存の <see cref="ThrowController"/> がそのまま動かせる。
+/// 引き寄せの動きは光線の巻き取り（<see cref="SweeperReel"/>）がそのまま動かせる。
 /// 投げるときはホストへ知らせ、**ホストが力を加えて持ち主を取り戻す。**
 ///
 /// 物理を回すのは「そのときの持ち主」だけ。それ以外のPCでは止めてある
@@ -40,12 +40,6 @@ public class FishingNetSupply : NetworkBehaviour
 
     /// <summary>自分が最後に引っ掛けを頼んだときの <see cref="explosionRevision"/>（このPCの控え）。投げ・離すの指示に添える。</summary>
     private uint localClaimRevision;
-
-    /// <summary>このPCから引っ掛けを頼んだ回数。断りの返事が「どの依頼へのものか」を見分けるのに使う。</summary>
-    private uint localClaimAttempt;
-
-    // 最後に引っ掛けを頼んだ人の参加番号（1台で複数人のとき、断りをその人のフックへ返すため）
-    private int localClaimPlayerIndex = -1;
 
     /// <summary>いま誰かに引っ掛けられているか。</summary>
     public bool IsClaimed => hookedByPlayerIndex.Value >= 0;
@@ -93,7 +87,7 @@ public class FishingNetSupply : NetworkBehaviour
             return;
         }
 
-        // 引き寄せ中は ThrowController が自分で止める（キネマティックにする）ので、
+        // 引き寄せ中は巻き取り（SweeperReel）が自分で止める（キネマティックにする）ので、
         // ここでは「持ち主かどうか」だけで決める
         body.isKinematic = !IsOwner;
 
@@ -109,15 +103,14 @@ public class FishingNetSupply : NetworkBehaviour
     // ------------------------------------------------------------
 
     /// <summary>
-    /// 引っ掛けたいとホストへ頼む。<see cref="HookController"/> から呼ばれる。
-    /// **早い者勝ちの判定はホストが行う**ので、断られることがある。
+    /// 引っ掛けたいとホストへ頼む。<see cref="SweeperReel"/> から呼ばれる。
+    /// **早い者勝ちの判定はホストが行う**ので、断られることがある
+    /// （断られたら記録が自分にならないので、<see cref="SweeperReel"/> がそれを見てやめる）。
     /// </summary>
     public void RequestClaim(int playerIndex)
     {
         localClaimRevision = explosionRevision.Value;
-        localClaimAttempt += 1;
-        localClaimPlayerIndex = playerIndex;
-        RequestClaimServerRpc(playerIndex, localClaimRevision, localClaimAttempt);
+        RequestClaimServerRpc(playerIndex, localClaimRevision);
     }
 
     /// <summary>
@@ -127,8 +120,7 @@ public class FishingNetSupply : NetworkBehaviour
     /// 引っ掛ける前の持ち主はホストなので、これが無いと参加者から頼めない。
     /// </summary>
     [ServerRpc(RequireOwnership = false)]
-    private void RequestClaimServerRpc(int playerIndex, uint claimRevision, uint claimAttempt,
-        ServerRpcParams rpcParams = default)
+    private void RequestClaimServerRpc(int playerIndex, uint claimRevision, ServerRpcParams rpcParams = default)
     {
         // **同じ人からの掛け直しは受け付ける**（2026/10/6）。
         // 遅れて「離した」が届く前に同じ人がもう一度引っ掛けた場合や、
@@ -137,8 +129,7 @@ public class FishingNetSupply : NetworkBehaviour
 
         if (claimRevision != explosionRevision.Value || takenByOther || hookable.IsVanished)
         {
-            // すでに誰かが掛けている。頼んできた人に断りを返す
-            DenyClaimClientRpc(claimRevision, claimAttempt, RpcToSender(rpcParams));
+            // すでに誰かが掛けている。記録は変えない（頼んだ人は、記録が自分でないのを見て手を離す）
             return;
         }
 
@@ -159,29 +150,12 @@ public class FishingNetSupply : NetworkBehaviour
         }
     }
 
-    /// <summary>頼んだ本人だけに「取られていた」と伝える。</summary>
-    [ClientRpc]
-    private void DenyClaimClientRpc(uint claimRevision, uint claimAttempt, ClientRpcParams rpcParams = default)
-    {
-        // 爆発後に掛け直していたら、古い依頼への断りで新しい引き寄せを取り消さない。
-        if (claimRevision != localClaimRevision || claimAttempt != localClaimAttempt)
-        {
-            return;
-        }
-
-        HookController hook = FindLocalHookController(localClaimPlayerIndex);
-        if (hook != null)
-        {
-            hook.CancelAttachBecauseTaken(hookable);
-        }
-    }
-
     // ------------------------------------------------------------
     // 投げる・離す（本人 → ホスト）
     // ------------------------------------------------------------
 
     /// <summary>
-    /// 投げをホストへ知らせる。<see cref="ThrowController"/> から呼ばれる。
+    /// 投げをホストへ知らせる。<see cref="SweeperReel"/> から呼ばれる。
     /// **力を加えるのはホスト。** そうしないと、どこへ飛んだかが人によって変わる。
     /// </summary>
     public void RequestThrow(Vector3 direction, float force, float lift, int playerIndex,
@@ -272,93 +246,8 @@ public class FishingNetSupply : NetworkBehaviour
         }
     }
 
-    // ------------------------------------------------------------
-    // 横取り（宇宙ごみ式。2026/10/13・大槻さん）
-    // ------------------------------------------------------------
-
-    /// <summary>
-    /// **横取りをホストに頼む。** ほかの人がつかんでいる物資にくっついて待っていた人が、引っ張ったときに呼ぶ
-    /// （<see cref="ThrowController"/>）。返事は <see cref="StealResultClientRpc"/> で、頼んだ本人のPCに届く。
-    /// </summary>
-    public void RequestSteal(int playerIndex)
-    {
-        localClaimPlayerIndex = playerIndex;
-        RequestStealServerRpc(playerIndex);
-    }
-
-    /// <summary>
-    /// ホスト側の受け口。まだほかの人がつかんでいれば、**その人のフックを外して（爆風と同じ外し方。力は加えない）**、
-    /// 頼んだ人のものにする（持ち主もその人へ移す）。もう誰もつかんでいなければ断る（くっついていたフックは戻る）。
-    /// </summary>
-    [ServerRpc(RequireOwnership = false)]
-    private void RequestStealServerRpc(int playerIndex, ServerRpcParams rpcParams = default)
-    {
-        bool heldByOther = IsClaimed && hookedByPlayerIndex.Value != playerIndex;
-        if (!heldByOther || hookable.IsVanished)
-        {
-            StealResultClientRpc(playerIndex, false, explosionRevision.Value, RpcToSender(rpcParams));
-            return;
-        }
-
-        Debug.Log($"[FISH] 参加番号 {playerIndex} が、参加番号 {hookedByPlayerIndex.Value} のつかんでいる物資を横取りしました。");
-
-        // 持っている人のフックを外す（全員のPCで、その人の引き寄せが止まる）
-        ServerApplyExplosion(Vector3.zero);
-
-        // 頼んだ人のものにする
-        ServerGrantClaim(playerIndex, rpcParams.Receive.SenderClientId);
-
-        StealResultClientRpc(playerIndex, true, explosionRevision.Value, RpcToSender(rpcParams));
-    }
-
-    /// <summary>横取りの返事（頼んだ本人のPCだけ）。許されたら、その人が引っ張り始める。</summary>
-    [ClientRpc]
-    private void StealResultClientRpc(int playerIndex, bool granted, uint revision, ClientRpcParams rpcParams = default)
-    {
-        if (granted)
-        {
-            // 外したあとの新しい番号で、自分の引っ掛けとして扱う（このあとの投げ・離すの知らせが受け付けられるように）
-            localClaimRevision = revision;
-            localClaimPlayerIndex = playerIndex;
-        }
-
-        HookController hook = FindLocalHookController(playerIndex);
-        if (hook != null && hook.Thrower != null)
-        {
-            hook.Thrower.OnStealResult(hookable, granted);
-        }
-    }
-
-    /// <summary>
-    /// **ほかの人のフックが当たったので、つかんでいる人の引っ掛けを外してほしい**とホストへ頼む。
-    /// 宇宙ごみ式（<see cref="ThrowStyle.TwoButtons"/>）の <see cref="HookController"/> だけが呼ぶ（2026/9/22）。
-    /// 釣りでは呼ばれないので、釣りの動きは変わらない。
-    /// </summary>
-    public void RequestInterfere(int playerIndex)
-    {
-        RequestInterfereServerRpc(playerIndex);
-    }
-
-    /// <summary>ホスト側の受け口。ほかの人がつかんでいれば、爆風と同じ外し方（力 0）で外す。</summary>
-    [ServerRpc(RequireOwnership = false)]
-    private void RequestInterfereServerRpc(int playerIndex)
-    {
-        // 誰もつかんでいない／自分でつかんでいるなら何もしない
-        if (!IsClaimed || hookedByPlayerIndex.Value == playerIndex)
-        {
-            return;
-        }
-
-        Debug.Log($"[FISH] 参加番号 {playerIndex} のフックが当たったので、" +
-                  $"参加番号 {hookedByPlayerIndex.Value} の引っ掛けを外しました。");
-
-        // 爆風と同じ外し方をする。**力は加えない**（その場に落ちる）
-        ServerApplyExplosion(Vector3.zero);
-    }
-
     /// <summary>
     /// 爆風で脱鉤して吹き飛ばす。各PCの爆弾が呼んでもホストだけが処理する。
-    /// ほかの人のフックが当たって外すとき（<see cref="RequestInterfere"/>）も、力 0 でここを使う。
     /// </summary>
     public void ServerApplyExplosion(Vector3 velocity)
     {
@@ -371,7 +260,7 @@ public class FishingNetSupply : NetworkBehaviour
         explosionRevision.Value += 1;
         ReleaseForExplosionClientRpc(explosionRevision.Value);
         // ホストと専用サーバーはここで手元の状態を戻す。
-        ThrowController.ReleaseTargetForExplosion(hookable);
+        hookable.SetHooked(false);
         hookedByPlayerIndex.Value = -1;
         TakeBackOwnership();
         body.AddForce(velocity, ForceMode.VelocityChange);
@@ -384,7 +273,7 @@ public class FishingNetSupply : NetworkBehaviour
         // 爆発後の新しい鉤まで、遅れて届いた脱鉤の合図で外さない。
         if (!IsServer && localClaimRevision < releasedRevision)
         {
-            ThrowController.ReleaseTargetForExplosion(hookable);
+            hookable.SetHooked(false);
         }
     }
 
@@ -619,45 +508,5 @@ public class FishingNetSupply : NetworkBehaviour
         {
             lastThrownByPlayerIndex.Value = -1;
         }
-    }
-
-    // ------------------------------------------------------------
-    // 補助
-    // ------------------------------------------------------------
-
-    /// <summary>ClientRpc の宛先を「頼んできた人のPCだけ」にするための設定を作る（全員に配らないため）。</summary>
-    private static ClientRpcParams RpcToSender(ServerRpcParams rpcParams)
-    {
-        return new ClientRpcParams
-        {
-            Send = new ClientRpcSendParams
-            {
-                TargetClientIds = new[] { rpcParams.Receive.SenderClientId }
-            }
-        };
-    }
-
-    /// <summary>
-    /// このPCで自分が操作しているプレイヤーの HookController を探す。
-    /// 1台で複数人のときは、参加番号 <paramref name="playerIndex"/> の人のもの（見つからなければ、このPCの誰か）。
-    /// </summary>
-    private static HookController FindLocalHookController(int playerIndex)
-    {
-        foreach (FishingNetPlayer player in FishingNetPlayer.All)
-        {
-            if (player != null && player.IsOwner && player.PlayerIndex == playerIndex)
-            {
-                return player.GetComponent<HookController>();
-            }
-        }
-
-        foreach (FishingNetPlayer player in FishingNetPlayer.All)
-        {
-            if (player != null && player.IsOwner)
-            {
-                return player.GetComponent<HookController>();
-            }
-        }
-        return null;
     }
 }

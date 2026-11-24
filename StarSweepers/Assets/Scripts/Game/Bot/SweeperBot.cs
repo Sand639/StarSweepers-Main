@@ -296,7 +296,7 @@ public partial class SweeperBot : MonoBehaviour
             return;
         }
 
-        if (!SpaceJunkRound.PlayAllowed || !FishingMatch.PlayAllowed || GamePause.BlocksInput || !shooter.enabled)
+        if (!SpaceJunkRound.PlayAllowed || GamePause.BlocksInput || !shooter.enabled)
         {
             pad.Move = Vector2.zero;
             pad.SetPull(false);
