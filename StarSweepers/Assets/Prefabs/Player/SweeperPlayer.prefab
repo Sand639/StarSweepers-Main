@@ -24,6 +24,8 @@ GameObject:
   - component: {fileID: 5449701636653053172}
   - component: {fileID: 9160595561438689809}
   - component: {fileID: 1200197905472193814}
+  - component: {fileID: 3244258786415386131}
+  - component: {fileID: 3406173108391384504}
   m_Layer: 0
   m_Name: SweeperPlayer
   m_TagString: Untagged
@@ -168,6 +170,14 @@ MonoBehaviour:
   blinkPerSecond: 6
   stunMarker: {fileID: 4238607434163393332}
   markerSpinSpeed: 240
+  useStars: 1
+  starCount: 3
+  starHeight: 1.35
+  starOrbitRadius: 0.38
+  starSize: 0.24
+  starOrbitSpeed: 320
+  starColor: {r: 1, g: 0.86, b: 0.25, a: 1}
+  starMaterial: {fileID: 2100000, guid: 7a484494f321dc940b60859f5bbd7349, type: 2}
 --- !u!114 &4960064378279901257
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -308,6 +318,33 @@ MonoBehaviour:
   rotateWithBody: 1
   color: {r: 0.3, g: 0.6, b: 0.95, a: 1}
   material: {fileID: 2100000, guid: 7a484494f321dc940b60859f5bbd7349, type: 2}
+  useShapeLooks: 1
+  shapeLooks:
+  - shape: 0
+    size: 1.4
+    thickness: 0.1
+    starInner: 0.5
+    lift: 0.02
+  - shape: 1
+    size: 1.7
+    thickness: 0.11
+    starInner: 0.5
+    lift: 0.021
+  - shape: 2
+    size: 1.3
+    thickness: 0.1
+    starInner: 0.5
+    lift: 0.022
+  - shape: 3
+    size: 1.75
+    thickness: 0.11
+    starInner: 0.5
+    lift: 0.023
+  - shape: 4
+    size: 1.45
+    thickness: 0.1
+    starInner: 0.5
+    lift: 0.024
 --- !u!114 &1590951905096856342
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -320,9 +357,12 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: ace12652a1ddf004fa7d6dcca86eaa06, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::SweeperReel
-  reelSeconds: 2
+  reelSeconds: 2.3
   stopDistance: 1.9
   noGravityWhileHeld: 1
+  holdAtGrabHeight: 1
+  maxHoldAbove: 1.5
+  aboveHoldGravityScale: 1
   spinDamping: 6
   maxSwingSpeed: 540
   maxDragSpeed: 40
@@ -340,6 +380,14 @@ MonoBehaviour:
   throwFollowMotion: 0.777
   throwFollowNear: 1
   throwFollowSwitch: 0
+  arriveThrowsBack: 1
+  nearThrowDistance: 2.4
+  carryForward: 0.75
+  carryHeight: 0.8
+  carryInSeconds: 0.1
+  carryWindup: 0.25
+  carryThrowDistance: 7
+  carryArcHeight: 2.4
   forwardSpeed: 12
   forwardLift: 1.5
   heavyDragDistance: 4
@@ -352,8 +400,24 @@ MonoBehaviour:
   throwMinStrength: 1
   middlePullStrength: 0.5
   farPullMinStrength: 0.2
-  distanceReelSpeed: 5.5
-  criticalStart: 1
+  distanceReelSpeed: 5
+  tugEnabled: 1
+  tugOnHeavy: 0
+  tugWithTeammates: 1
+  tugBasePull: 6
+  tugYankGain: 3
+  tugSwingGain: 0.6
+  tugMaxSwingTip: 12
+  tugSwingSide: 0.5
+  tugDrag: 3
+  tugMaxSpeed: 10
+  tugSnapStrain: 1.2
+  tugStrainRecovery: 1.5
+  tugMaxSeconds: 3
+  tugMaxLengthScale: 1.15
+  criticalStartShare: 0.5
+  criticalCannotBeStolen: 1
+  criticalProtectExtra: 0.3
   criticalLength: 0.2
   criticalBackDistance: 18
   criticalArcHeight: 5.5
@@ -444,6 +508,9 @@ MonoBehaviour:
   chargeSeconds: 1
   extendSpeed: 30
   retractSpeed: 40
+  recastAfterMiss: 0.25
+  recastAfterThrow: 0.15
+  recastRingAlpha: 0.35
   hitRadius: 0.45
   castHeight: 0.6
   hitMask:
@@ -472,6 +539,49 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::SweeperNetSync
   ShowTopMostFoldoutHeaderGroup: 1
+--- !u!114 &3244258786415386131
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1024469107789706358}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 84dd0046073040b88a2551c996291752, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::SweeperPulledHit
+  stunSeconds: 1.8
+  knockbackSpeed: 11
+  knockbackLift: 4.5
+  speedScaling: 1
+  minStunSpeed: 1.5
+  maxStunSpeed: 9
+  minStunSeconds: 0.6
+  minKnockbackSpeed: 4
+  minKnockbackLift: 2
+  grabGraceSeconds: 0.25
+  rehitGrace: 0.5
+  hitByTeammates: 1
+  bombsExplodeOnHit: 1
+  contactPadding: 0.2
+--- !u!114 &3406173108391384504
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1024469107789706358}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 27fc3416e75401e4d90f490b382d2076, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::SweeperHitEffects
+  minSpeed: 2.5
+  burstColor: {r: 1, g: 0.95, b: 0.75, a: 1}
+  ringColor: {r: 1, g: 0.6, b: 0.25, a: 1}
+  hitHeight: 0.6
+  material: {fileID: 2100000, guid: 7a484494f321dc940b60859f5bbd7349, type: 2}
 --- !u!1 &3442877899701680878
 GameObject:
   m_ObjectHideFlags: 0
@@ -647,6 +757,33 @@ MonoBehaviour:
   rotateWithBody: 0
   color: {r: 0.3, g: 0.6, b: 0.95, a: 1}
   material: {fileID: 2100000, guid: 7a484494f321dc940b60859f5bbd7349, type: 2}
+  useShapeLooks: 1
+  shapeLooks:
+  - shape: 0
+    size: 1.4
+    thickness: 0.1
+    starInner: 0.5
+    lift: 0.02
+  - shape: 1
+    size: 1.7
+    thickness: 0.11
+    starInner: 0.5
+    lift: 0.021
+  - shape: 2
+    size: 1.3
+    thickness: 0.1
+    starInner: 0.5
+    lift: 0.022
+  - shape: 3
+    size: 1.75
+    thickness: 0.11
+    starInner: 0.5
+    lift: 0.023
+  - shape: 4
+    size: 1.45
+    thickness: 0.1
+    starInner: 0.5
+    lift: 0.024
 --- !u!1 &5250861167785453096
 GameObject:
   m_ObjectHideFlags: 0
