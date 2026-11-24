@@ -9,7 +9,7 @@ using UnityEngine;
 public static class SweeperWhipSetup
 {
     private const string PlayerPrefabPath = "Assets/Prefabs/Player/SweeperPlayer.prefab";
-    private const string ScenePath = FishingSceneBuilder.SceneFolder + "/SweeperWhipTest.unity";
+    private const string ScenePath = SceneBuildTools.SceneFolder + "/SweeperWhipTest.unity";
 
     /// <summary>床・四方の壁・プレイヤー・まわりの物資・柱を置いた検証シーンを作る。</summary>
     [MenuItem("Tools/StarSweepers/鞭の光線の検証シーンを作る")]
@@ -29,30 +29,30 @@ public static class SweeperWhipSetup
 
         var scene = EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
 
-        FishingSceneBuilder.CreateLight();
-        FishingSceneBuilder.CreateGround();
-        FishingSceneBuilder.CreatePlainWalls();
+        SceneBuildTools.CreateLight();
+        SceneBuildTools.CreateGround();
+        SceneBuildTools.CreatePlainWalls();
 
         var player = (GameObject)PrefabUtility.InstantiatePrefab(prefab, scene);
         player.name = "SweeperPlayer";
         player.transform.position = Vector3.zero;
-        FishingSceneBuilder.CreateCamera(player);
+        SceneBuildTools.CreateCamera(player);
 
         // まわりに物資を2重の輪で並べる（近い 4m に 8個・遠い 9m に 12個。消えても 6 秒で戻る）
-        FishingSceneBuilder.CreateSupplyRing(8, 4f);
+        SceneBuildTools.CreateSupplyRing(8, 4f);
         for (int i = 0; i < 12; i++)
         {
             float angle = 15f + 30f * i;
             Vector3 position = Quaternion.Euler(0f, angle, 0f) * new Vector3(0f, 0f, 9f);
             position.y = 0.4f;
-            HookableObject hookable = FishingSceneBuilder.CreateSupply($"FarSupply_{i + 1}", position);
-            FishingSceneBuilder.SetFloat(hookable, "respawnSeconds", 6f);
+            HookableObject hookable = SceneBuildTools.CreateSupply($"FarSupply_{i + 1}", position);
+            SceneBuildTools.SetFloat(hookable, "respawnSeconds", 6f);
         }
 
         // 柱：光線が壁で止まる（柱の向こうの物資には届かない）ことを見る
-        Material wall = AssetDatabase.LoadAssetAtPath<Material>(FishingSceneBuilder.MaterialFolder + "/FishingWall.mat");
-        FishingSceneBuilder.CreateBox("Pillar_East", new Vector3(6.5f, 1f, 0f), new Vector3(1f, 2f, 1f), wall);
-        FishingSceneBuilder.CreateBox("Pillar_West", new Vector3(-6.5f, 1f, 0f), new Vector3(1f, 2f, 1f), wall);
+        Material wall = AssetDatabase.LoadAssetAtPath<Material>(SceneBuildTools.MaterialFolder + "/FishingWall.mat");
+        SceneBuildTools.CreateBox("Pillar_East", new Vector3(6.5f, 1f, 0f), new Vector3(1f, 2f, 1f), wall);
+        SceneBuildTools.CreateBox("Pillar_West", new Vector3(-6.5f, 1f, 0f), new Vector3(1f, 2f, 1f), wall);
 
         EditorSceneManager.SaveScene(scene, ScenePath);
         AssetDatabase.SaveAssets();

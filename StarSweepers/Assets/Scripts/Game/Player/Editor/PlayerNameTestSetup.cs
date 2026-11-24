@@ -34,7 +34,7 @@ public static class PlayerNameTestSetup
         NetworkManager manager = hud != null ? hud.GetComponent<NetworkManager>() : null;
         if (EditorApplication.isPlaying && manager != null && manager.IsHost && SpaceJunkSession.Current != null)
         {
-            foreach (FishingNetPlayer player in FishingNetPlayer.All)
+            foreach (SweeperNetPlayer player in SweeperNetPlayer.All)
             {
                 if (player == null || !player.IsSpawned || player.NetworkManager != manager) continue;
                 if (player.NamePrefixIndex < 0 || player.NameConnectorIndex < 0 || player.NameSuffixIndex < 0
@@ -69,7 +69,7 @@ public static class PlayerNameTestSetup
         }
 
         GameObject player = AssetDatabase.LoadAssetAtPath<GameObject>(
-            "Assets/Prefabs/Player/SpaceJunkPlayer.prefab");
+            "Assets/Prefabs/Player/SweeperPlayer.prefab");
         GameObject session = AssetDatabase.LoadAssetAtPath<GameObject>(
             "Assets/Prefabs/System/SpaceJunkSession.prefab");
         if (player == null || session == null) throw new System.InvalidOperationException("検証に使うプレハブがありません。");

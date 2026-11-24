@@ -122,7 +122,7 @@ public abstract class SpaceJunkCameraMode : MonoBehaviour
             return target;
         }
 
-        foreach (FishingNetPlayer player in FishingNetPlayer.All)
+        foreach (SweeperNetPlayer player in SweeperNetPlayer.All)
         {
             if (player != null && player.IsOwner)
             {
@@ -156,7 +156,7 @@ public abstract class SpaceJunkCameraMode : MonoBehaviour
 
         int myTeam = session.TeamOf(manager.LocalClientId);
 
-        foreach (FishingNetPlayer player in FishingNetPlayer.All)
+        foreach (SweeperNetPlayer player in SweeperNetPlayer.All)
         {
             if (player == null || player.IsOwner || player.transform == self)
             {

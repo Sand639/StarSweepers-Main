@@ -11,18 +11,19 @@ using UnityEngine.TestTools;
 /// <summary>
 /// **宇宙ごみのオンラインの新しい体（プレイヤーの本実装）の自動テスト。**（2026/10/28）
 ///
-/// 1つの Unity の中でホストと参加者を両方つなぎ、本物のプレハブ（`SpaceJunkSweeperPlayer.prefab`・`SpaceJunkPlate.prefab`）で確かめる。
+/// 1つの Unity の中でホストと参加者を両方つなぎ、本物のプレハブ（`SweeperPlayer.prefab`・`SpaceJunkPlate.prefab`）で確かめる。
 /// ・参加者が光線を撃つと、ホストの画面でもその人の光線の段階が変わる
 /// ・光線が物資に当たると、ホストが「その人が引っ掛け中」と記録し、持ち主が参加者へ移る
 /// ・巻き取り中に押すと、ホストが物資を受け取り（記録が消え、持ち主がホストへ戻る）、物資が上へ飛ぶ（頭を越える放物線）
 /// ・体の歩く部品が止められると、光線の部品も止まる
-/// ・部屋を作る前の Player Prefab が、設定なしで新しい体に入れ替わる（2026/11/3）。ボットも新しい体で出す（2026/11/5）
+/// ・NetworkManager の Player Prefab がこの体になっている（ボットも同じ体で出す）
 ///
 /// `Window > General > Test Runner` の EditMode から実行できる。
 /// </summary>
 public class SweeperOnlineTests
 {
-    private const string PlayerPrefabPath = "Assets/Prefabs/Player/SpaceJunkSweeperPlayer.prefab";
+    private const string PlayerPrefabPath = "Assets/Prefabs/Player/SweeperPlayer.prefab";
+    private const string NetworkManagerPrefabPath = "Assets/Prefabs/System/SpaceJunkNetworkManager.prefab";
     private const string SupplyPrefabPath = "Assets/Prefabs/Item/SpaceJunkPlate.prefab";
     private const string NetworkPrefabsPath = "Assets/DefaultNetworkPrefabs.asset";
     private const ushort Port = 17991;
@@ -36,58 +37,16 @@ public class SweeperOnlineTests
             "新しい体が通信の一覧（DefaultNetworkPrefabs.asset）に登録されていない");
     }
 
-    [UnityTest]
-    public IEnumerator Switch_ReplacesPlayerPrefabBeforeHosting_AndBotsUseSweeperBody()
+    /// <summary>NetworkManager のプレハブの Player Prefab が、この体になっている（ボットも同じ体で出る）。2026/11/24 から入れ替えの係は無い。</summary>
+    [Test]
+    public void NetworkManager_UsesSweeperBodyAsPlayerPrefab()
     {
-        yield return new EnterPlayMode();
-        yield return CheckSwitch();
-        yield return new ExitPlayMode();
-    }
-
-    /// <summary>
-    /// 切り替えの中身。**再生を始めてから呼ぶ別の関数にしてある**（同じ関数の中で、あとで使う値をラムダに渡すと、
-    /// 再生の切り替えのときにその入れ物が消えて NullReferenceException になるため）。
-    /// </summary>
-    private static IEnumerator CheckSwitch()
-    {
-        // 今の体の代わり（宇宙ごみの体の印 SpaceJunkPlayerSetup だけ付いた、止めてある物）。
-        // 切り替えの係は「宇宙ごみの体か」をこの印で見るだけなので、本物のプレハブ（SpaceJunkPlayer.prefab）は読まない
-        GameObject currentBody = new GameObject("CurrentBodyStandIn");
-        currentBody.SetActive(false);
-        currentBody.AddComponent<SpaceJunkPlayerSetup>();
-        GameObject sweeperBody = AssetDatabase.LoadAssetAtPath<GameObject>(PlayerPrefabPath);
-        Assert.That(currentBody, Is.Not.Null);
-        Assert.That(sweeperBody, Is.Not.Null, "新しい体のプレハブが無い（メニューで作る）");
-
-        GameObject root = new GameObject("SwitchTestManager");
-        try
-        {
-            root.AddComponent<UnityTransport>();
-            NetworkManager manager = root.AddComponent<NetworkManager>();
-            manager.NetworkConfig = new NetworkConfig
-            {
-                NetworkTransport = root.GetComponent<UnityTransport>(),
-                PlayerPrefab = currentBody
-            };
-            manager.NetworkConfig.Prefabs.Add(new NetworkPrefab { Prefab = currentBody });
-            manager.NetworkConfig.Prefabs.Add(new NetworkPrefab { Prefab = sweeperBody });
-            yield return WaitFor("singleton", () => NetworkManager.Singleton == manager);
-
-            yield return WaitFor("swap", () => manager.NetworkConfig.PlayerPrefab == sweeperBody);
-            Assert.That(Object.FindObjectsByType<SweeperOnlineSwitch>(FindObjectsInactive.Include, FindObjectsSortMode.None).Length,
-                Is.GreaterThan(0), "切り替えの係が作られていない");
-            Assert.That(manager.NetworkConfig.PlayerPrefab, Is.EqualTo(sweeperBody), "新しい体に入れ替わっていない");
-            Assert.That(SweeperOnlineSwitch.BotPrefabOr(manager.NetworkConfig.PlayerPrefab), Is.EqualTo(sweeperBody),
-                "ボットも新しい体で出す（2026/11/5）");
-            Assert.That(SweeperOnlineSwitch.CurrentBodyPrefab, Is.EqualTo(currentBody), "今の体を覚えていない");
-        }
-        finally
-        {
-            Object.Destroy(root);
-            Object.Destroy(currentBody);
-        }
-
-        yield return null;
+        GameObject managerPrefab = AssetDatabase.LoadAssetAtPath<GameObject>(NetworkManagerPrefabPath);
+        Assert.That(managerPrefab, Is.Not.Null, "NetworkManager のプレハブが無い");
+        NetworkManager manager = managerPrefab.GetComponent<NetworkManager>();
+        Assert.That(manager, Is.Not.Null);
+        Assert.That(manager.NetworkConfig.PlayerPrefab, Is.EqualTo(AssetDatabase.LoadAssetAtPath<GameObject>(PlayerPrefabPath)),
+            "NetworkManager の Player Prefab がプレイヤーの体になっていない");
     }
 
     [UnityTest]
@@ -117,8 +76,8 @@ public class SweeperOnlineTests
             yield return WaitFor("step1", () => client.IsConnectedClient && FindPlayer(client, client.LocalClientId) != null
                 && FindPlayer(host, client.LocalClientId) != null);
 
-            FishingNetPlayer clientPlayer = FindPlayer(client, client.LocalClientId);
-            FishingNetPlayer clientPlayerOnHost = FindPlayer(host, client.LocalClientId);
+            SweeperNetPlayer clientPlayer = FindPlayer(client, client.LocalClientId);
+            SweeperNetPlayer clientPlayerOnHost = FindPlayer(host, client.LocalClientId);
             Assert.That(clientPlayer.IsOwner, Is.True);
             Assert.That(clientPlayer.GetComponent<SweeperNetSync>(), Is.Not.Null);
             yield return WaitFor("step2", () => clientPlayer.PlayerIndex >= 0);
@@ -131,7 +90,7 @@ public class SweeperOnlineTests
             GameObject supplyObject = Object.Instantiate(supplyPrefab, target, Quaternion.identity);
             NetworkObject supplyNetwork = supplyObject.GetComponent<NetworkObject>();
             supplyNetwork.Spawn();
-            FishingNetSupply hostSupply = supplyObject.GetComponent<FishingNetSupply>();
+            NetSupply hostSupply = supplyObject.GetComponent<NetSupply>();
             ulong supplyId = supplyNetwork.NetworkObjectId;
 
             yield return WaitFor("step3", () => client.SpawnManager.SpawnedObjects.ContainsKey(supplyId));
@@ -189,7 +148,7 @@ public class SweeperOnlineTests
             yield return WaitFor("step11", () => SyncedPhase(clientPlayerOnHost) == SweeperShooter.ShotPhase.Idle);
 
             // ---- 体の歩く部品が止められたら、光線の部品も止まる ----
-            FishingPlayerController body = clientPlayer.GetComponent<FishingPlayerController>();
+            SweeperMover body = clientPlayer.GetComponent<SweeperMover>();
             body.enabled = false;
             yield return WaitFor("lock", () => !shooter.enabled);
             body.enabled = true;
@@ -227,9 +186,9 @@ public class SweeperOnlineTests
         return manager;
     }
 
-    private static FishingNetPlayer FindPlayer(NetworkManager manager, ulong owner)
+    private static SweeperNetPlayer FindPlayer(NetworkManager manager, ulong owner)
     {
-        foreach (FishingNetPlayer player in FishingNetPlayer.All)
+        foreach (SweeperNetPlayer player in SweeperNetPlayer.All)
         {
             if (player != null && player.IsSpawned && player.NetworkManager == manager
                 && player.OwnerClientId == owner && player.LocalSeat == 0) return player;
@@ -238,7 +197,7 @@ public class SweeperOnlineTests
     }
 
     /// <summary>その体の <see cref="SweeperNetSync"/> が配っている光線の段階（ほかのPCから見た値）。</summary>
-    private static SweeperShooter.ShotPhase SyncedPhase(FishingNetPlayer player)
+    private static SweeperShooter.ShotPhase SyncedPhase(SweeperNetPlayer player)
     {
         SweeperNetSync sync = player.GetComponent<SweeperNetSync>();
         FieldInfo field = typeof(SweeperNetSync).GetField("shotPhase", BindingFlags.Instance | BindingFlags.NonPublic);

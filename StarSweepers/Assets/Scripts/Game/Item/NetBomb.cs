@@ -17,7 +17,7 @@ using UnityEngine;
 /// </summary>
 [RequireComponent(typeof(NetworkObject))]
 [RequireComponent(typeof(ExplosiveObject))]
-public class FishingNetBomb : NetworkBehaviour
+public class NetBomb : NetworkBehaviour
 {
     /// <summary>導火線に火がついたか。**ホストが決めて全員に配る。**</summary>
     private readonly NetworkVariable<bool> lit = new NetworkVariable<bool>(false);

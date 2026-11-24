@@ -53,7 +53,7 @@ public class KnockBackExplosiveObject : ExplosiveObject
     {
         // 操作が止まっている体（オンラインの他人の体など）には効かせない。
         // handled.Add が false ＝ この爆発でもう処理した体（当たり判定が複数あっても1回だけ）
-        FishingPlayerController player = hit.GetComponentInParent<FishingPlayerController>();
+        SweeperMover player = hit.GetComponentInParent<SweeperMover>();
         if (player == null || !player.isActiveAndEnabled || !handled.Add(player.gameObject))
         {
             return;
@@ -95,7 +95,7 @@ public class KnockBackExplosiveObject : ExplosiveObject
         Vector3 velocity = direction.normalized * objectKnockbackSpeed
                          + Vector3.up * objectKnockbackLift;
 
-        FishingNetSupply netSupply = other.GetComponent<FishingNetSupply>();
+        NetSupply netSupply = other.GetComponent<NetSupply>();
         if (netSupply != null && netSupply.IsSpawned)
         {
             // 爆発は各PCで起きるが、物資を飛ばすのはホストだけ。
@@ -106,7 +106,7 @@ public class KnockBackExplosiveObject : ExplosiveObject
 
         // 1人用：誰かが引き寄せ中ならまず糸を外す（引き寄せ中は isKinematic で止めてあるため、
         // 外したうえで物理を戻さないと飛ばない）
-        ThrowController.ReleaseTargetForExplosion(other);
+        other.SetHooked(false);
         other.Body.isKinematic = false;
         // VelocityChange ＝ 質量に関係なく、同じ速さをそのまま足す
         other.Body.AddForce(velocity, ForceMode.VelocityChange);

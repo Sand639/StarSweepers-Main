@@ -45,10 +45,10 @@ public class SpaceJunkGoalFlyIntro : MonoBehaviour
     public static Camera ViewCamera { get; private set; }
 
     /// <summary>名前のタグの大きさの倍率（強調している人だけ入る）。</summary>
-    private static readonly Dictionary<FishingNetPlayer, float> emphasis = new Dictionary<FishingNetPlayer, float>();
+    private static readonly Dictionary<SweeperNetPlayer, float> emphasis = new Dictionary<SweeperNetPlayer, float>();
 
     /// <summary>そのプレイヤーの名前のタグの大きさの倍率。強調していなければ 1。</summary>
-    public static float NameEmphasisOf(FishingNetPlayer player)
+    public static float NameEmphasisOf(SweeperNetPlayer player)
     {
         return player != null && emphasis.TryGetValue(player, out float scale) ? scale : 1f;
     }

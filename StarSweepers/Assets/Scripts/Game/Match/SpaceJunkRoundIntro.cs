@@ -362,7 +362,7 @@ public class SpaceJunkRoundIntro : MonoBehaviour
         if (session != null && manager != null)
         {
             int myTeam = session.TeamOf(manager.LocalClientId);
-            foreach (FishingNetPlayer player in FishingNetPlayer.All)
+            foreach (SweeperNetPlayer player in SweeperNetPlayer.All)
             {
                 if (player != null && session.TeamOf(player.OwnerClientId) == myTeam)
                 {
@@ -388,7 +388,7 @@ public class SpaceJunkRoundIntro : MonoBehaviour
         if (session != null && manager != null)
         {
             int myTeam = session.TeamOf(manager.LocalClientId);
-            foreach (FishingNetPlayer player in FishingNetPlayer.All)
+            foreach (SweeperNetPlayer player in SweeperNetPlayer.All)
             {
                 if (player != null && session.TeamOf(player.OwnerClientId) == myTeam)
                 {
@@ -403,7 +403,7 @@ public class SpaceJunkRoundIntro : MonoBehaviour
     /// <summary>このPCで操作しているプレイヤー（まだ生まれていなければ null）。</summary>
     private static Transform LocalPlayer()
     {
-        foreach (FishingNetPlayer player in FishingNetPlayer.All)
+        foreach (SweeperNetPlayer player in SweeperNetPlayer.All)
         {
             // 1台で複数人なら、そのPCの1人目（カメラはそのPCの1人目に付いているため）
             if (player != null && player.IsOwner && player.LocalSeat == 0)

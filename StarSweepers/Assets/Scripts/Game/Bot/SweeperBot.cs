@@ -156,7 +156,7 @@ public partial class SweeperBot : MonoBehaviour
     private const float WatchMinSeconds = 0.6f;
 
     private VirtualPlayerInput pad;
-    private FishingNetPlayer netPlayer;
+    private SweeperNetPlayer netPlayer;
     private CharacterController body;
     private SweeperShooter shooter;
     private SweeperReel reel;
@@ -249,7 +249,7 @@ public partial class SweeperBot : MonoBehaviour
     private void Awake()
     {
         pad = GetComponent<VirtualPlayerInput>();
-        netPlayer = GetComponent<FishingNetPlayer>();
+        netPlayer = GetComponent<SweeperNetPlayer>();
         body = GetComponent<CharacterController>();
         shooter = GetComponent<SweeperShooter>();
         reel = GetComponent<SweeperReel>();
@@ -296,7 +296,7 @@ public partial class SweeperBot : MonoBehaviour
             return;
         }
 
-        if (!SpaceJunkRound.PlayAllowed || !FishingMatch.PlayAllowed || GamePause.BlocksInput || !shooter.enabled)
+        if (!SpaceJunkRound.PlayAllowed || GamePause.BlocksInput || !shooter.enabled)
         {
             pad.Move = Vector2.zero;
             pad.SetPull(false);
@@ -631,7 +631,7 @@ public partial class SweeperBot : MonoBehaviour
             return false;
         }
 
-        FishingNetSupply netSupply = item.GetComponent<FishingNetSupply>();
+        NetSupply netSupply = item.GetComponent<NetSupply>();
         return netSupply == null || !netSupply.IsSpawned || !netSupply.IsClaimed;
     }
 

@@ -38,7 +38,7 @@ public sealed class LobbyTeamZone : MonoBehaviour
 
     private void OnTriggerEnter(Collider other)
     {
-        FishingNetPlayer player = other.GetComponentInParent<FishingNetPlayer>();
+        SweeperNetPlayer player = other.GetComponentInParent<SweeperNetPlayer>();
         if (player == null || !player.IsOwner || !player.IsSpawned)
         {
             return;
@@ -64,7 +64,7 @@ public sealed class LobbyTeamZone : MonoBehaviour
 
     private void OnTriggerExit(Collider other)
     {
-        FishingNetPlayer player = other.GetComponentInParent<FishingNetPlayer>();
+        SweeperNetPlayer player = other.GetComponentInParent<SweeperNetPlayer>();
         if (player == null || !player.IsOwner)
         {
             return;

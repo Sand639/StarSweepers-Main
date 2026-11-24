@@ -5,7 +5,7 @@
 | スクリプト | `StarSweepers/Assets/Scripts/Game/Effect/GoalEffect.cs`（渦の係）・`GoalAbsorb.cs`（吸い込まれる係）・`GoalEffectTestDriver.cs`（検証シーン専用） |
 | 付いている場所 | 渦の係はプレハブ `Prefabs/Effect/GoalEffect.prefab`。それを**進行役のプレハブ `Prefabs/System/SpaceJunkRound.prefab` の子**と、**ロビー `Scenes/MainLoop/Lobby.unity`** に置いてある。検証シーン `Scenes/Test/GoalEffectTest.unity` にも1つ。吸い込まれる係は、吸い込みが始まった物資に**再生中に付き、終わったら外れる**（どこにも置かない） |
 | 見た目 | シェーダー `Art/Shaders/GoalVortex.shader`・マテリアル `Art/Materials/GoalVortex.mat` |
-| 一緒に使うスクリプト | `SpaceJunkGoal.cs`・`SpaceJunkLobbyGoal.cs`（ゴール。物資を渦に渡す）、`HookableObject.cs`（吸い込み中の印 `IsAbsorbing`）、`FishingNetSupply.cs`（参加者への知らせ `BeginAbsorbClientRpc`）、`SpaceJunkGoalScoreEffect.cs`（床の四角の測り方 `TryGetGoalArea` を借りる）、`Game/Match/Editor/GoalEffectSetup.cs`（メニュー）、`GoalEffectTests.cs`（自動テスト） |
+| 一緒に使うスクリプト | `SpaceJunkGoal.cs`・`SpaceJunkLobbyGoal.cs`（ゴール。物資を渦に渡す）、`HookableObject.cs`（吸い込み中の印 `IsAbsorbing`）、`NetSupply.cs`（参加者への知らせ `BeginAbsorbClientRpc`）、`SpaceJunkGoalScoreEffect.cs`（床の四角の測り方 `TryGetGoalArea` を借りる）、`Game/Match/Editor/GoalEffectSetup.cs`（メニュー）、`GoalEffectTests.cs`（自動テスト） |
 | 関係するドキュメント | `機能ドキュメント/ゴールの渦と光の柱.md` |
 
 ## 何をするスクリプトか
@@ -14,7 +14,7 @@
 
 - **見た目の種類（`GoalEffectStyle`）**：`style` のプルダウンで **渦（Vortex）** と **光の柱（Pillar）** を選ぶ。`DrawAt` は種類によって `DrawVortices`（渦）か `DrawPillars`（光の柱）を呼ぶ。判定の円柱・引き寄せ・吸い込みの始まりと終わり・得点の流れ（`ServerFeed`）は共通。
 - **光の柱（`DrawPillars`）**：床の光（円の板。筒の 1.35 倍まで）・筒（`CreateCylinderMesh`。半径 1・高さ 1 の筒を、渦の半径×高さ×渦の半径にする）・光の筋・きらめき（`CreateBillboardMesh`。カメラのほうを向く板。足もとは筒の中の床で、高さと動きはシェーダーが決める）を `GoalPillar.shader` の `_Part` 0〜3 で描く。色は `pillarUseTeamColor` ならチームの色、そうでなければ `pillarColor`。`_Funnel` に（半径, 高さ）を渡す。
-- **物資の動きの選び方（`absorbMotion`・`UsesPillarMotion`）**：`GoalAbsorbMotion` のプルダウン（見た目に合わせる・渦の吸い込み・光の柱）。`UsesPillarMotion` は「光の柱」を選んだとき、または「見た目に合わせる」で見た目が光の柱のとき true。ホストの `ServerFeed` が吸い込みを始めるときにこれを読み、`GoalAbsorb.Begin(…, pillarMotion, …)` に渡し、`FishingNetSupply.ServerBeginAbsorb(開始時刻, 秒数, pillarMotion)` で参加者のPCへも送る（参加者は自分のプルダウンを見ない）。吸い込みの長さ `CurrentAbsorbSeconds` もこれで決まる。
+- **物資の動きの選び方（`absorbMotion`・`UsesPillarMotion`）**：`GoalAbsorbMotion` のプルダウン（見た目に合わせる・渦の吸い込み・光の柱）。`UsesPillarMotion` は「光の柱」を選んだとき、または「見た目に合わせる」で見た目が光の柱のとき true。ホストの `ServerFeed` が吸い込みを始めるときにこれを読み、`GoalAbsorb.Begin(…, pillarMotion, …)` に渡し、`NetSupply.ServerBeginAbsorb(開始時刻, 秒数, pillarMotion)` で参加者のPCへも送る（参加者は自分のプルダウンを見ない）。吸い込みの長さ `CurrentAbsorbSeconds` もこれで決まる。
 - **光の柱のときの物資の動き（`GoalAbsorb.ApplyPillar`）**：吸い込みの長さは `CurrentAbsorbSeconds`＝Pillar Move Seconds＋Pillar Rise Seconds（ホストが参加者へ送る秒数もこれ）。前半は、始めの位置から「真ん中の上（`PillarTopY`＝床＋光の柱の高さ）」へ一直線に運ぶ（だんだん遅く）。後半は、そこから Pillar Rise Distance だけゆっくり上げる（smoothstep）。**大きさは変えない**（当たり判定は渦と同じく、始まったときに切る）。位置はホストだけが動かす。どのPCでも、そのPCの吸い込みが終わったときに `GoalEffect.PlayFlash` で消えた瞬間の光を出す（ホストは `Finish`、参加者は進み具合が 1 になったとき）。光の柱の動きかどうかは、吸い込みが始まったときにホストが決めた値（`IsPillar`）。
 - **消える光（`DrawFlashes`）**：見た目の種類にかかわらず毎回描く。吸い込み中の物資（`GoalAbsorb.All`）のうち光の柱の物は、残りが Pillar Glow Seconds より短くなったら、物資の位置にやわらかい光の玉（`_Flash.x`＝0）。`PlayFlash` で足した光は、Pillar Flash Seconds の間、白っぽい芯・十字・広がる輪（`_Flash.x`＝1）。色は、いちばん近いゴールの光の柱の色（`ColorNear`）。`GoalPillar.shader` の `_Part`＝4 で、カメラのほうを向く板（`CreateFlashMesh`）に描く。
 
@@ -26,7 +26,7 @@
 | いつ | 何をするか |
 | --- | --- |
 | ホストで、物資がゴールの判定の中にいる間（`OnTriggerStay`） | ゴールの `TryCollect` → `GoalEffect.In(シーン).ServerFeed(ゴール, 物資, Collect)`。渦がシーンに無ければ、その場で `Collect`（入った瞬間に数えて消す） |
-| `ServerFeed` | 消えた・吸い込み中・引っ掛けられている物、持ち主がまだホストに戻っていない物（`FishingNetSupply.IsOwner` が false）は何もしない。`TryGetArea` で円柱を求め、物資の重心が中なら吸い込みを始める（`GoalAbsorb.Begin` → `FishingNetSupply.ServerBeginAbsorb`。`AbsorbCount` を1増やす）。外なら `Pull` |
+| `ServerFeed` | 消えた・吸い込み中・引っ掛けられている物、持ち主がまだホストに戻っていない物（`NetSupply.IsOwner` が false）は何もしない。`TryGetArea` で円柱を求め、物資の重心が中なら吸い込みを始める（`GoalAbsorb.Begin` → `NetSupply.ServerBeginAbsorb`。`AbsorbCount` を1増やす）。外なら `Pull` |
 | `Pull` | 渦の真ん中への水平の向きに、Pull Acceleration の加速度を加える。物資は当たり判定が複数あると1回の物理の更新で何度も呼ばれるので、`Time.fixedTime` で1回だけにする |
 | `GoalAbsorb.Begin`（ホスト） | 物資に係を付け、`HookableObject.SetAbsorbing(true)`、当たり判定を全部切り、物理を止める（Kinematic）。始めの位置を、渦の真ん中からの半径・角度・高さで覚える |
 | `BeginAbsorbClientRpc`（参加者のPC） | 同じく係を付ける（位置は動かさないので、真ん中の位置は渡さない）。印を付け、当たり判定を切る |
@@ -121,3 +121,4 @@
 | 2026/11/17 | Claude Code（依頼：大槻 海斗） | 名前を変えた（このファイルも `SpaceJunkGoalVortex.md` から `GoalEffect.md` に）。見た目の種類のプルダウンと光の柱、光の柱のときの物資の動きを書き足した |
 | 2026/11/17 | Claude Code（依頼：大槻 海斗） | 光の柱のときの物資の動き（真ん中の上へ運ぶ → ゆっくり上げる → 光って消える）と、消える光（`DrawFlashes`・`PlayFlash`）を書いた |
 | 2026/11/17 | Claude Code（依頼：大槻 海斗） | 物資の動きのプルダウン（`absorbMotion`）と、ホストが決めた動きを参加者へ送るようにしたことを書いた |
+| 2026/11/24 | Claude Code（依頼：小野田 喬） | 名前を変えたスクリプト（`FishingNetSupply` → `NetSupply` など）に合わせて書き換えた |

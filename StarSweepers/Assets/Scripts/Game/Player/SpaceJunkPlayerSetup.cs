@@ -5,19 +5,19 @@ using UnityEngine.InputSystem.LowLevel;
 /// <summary>
 /// **宇宙ごみ用に、プレイヤーへ上乗せする部品。**
 ///
-/// フックの操作そのものは釣りの部品（<c>FishingNetPlayer</c> / <c>HookController</c> など）を
+/// フックの操作そのものは釣りの部品（<c>SweeperNetPlayer</c> / <c>HookController</c> など）を
 /// **そのまま共用している。** ただし、そのままでは次の2つが合わない。
 ///
 /// ### ① マップに着いても、位置とカメラが合わない
 ///
-/// <c>FishingNetPlayer</c> は「釣り会場に着いたか」を **<c>FishingMatch</c> がいるかどうか**で判断している。
+/// <c>SweeperNetPlayer</c> は「釣り会場に着いたか」を **<c>FishingMatch</c> がいるかどうか**で判断している。
 /// 宇宙ごみのマップには <c>FishingMatch</c> を置かない（釣りの時間制ルールが動いてしまうため）ので、
 /// **着いたことに気づかず、ロビーの位置のまま・カメラも追ってこない。**
 /// → ここで <see cref="SpaceJunkRound"/> が現れたかどうかで同じことをやり直す。
 ///
 /// ### ② チームの色が食い違う
 ///
-/// <c>FishingNetPlayer</c> は**参加した順に2人ずつ**でチームの色を塗る。
+/// <c>SweeperNetPlayer</c> は**参加した順に2人ずつ**でチームの色を塗る。
 /// 宇宙ごみは**ホストが自由にチームを決める**ので、そのままでは色が合わない。
 /// → ここで <see cref="SpaceJunkSession"/> が持っているチームの色に塗り直す。
 ///
@@ -102,22 +102,16 @@ public partial class SpaceJunkPlayerSetup : MonoBehaviour
     // 同じプレハブに付いている釣りの部品（Awake で取る）。無いものは null のまま使う
 
     /// <summary>通信上のプレイヤー（自分のぶんか・何人目か・接続番号）。</summary>
-    private FishingNetPlayer netPlayer;
+    private SweeperNetPlayer netPlayer;
 
     /// <summary>歩く・落ちるの当たり判定。位置を直接動かすときはいったん切る。</summary>
     private CharacterController characterController;
 
     /// <summary>歩く部品。動けなくするときに enabled を切る。</summary>
-    private FishingPlayerController mover;
-
-    /// <summary>フックの部品。動けなくするときに enabled を切り、出てくる場所へ戻すときにフックを戻す。</summary>
-    private HookController hookController;
+    private SweeperMover mover;
 
     /// <summary>キー／コントローラーの入力（1台で複数人のとき、自分の担当だけを読む）。</summary>
     private PlayerInputSource input;
-
-    /// <summary>フックの糸（液体）。チームの色を渡す。</summary>
-    private HookLine hookLine;
 
     /// <summary>復活までの残り秒数（自分のぶんだけ使う）。</summary>
     private float respawnRemaining;
@@ -157,11 +151,9 @@ public partial class SpaceJunkPlayerSetup : MonoBehaviour
 
     private void Awake()
     {
-        netPlayer = GetComponent<FishingNetPlayer>();
+        netPlayer = GetComponent<SweeperNetPlayer>();
         characterController = GetComponent<CharacterController>();
-        mover = GetComponent<FishingPlayerController>();
-        hookController = GetComponent<HookController>();
-        hookLine = GetComponentInChildren<HookLine>(true);
+        mover = GetComponent<SweeperMover>();
         input = PlayerInputSource.Get(this);
 
         baseScale = transform.localScale;
@@ -229,8 +221,6 @@ public partial class SpaceJunkPlayerSetup : MonoBehaviour
             LocalResetKeyName = $"{resetKey}／{GamepadInput.Label(resetButton)}";
             EnsureRadar();
         }
-
-        EnsureLocalStateCheck();
 
         TickPlacement();
         TickRespawnLock();
@@ -324,15 +314,6 @@ public partial class SpaceJunkPlayerSetup : MonoBehaviour
         nameplate.Attach(netPlayer);
     }
 
-    /// <summary>自分のぶんにだけ、答え合わせの部品を付ける。</summary>
-    private void EnsureLocalStateCheck()
-    {
-        if (GetComponent<SpaceJunkLocalStateCheck>() == null)
-        {
-            gameObject.AddComponent<SpaceJunkLocalStateCheck>();
-        }
-    }
-
     /// <summary>
     /// **落ちて戻れなくなったときの立て直し。**
     ///
@@ -423,11 +404,6 @@ public partial class SpaceJunkPlayerSetup : MonoBehaviour
         lastAppliedTeam = team;
         Color color = SpaceJunkTeams.TeamColor(team);
 
-        if (hookLine != null)
-        {
-            hookLine.SetTeamColor(color);
-        }
-
         foreach (Renderer renderer in teamRenderers)
         {
             if (renderer != null)
@@ -438,28 +414,11 @@ public partial class SpaceJunkPlayerSetup : MonoBehaviour
     }
 
     /// <summary>
-    /// **シーンに置いてあるもの（カメラ・ゲージ）と自分を結びつける。**
+    /// **シーンに置いてあるカメラと自分を結びつける。**
     /// プレイヤーはプレハブから生まれるので、シーンの中身をあらかじめ入れておけない。
     /// </summary>
     private void FollowWithCamera()
     {
-        PlayerAimController aim = GetComponent<PlayerAimController>();
-        if (aim != null && Camera.main != null)
-        {
-            aim.SetCamera(Camera.main);
-        }
-
-        // チャージ量とスキルチェックのゲージは、人ごとに頭の上に出す（1台で複数人のときも全員に出る）
-        HookController hook = GetComponent<HookController>();
-        if (hook != null)
-        {
-            HookChargeUI ui = HookChargeUI.CreateOverhead(transform);
-            if (ui != null && hook.UI != ui)
-            {
-                hook.SetUI(ui);
-            }
-        }
-
         // カメラは画面に1つしか無いので、そのPCの1人目にだけ結びつける（1台で複数人のとき）
         if (!IsFirstLocalPlayer)
         {

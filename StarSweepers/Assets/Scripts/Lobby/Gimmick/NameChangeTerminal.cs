@@ -63,7 +63,7 @@ public class NameChangeTerminal : MonoBehaviour
         bool blocked = GamePause.BlocksInput || SpaceJunkLobbyScreen.IsTyping
             || (SpaceJunkLobbyTerminal.Current != null && SpaceJunkLobbyTerminal.Current.IsOpen);
 
-        foreach (FishingNetPlayer player in FishingNetPlayer.All)
+        foreach (SweeperNetPlayer player in SweeperNetPlayer.All)
         {
             if (!CanUse(player)) continue;
             IsPlayerNearby = true;
@@ -82,7 +82,7 @@ public class NameChangeTerminal : MonoBehaviour
     }
 
     /// <summary>近くにいる本人だけの名前を抽選し、既存のPlayer経由で全員へ同期する。</summary>
-    public bool TryRandomName(FishingNetPlayer player)
+    public bool TryRandomName(SweeperNetPlayer player)
     {
         if (!CanUse(player) || GamePause.BlocksInput || SpaceJunkLobbyScreen.IsTyping
             || (SpaceJunkLobbyTerminal.Current != null && SpaceJunkLobbyTerminal.Current.IsOpen)) return false;
@@ -97,7 +97,7 @@ public class NameChangeTerminal : MonoBehaviour
             && player.SetName(prefix, connector, suffix);
     }
 
-    private bool CanUse(FishingNetPlayer player)
+    private bool CanUse(SweeperNetPlayer player)
     {
         return isActiveAndEnabled && player != null && player.IsSpawned && player.IsOwner
             && player.NetworkManager != null && player.NetworkManager.IsListening

@@ -20,12 +20,12 @@ using UnityEngine.Serialization;
 ///
 /// **出すのはホストだけ。** ホストが出して Spawn() すると、全員の画面に同じ物が現れる。
 /// プレハブは `DefaultNetworkPrefabs` に登録してあるもの
-/// （`FishingOnlineBomb` や `KnockBackBoom`、`SpaceJunkSpecial`）を使うこと。
+/// （`SpaceJunkBomb` や `KnockBackBoom`、`SpaceJunkSpecial`）を使うこと。
 /// </summary>
 public class SpaceJunkBombPoints : MonoBehaviour
 {
     [Header("出す物")]
-    [Tooltip("出す物のプレハブ。オンラインで使うなら NetworkObject が付いたもの（FishingOnlineBomb / KnockBackBoom / SpaceJunkSpecial）")]
+    [Tooltip("出す物のプレハブ。オンラインで使うなら NetworkObject が付いたもの（SpaceJunkBomb / KnockBackBoom / SpaceJunkSpecial）")]
     [FormerlySerializedAs("bombPrefab")]
     [SerializeField] private GameObject spawnPrefab;
 

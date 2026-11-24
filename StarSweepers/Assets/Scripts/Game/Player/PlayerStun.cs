@@ -37,7 +37,7 @@ public class PlayerStun : MonoBehaviour
 
     // 点滅が終わったら戻す色。
     // **スタンが始まる瞬間に、その時点の色を控える。**
-    // Awake で控えると、あとからチームの色（FishingNetPlayer）が塗られても
+    // Awake で控えると、あとからチームの色（SweeperNetPlayer）が塗られても
     // プレハブの元の色（青）に戻ってしまうため
     private Color[] originalColors = new Color[0];
 

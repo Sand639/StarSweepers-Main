@@ -40,8 +40,7 @@ public partial class SpaceJunkPlayerSetup
     public bool IsWaitingForPlacement => placementPending;
 
     /// <summary>
-    /// **いま、このプレイヤーは動けるべきか。** 答え合わせ（<see cref="SpaceJunkLocalStateCheck"/>）が、
-    /// 実際の状態と比べるのに使う。
+    /// **いま、このプレイヤーは動けるべきか。** 置き直しが終わったときに、これに合わせて動けるようにする。
     /// </summary>
     public bool ControlShouldBeEnabled
     {

@@ -484,7 +484,7 @@ public partial class SpaceJunkSession : NetworkBehaviour
             return $"BOT {LocalMultiplayer.SeatOf(clientId) - BotSeatStart + 1}";
         }
 
-        foreach (FishingNetPlayer player in FishingNetPlayer.All)
+        foreach (SweeperNetPlayer player in SweeperNetPlayer.All)
         {
             if (player != null && player.IsSpawned && player.NetworkManager == NetworkManager
                 && player.PlayerKey == clientId)

@@ -41,7 +41,7 @@ public class SpaceJunkNameplate : MonoBehaviour
     [SerializeField] private bool showOwnName = true;
 
     /// <summary>名前を出す相手のプレイヤー。いなくなったら、このタグも消す。</summary>
-    private FishingNetPlayer owner;
+    private SweeperNetPlayer owner;
 
     /// <summary>名前の文字（チームの色）。</summary>
     private TextMesh text;
@@ -59,7 +59,7 @@ public class SpaceJunkNameplate : MonoBehaviour
     private Vector3 baseScale;
 
     /// <summary>どのプレイヤーの名前を出すかを決める。</summary>
-    public void Attach(FishingNetPlayer player)
+    public void Attach(SweeperNetPlayer player)
     {
         owner = player;
     }

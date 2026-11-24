@@ -11,9 +11,9 @@ using UnityEngine.TestTools;
 /// 通信なしで、新しい体のプレハブ（`SweeperPlayer.prefab`）と箱だけを置き、光線が当たった直後に押して確かめる。
 /// 距離の 100% は、ビームの長さの上限（Max Reach。12m）。溜めた長さには関係ない。
 /// ・近く（20% より手前）で押すと、**前へ投げる**（いつもの前へ投げる速さ × 強さ）
-/// ・投げとクリティカルの間（20〜29%）で押すと、強さ 0.5 で引っ張る
+/// ・投げとクリティカルの間（Throw Zone End〜Critical Near。今の値は 18〜33%）で押すと、強さ 0.5 で引っ張る
 /// ・クリティカルより遠くで押すと、**引っ張る**＝いつもの後ろへの投げの速さ × 強さ。強さが 1 より小さいので、体の後ろまでは届かず手前に落ちる
-/// ・29〜32% で押すと、今までどおりのクリティカルプル（体の後ろまで飛ぶ）
+/// ・Critical Near〜Far（今の値は 33〜40%）で押すと、今までどおりのクリティカルプル（体の後ろまで飛ぶ）
 ///
 /// 作り方は <c>SweeperHeavyBotTests</c> と同じ。設定はテストの間だけ変え、終わったら元に戻す。
 /// `Window > General > Test Runner` の EditMode から実行できる。
@@ -30,7 +30,7 @@ public class SweeperDistanceModeTests
         yield return new ExitPlayMode();
     }
 
-    /// <summary>投げとクリティカルの間（20〜29%）の引っ張りは、どこで押しても強さ 0.5。3m ÷ 12m＝25%。</summary>
+    /// <summary>投げとクリティカルの間（今の値は 18〜33%）の引っ張りは、どこで押しても強さ 0.5。3m ÷ 12m＝25%。</summary>
     [UnityTest]
     public IEnumerator MiddlePress_PullsAtHalfStrength()
     {
@@ -184,10 +184,13 @@ public class SweeperDistanceModeTests
                     yield return NextFrame();
                 }
                 Assert.That(reel.InCriticalWindow, Is.True, "クリティカルの距離に来なかった");
-                // クリティカルは距離で取る：ビームの長さの上限 12m の 29〜32%（3.48〜3.84m）
+                // クリティカルは距離で取る：ビームの長さの上限（12m）に、プレハブの Critical Near・Critical Far を掛けた範囲。
+                // 値は調整で変わるので、決め打ちせずにプレハブから読む（2026/11/24 に体のプレハブを1つにしたとき、試合の値 33〜40% になった）
+                Assert.That(reel.TryGetDistanceZones(out _, out float criticalNear, out float criticalFar), Is.True);
                 float pressedAt = Mathf.Abs(box.transform.position.z - player.transform.position.z);
-                Debug.Log($"[SweeperDistanceModeTests] クリティカルの距離に来た：{pressedAt:F2}m");
-                Assert.That(pressedAt, Is.InRange(3.3f, 4.0f), "クリティカルになった距離が、29〜32% ではない");
+                Debug.Log($"[SweeperDistanceModeTests] クリティカルの距離に来た：{pressedAt:F2}m（範囲 {criticalNear:F2}〜{criticalFar:F2}m）");
+                // 1フレームぶん動くので、両はしに少しだけ余裕を持たせる
+                Assert.That(pressedAt, Is.InRange(criticalNear - 0.2f, criticalFar + 0.05f), "クリティカルになった距離が、Critical Near〜Far の範囲ではない");
             }
             reel.Press();
             Assert.That(reel.IsActive, Is.False, "押しても飛ばなかった");

@@ -20,7 +20,7 @@ GameObject:
   - component: {fileID: 5661853083440883210}
   - component: {fileID: 4457384760071901500}
   m_Layer: 0
-  m_Name: FishingOnlineBomb
+  m_Name: SpaceJunkBomb
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0

@@ -318,7 +318,7 @@ public class SpaceJunkLandingIntro : MonoBehaviour
 
         if (session != null)
         {
-            foreach (FishingNetPlayer player in FishingNetPlayer.All)
+            foreach (SweeperNetPlayer player in SweeperNetPlayer.All)
             {
                 if (player != null && player.IsSpawned && session.TeamOf(player.PlayerKey) == team)
                 {
@@ -337,7 +337,7 @@ public class SpaceJunkLandingIntro : MonoBehaviour
 
         center /= count;
 
-        foreach (FishingNetPlayer player in FishingNetPlayer.All)
+        foreach (SweeperNetPlayer player in SweeperNetPlayer.All)
         {
             if (player != null && player.IsSpawned && session.TeamOf(player.PlayerKey) == team)
             {

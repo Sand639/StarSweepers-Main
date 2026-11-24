@@ -149,7 +149,7 @@ public class SpaceJunkLiftFloor : MonoBehaviour
         for (int i = 0; i < count; i++)
         {
             CharacterController controller = overlapBuffer[i] as CharacterController;
-            if (controller == null || !controller.enabled || controller.GetComponent<FishingPlayerController>() == null)
+            if (controller == null || !controller.enabled || controller.GetComponent<SweeperMover>() == null)
             {
                 continue;
             }
