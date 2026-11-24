@@ -47,6 +47,12 @@ public class PlayerStun : MonoBehaviour
     // 「_Color がありません」というエラーが出てしまう。そのためマテリアルごとに探す
     private int[] colorPropertyIds = new int[0];
 
+    // 体ごとに、服の色を塗る部品（Hans さんの CharacterColorController）。無い体は null。
+    // 服の色はチームの色を MaterialPropertyBlock で上書きしているので、マテリアルを塗っても隠れて見えない。
+    // そのため、この部品がある体は同じく MaterialPropertyBlock で赤く塗り、戻すときは部品に塗り直してもらう
+    private CharacterColorController[] suitPainters = new CharacterColorController[0];
+    private MaterialPropertyBlock suitBlock;
+
     // 探す順番。左ほど優先
     private static readonly int[] FallbackColorIds =
     {
@@ -74,6 +80,7 @@ public class PlayerStun : MonoBehaviour
     {
         originalColors = new Color[bodyRenderers.Length];
         colorPropertyIds = new int[bodyRenderers.Length];
+        suitPainters = new CharacterColorController[bodyRenderers.Length];
         for (int i = 0; i < bodyRenderers.Length; i++)
         {
             colorPropertyIds[i] = -1;
@@ -81,6 +88,14 @@ public class PlayerStun : MonoBehaviour
 
             if (bodyRenderers[i] == null)
             {
+                continue;
+            }
+
+            // 服の色の部品がある体は、マテリアルを複製せずに服の色の項目を塗る（戻すのは部品に任せる）
+            suitPainters[i] = FindSuitPainter(bodyRenderers[i]);
+            if (suitPainters[i] != null)
+            {
+                colorPropertyIds[i] = Shader.PropertyToID(suitPainters[i].colorProperty);
                 continue;
             }
 
@@ -126,6 +141,19 @@ public class PlayerStun : MonoBehaviour
         return -1;
     }
 
+    /// <summary>この体の服の色を塗っている部品を探す。無ければ null。</summary>
+    private CharacterColorController FindSuitPainter(Renderer body)
+    {
+        foreach (CharacterColorController painter in GetComponentsInChildren<CharacterColorController>(true))
+        {
+            if (painter.characterRenderer == body)
+            {
+                return painter;
+            }
+        }
+        return null;
+    }
+
     /// <summary>i 番目の体を、この色で塗る。色を持たないマテリアルなら何もしない。</summary>
     private void Paint(int i, Color color)
     {
@@ -133,7 +161,31 @@ public class PlayerStun : MonoBehaviour
         {
             return;
         }
+
+        CharacterColorController painter = i < suitPainters.Length ? suitPainters[i] : null;
+        if (painter != null)
+        {
+            suitBlock ??= new MaterialPropertyBlock();
+            bodyRenderers[i].GetPropertyBlock(suitBlock, painter.bodyMaterialIndex);
+            suitBlock.SetColor(colorPropertyIds[i], color);
+            bodyRenderers[i].SetPropertyBlock(suitBlock, painter.bodyMaterialIndex);
+            return;
+        }
+
         bodyRenderers[i].material.SetColor(colorPropertyIds[i], color);
+    }
+
+    /// <summary>i 番目の体を元の色に戻す。服の色の部品がある体は、部品にいまのチームの色で塗り直してもらう。</summary>
+    private void PaintOriginal(int i)
+    {
+        CharacterColorController painter = i < suitPainters.Length ? suitPainters[i] : null;
+        if (painter != null)
+        {
+            painter.ApplyColor();
+            return;
+        }
+
+        Paint(i, originalColors[i]);
     }
 
     /// <summary>
@@ -195,7 +247,14 @@ public class PlayerStun : MonoBehaviour
 
         for (int i = 0; i < originalColors.Length; i++)
         {
-            Paint(i, on ? stunColor : originalColors[i]);
+            if (on)
+            {
+                Paint(i, stunColor);
+            }
+            else
+            {
+                PaintOriginal(i);
+            }
         }
     }
 
@@ -203,7 +262,7 @@ public class PlayerStun : MonoBehaviour
     {
         for (int i = 0; i < originalColors.Length; i++)
         {
-            Paint(i, originalColors[i]);
+            PaintOriginal(i);
         }
     }
 }

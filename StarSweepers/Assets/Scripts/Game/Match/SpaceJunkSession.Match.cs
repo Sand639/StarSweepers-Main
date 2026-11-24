@@ -18,12 +18,16 @@ public partial class SpaceJunkSession
     /// </summary>
     public void ServerStartMatch()
     {
-        if (!IsServer)
+        LobbyTestDeparture departure = LobbyTestDeparture.Current;
+        if (!IsServer ||
+            (departure != null && (State != SpaceJunkMatchState.Lobby || TestBoardingTime <= 0 ||
+                                   NetworkManager.ServerTime.Time < TestBoardingTime + departure.Duration)))
         {
             return;
         }
 
         CancelLobbyStartCountdown();
+        roundResultActive = false;
         playersInTeamZones.Clear();
 
         if (!HasPlayableMapChoice)
@@ -54,7 +58,7 @@ public partial class SpaceJunkSession
     /// </summary>
     public void ServerReportRoundResult(int winnerTeam)
     {
-        if (!IsServer)
+        if (!IsServer || roundResultActive)
         {
             return;
         }
@@ -71,6 +75,7 @@ public partial class SpaceJunkSession
             return;
         }
 
+        roundResultActive = true;
         lastRoundWinner.Value = winnerTeam;
 
         if (winnerTeam >= 0 && winnerTeam < roundWins.Count)
@@ -109,7 +114,7 @@ public partial class SpaceJunkSession
         // ※ 2026/9/20 から `GamePause` が**つながっている間は時間を止めない**ように
         //    なったので、いまは止まらないはず。**それでも realtime のままにしておく。**
         //    ラウンドの進行を、ポーズの作りに依存させたくないため
-        yield return new WaitForSecondsRealtime(roundResultSeconds);
+        yield return PresentRoundResult(roundResultSeconds);
 
         if (!IsServer || state.Value != SpaceJunkMatchState.Playing)
         {
@@ -117,24 +122,49 @@ public partial class SpaceJunkSession
         }
 
         currentRound.Value = currentRound.Value + 1;
-        LoadNextMap();
+
+        // 全員の結果表示が終わってから、色帯で覆って次のマップへ進む。
+        while (IsSpawned && IsServer && state.Value == SpaceJunkMatchState.Playing)
+        {
+            if (SceneTransition.PlayForEveryone(() =>
+            {
+                HideRoundResultClientRpc();
+                roundResultActive = false;
+                LoadNextMap();
+            }, SceneTransitionType.RoundedStripes))
+            {
+                yield break;
+            }
+            yield return null;
+        }
     }
 
     /// <summary>試合の結果を見せる時間だけ待ってから、全員をロビーへ戻す。</summary>
     private IEnumerator ReturnToLobbyAfterDelay()
     {
         // 上と同じ理由で、止まらない時計で数える
-        yield return new WaitForSecondsRealtime(matchResultSeconds);
+        yield return PresentRoundResult(matchResultSeconds);
 
         if (!IsServer)
         {
             yield break;
         }
 
-        state.Value = SpaceJunkMatchState.Lobby;
-        currentRound.Value = 0;
-
-        LoadScene(lobbySceneName);
+        while (IsSpawned && IsServer && state.Value == SpaceJunkMatchState.MatchOver)
+        {
+            if (SceneTransition.PlayForEveryone(() =>
+            {
+                HideRoundResultClientRpc();
+                roundResultActive = false;
+                state.Value = SpaceJunkMatchState.Lobby;
+                currentRound.Value = 0;
+                LoadScene(lobbySceneName);
+            }, SceneTransitionType.RoundedStripes))
+            {
+                yield break;
+            }
+            yield return null;
+        }
     }
 
     /// <summary>
@@ -208,6 +238,8 @@ public partial class SpaceJunkSession
     /// <summary>試合を打ち切って、全員をロビーへ戻す。</summary>
     private void AbortToLobby()
     {
+        roundResultActive = false;
+        HideRoundResultClientRpc();
         state.Value = SpaceJunkMatchState.Lobby;
         currentRound.Value = 0;
         matchWinner.Value = -1;

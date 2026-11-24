@@ -79,7 +79,7 @@ public class SpaceJunkRadar : MonoBehaviour
     {
         // マップにいる間だけ。ポーズ中は出さない（ポーズ画面の邪魔をしないように）
         // OnGUI は1フレームに何度も呼ばれる（配置・入力・描画）。絵を描くだけなので、描画の回（Repaint）だけで描く
-        if (SpaceJunkRound.Current == null || GamePause.IsPaused || Event.current.type != EventType.Repaint)
+        if (RoundResultPlayback.IsPresenting || SpaceJunkRound.Current == null || GamePause.IsPaused || Event.current.type != EventType.Repaint)
         {
             return;
         }

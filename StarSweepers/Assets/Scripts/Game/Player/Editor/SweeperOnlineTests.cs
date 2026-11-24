@@ -145,6 +145,15 @@ public class SweeperOnlineTests
                 .SetValue(clientPlayer.GetComponent<SweeperShooter>(), (LayerMask)~(1 << 2));
             yield return Wait(0.5f); // 物資が床に落ち着くまで
 
+            // ---- 参加者の撃ち方（ポーズ画面の設定）が、ホストの画面の写しにも届く（2026/11/17） ----
+            SweeperShooter clientShooter = clientPlayer.GetComponent<SweeperShooter>();
+            SweeperShooter hostCopyShooter = clientPlayerOnHost.GetComponent<SweeperShooter>();
+            clientShooter.FollowSettings = false;
+            clientShooter.Style = SweeperShooter.ShotStyle.Aim;
+            yield return WaitFor("style-aim", () => hostCopyShooter.Style == SweeperShooter.ShotStyle.Aim);
+            clientShooter.Style = SweeperShooter.ShotStyle.Whip;
+            yield return WaitFor("style-whip", () => hostCopyShooter.Style == SweeperShooter.ShotStyle.Whip);
+
             // ---- 参加者が光線を撃つ（押す → 少し溜める → 離す） ----
             SweeperShooter shooter = clientPlayer.GetComponent<SweeperShooter>();
             SweeperReel reel = clientPlayer.GetComponent<SweeperReel>();

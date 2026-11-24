@@ -1,0 +1,228 @@
+using System.IO;
+using System.Linq;
+using Unity.Netcode;
+using Unity.Netcode.Transports.UTP;
+using UnityEditor;
+using UnityEditor.SceneManagement;
+using UnityEngine;
+using UnityEngine.SceneManagement;
+
+// 【一時的な確認用。コミットしない】タイトルから再生してホストになり、ロビーで自分の体を
+// 赤の床・青の床へ南から歩かせて、チームが変わるか・床の色・立つ高さを記録する。
+// 起動：Unity.exe -batchmode -projectPath … -executeMethod TempLobbyPadPlayProbe.Run -probeOut 出力フォルダ -logFile …
+[InitializeOnLoad]
+public static class TempLobbyPadPlayProbe
+{
+    const string Flag = "TempLobbyPadPlayProbe.Active";
+    const string OutKey = "TempLobbyPadPlayProbe.Out";
+    const string StepKey = "TempLobbyPadPlayProbe.Step";
+    const string TimeKey = "TempLobbyPadPlayProbe.T";
+    const string StartKey = "TempLobbyPadPlayProbe.Start";
+    const string FailKey = "TempLobbyPadPlayProbe.Fail";
+    const ushort Port = 17994;
+
+    static TempLobbyPadPlayProbe()
+    {
+        if (SessionState.GetBool(Flag, false))
+        {
+            EditorApplication.update += Tick;
+        }
+    }
+
+    public static void Run()
+    {
+        string[] args = System.Environment.GetCommandLineArgs();
+        string outDir = ".";
+        for (int i = 0; i < args.Length - 1; i++)
+        {
+            if (args[i] == "-probeOut") outDir = args[i + 1];
+        }
+        Directory.CreateDirectory(outDir);
+
+        SessionState.SetBool(Flag, true);
+        SessionState.SetString(OutKey, outDir);
+        SessionState.SetInt(StepKey, 0);
+        SessionState.SetInt(FailKey, 0);
+        SessionState.SetInt("TempLobbyPadPlayProbe.Out4", 0);
+        SessionState.SetFloat(TimeKey, 0f);
+        SessionState.SetFloat(StartKey, 0f);
+        EditorSceneManager.OpenScene("Assets/Scenes/MainLoop/TitleScene.unity");
+        EditorApplication.update += Tick;
+        EditorApplication.EnterPlaymode();
+    }
+
+    static float Now => (float)EditorApplication.timeSinceStartup;
+
+    static void Next(int step)
+    {
+        SessionState.SetInt(StepKey, step);
+        SessionState.SetFloat(TimeKey, Now);
+        Debug.Log($"[LPROBE] step -> {step}（シーン：{SceneManager.GetActiveScene().name} frame={Time.frameCount}）");
+    }
+
+    static void Tick()
+    {
+        if (!EditorApplication.isPlaying)
+        {
+            return;
+        }
+
+        Application.runInBackground = true;
+        if (EditorApplication.isPaused)
+        {
+            EditorApplication.isPaused = false;
+        }
+        EditorApplication.QueuePlayerLoopUpdate();
+
+        if (SessionState.GetFloat(TimeKey, 0f) <= 0f)
+        {
+            SessionState.SetFloat(TimeKey, Now);
+            SessionState.SetFloat(StartKey, Now);
+            return;
+        }
+
+        if (Now - SessionState.GetFloat(StartKey, 0f) > 150f)
+        {
+            Debug.Log("[LPROBE] 時間切れ");
+            Finish(3);
+            return;
+        }
+
+        try
+        {
+            Step(SessionState.GetInt(StepKey, 0), Now - SessionState.GetFloat(TimeKey, 0f));
+        }
+        catch (System.Exception e)
+        {
+            Debug.LogError("[LPROBE] 例外：" + e);
+            Finish(2);
+        }
+    }
+
+    static FishingNetPlayer Me => FishingNetPlayer.All.FirstOrDefault(p => p != null && p.IsOwner);
+
+    static void Step(int step, float waited)
+    {
+        switch (step)
+        {
+            case 0:
+                if (waited < 3f) return;
+                NetworkManager.Singleton.GetComponent<UnityTransport>().SetConnectionData("127.0.0.1", Port, "127.0.0.1");
+                Debug.Log($"[LPROBE] StartHost={NetworkManager.Singleton.StartHost()}");
+                Next(1);
+                break;
+
+            case 1: // ロビーに着いて体が出るのを待つ
+                if (waited < 5f || SpaceJunkSession.Current == null || Me == null || SceneManager.GetActiveScene().name != "Lobby") return;
+                foreach (LobbyTeamZone zone in Object.FindObjectsByType<LobbyTeamZone>(FindObjectsSortMode.None))
+                {
+                    Renderer r = zone.GetComponentInChildren<Renderer>();
+                    BoxCollider box = zone.GetComponent<BoxCollider>();
+                    Debug.Log($"[LPROBE] zone '{zone.name}' pad='{(r ? r.name : "none")}' color={(r ? r.material.color.ToString("F2") : "-")} mat={(r ? r.sharedMaterial.name : "-")} trigger={box.bounds.center:F3}/{box.bounds.size:F3}");
+                }
+                Debug.Log($"[LPROBE] 最初のチーム={SpaceJunkSession.Current.TeamOf(Me.PlayerKey)} state={SpaceJunkSession.Current.State} pos={Me.transform.position:F2}");
+                Place(new Vector3(-3f, 0.3f, 3.6f));
+                Next(2);
+                break;
+
+            case 2: // 赤の床へ南から歩く
+                if (Walk(waited, 6f)) Next(3);
+                break;
+
+            case 3: // 床の上で待つ → 赤（1）になっているか（1人だと全員がエリアにいる扱いで3秒で試合が始まるので、その前に出る）
+                if (waited < 1.2f) return;
+                Check("赤の床", 1);
+                Shot("on_red");
+                Next(4);
+                break;
+
+            case 4: // 南へ歩いてエリアを出る（瞬間移動だと「出た」の通知が来ない）→ 待ち時間が取り消されるのを待つ
+                if (SessionState.GetInt("TempLobbyPadPlayProbe.Out4", 0) == 0)
+                {
+                    if (!Walk(waited, 3.6f, -1f)) return;
+                    SessionState.SetInt("TempLobbyPadPlayProbe.Out4", 1);
+                    SessionState.SetFloat(TimeKey, Now);
+                    return;
+                }
+                if (waited < 0.8f) return;
+                Debug.Log($"[LPROBE] エリアの外 state={SpaceJunkSession.Current.State} チーム={SpaceJunkSession.Current.TeamOf(Me.PlayerKey)}");
+                Place(new Vector3(3f, 0.3f, 3.6f));
+                Next(5);
+                break;
+
+            case 5: // 青の床へ南から歩く
+                if (Walk(waited, 6f)) Next(6);
+                break;
+
+            case 6: // 床の上で待つ → 青（0）になっているか
+                if (waited < 1.2f) return;
+                Check("青の床", 0);
+                Shot("on_blue");
+                Finish(SessionState.GetInt(FailKey, 0) == 0 ? 0 : 1);
+                break;
+        }
+    }
+
+    static void Place(Vector3 position)
+    {
+        FishingNetPlayer me = Me;
+        CharacterController cc = me.GetComponent<CharacterController>();
+        if (cc != null) cc.enabled = false;
+        me.transform.SetPositionAndRotation(position, Quaternion.identity);
+        if (cc != null) cc.enabled = true;
+    }
+
+    // CharacterController で北（dir=1）か南（dir=-1）へ少しずつ動かす。z が目標に着いたら true（3秒で打ち切り）
+    static bool Walk(float waited, float targetZ, float dir = 1f)
+    {
+        FishingNetPlayer me = Me;
+        CharacterController cc = me.GetComponent<CharacterController>();
+        bool arrived = (me.transform.position.z - targetZ) * dir >= 0f;
+        if (arrived || waited > 3f)
+        {
+            Debug.Log($"[LPROBE] 歩き終わり pos={me.transform.position:F3} 目標z={targetZ} {(arrived ? "着いた" : "着かなかった")}");
+            if (!arrived) SessionState.SetInt(FailKey, 1);
+            return true;
+        }
+        if (cc != null && cc.enabled) cc.Move(new Vector3(0f, -0.05f, 0.08f * dir));
+        else me.transform.position += new Vector3(0f, 0f, 0.08f * dir);
+        return false;
+    }
+
+    static void Check(string label, int expected)
+    {
+        FishingNetPlayer me = Me;
+        int team = SpaceJunkSession.Current.TeamOf(me.PlayerKey);
+        bool ok = team == expected;
+        if (!ok) SessionState.SetInt(FailKey, 1);
+        Debug.Log($"[LPROBE] {label}：チーム={team}（期待 {expected}）{(ok ? "OK" : "NG")} pos={me.transform.position:F3} state={SpaceJunkSession.Current.State}");
+    }
+
+    static void Shot(string label)
+    {
+        const int w = 1280, h = 720;
+        RenderTexture rt = new RenderTexture(w, h, 24);
+        foreach (Camera c in Camera.allCameras.OrderBy(c => c.depth))
+        {
+            RenderTexture old = c.targetTexture;
+            c.targetTexture = rt;
+            c.Render();
+            c.targetTexture = old;
+        }
+        RenderTexture.active = rt;
+        Texture2D tex = new Texture2D(w, h, TextureFormat.RGB24, false);
+        tex.ReadPixels(new Rect(0, 0, w, h), 0, 0);
+        tex.Apply();
+        RenderTexture.active = null;
+        File.WriteAllBytes(Path.Combine(SessionState.GetString(OutKey, "."), $"{label}.png"), tex.EncodeToPNG());
+        Object.DestroyImmediate(tex);
+        rt.Release();
+    }
+
+    static void Finish(int code)
+    {
+        SessionState.SetBool(Flag, false);
+        Debug.Log($"[LPROBE] finish {code}");
+        EditorApplication.Exit(code);
+    }
+}

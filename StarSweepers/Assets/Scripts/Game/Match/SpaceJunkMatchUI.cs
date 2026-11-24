@@ -61,7 +61,7 @@ public class SpaceJunkMatchUI : MonoBehaviour
     {
         SpaceJunkRound round = SpaceJunkRound.Current;
 
-        if (!showUi || round == null)
+        if (!showUi || round == null || RoundResultPlayback.IsPresenting)
         {
             return;
         }
@@ -85,6 +85,14 @@ public class SpaceJunkMatchUI : MonoBehaviour
         titleY = timerOnBar ? barBottom + 4f : 8f;
         eventY = timerOnBar ? barBottom + 28f : 70f;
         listY = timerOnBar ? Mathf.Max(96f, barBottom + 56f) : 96f;
+
+        // 高単価デブリのルーレット（HighValueRouletteUI）が出ている間は、真ん中の見出しとイベントの一行をその下へずらす（左のチームの行はそのまま）
+        float rouletteBottom = HighValueRouletteUI.OccupiedScreenHeight / scale;
+        if (rouletteBottom > 0f)
+        {
+            titleY = Mathf.Max(titleY, rouletteBottom + 4f);
+            eventY = Mathf.Max(eventY, rouletteBottom + 28f);
+        }
 
         DrawHeader(round, viewWidth);
         DrawTeamProgress(round, viewWidth);
@@ -277,6 +285,12 @@ public class SpaceJunkMatchUI : MonoBehaviour
             return;
         }
 
+        // お題を画像で出す UI（DebrisSetUI）が出ている間は、この文字の行は出さない
+        if (DebrisSetUI.IsShowing)
+        {
+            return;
+        }
+
         GUILayout.BeginHorizontal();
         GUILayout.Space(16f);
 
@@ -365,11 +379,14 @@ public class SpaceJunkMatchUI : MonoBehaviour
         // 始まって 4 秒間は、画面の上から 3 割の高さに大きく合図を出す（高さ 110 の枠の真ん中をそこに合わせる）
         if (since < 4f)
         {
+            // 高単価デブリの種類は、ルーレット（HighValueRouletteUI）が止まってから出す（回っている間に答えが見えないように）
+            string highValue = HighValueRouletteUI.IsSpinning ? string.Empty : HighValueText(round, "\n");
+
             Color saved = GUI.color;
             GUI.color = new Color(1f, 0.9f, 0.4f);
             GUI.Label(new Rect(0f, viewHeight * 0.3f - 55f, viewWidth, 110f),
                       $"イベント発生！　{round.EventName}\n" +
-                      $"<size=16>{round.EventDescription}{HighValueText(round, "\n")}</size>",
+                      $"<size=16>{round.EventDescription}{highValue}</size>",
                       resultStyle);
             GUI.color = saved;
             return;

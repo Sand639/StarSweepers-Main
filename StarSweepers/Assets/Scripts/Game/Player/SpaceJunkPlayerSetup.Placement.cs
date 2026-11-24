@@ -47,7 +47,7 @@ public partial class SpaceJunkPlayerSetup
     {
         get
         {
-            if (placementPending || respawnRemaining > 0f)
+            if (placementPending || respawnRemaining > 0f || LobbyTestDeparture.Current?.IsBoarding == true)
             {
                 return false;
             }
@@ -142,7 +142,9 @@ public partial class SpaceJunkPlayerSetup
     private static bool IsInLobbyScene()
     {
         string lobby = SpaceJunkSession.Current != null ? SpaceJunkSession.Current.LobbySceneName : TitleScreen.LobbySceneName;
-        return UnityEngine.SceneManagement.SceneManager.GetActiveScene().name == lobby;
+        UnityEngine.SceneManagement.Scene active = UnityEngine.SceneManagement.SceneManager.GetActiveScene();
+        LobbyTestDeparture departure = LobbyTestDeparture.Current;
+        return active.name == lobby || (departure != null && departure.gameObject.scene == active);
     }
 
     /// <summary>

@@ -58,10 +58,11 @@ public partial class SpaceJunkRound
         // 後ろから見る（途中で外しても、まだ見ていない番号がずれないように）
         for (int i = ids.Count - 1; i >= 0; i--)
         {
+            // ゴールの渦に吸い込まれている途中は、まだある（吸い込み終わったときにボーナスを数えるため）
             bool alive = NetworkManager.SpawnManager.SpawnedObjects.TryGetValue(ids[i], out NetworkObject networkObject)
                          && networkObject != null
                          && networkObject.TryGetComponent(out HookableObject item)
-                         && !item.IsVanished;
+                         && (!item.IsVanished || item.IsAbsorbing);
 
             if (!alive)
             {

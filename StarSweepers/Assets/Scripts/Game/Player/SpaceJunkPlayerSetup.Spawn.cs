@@ -5,6 +5,12 @@ using UnityEngine.InputSystem.LowLevel;
 /// <summary>SpaceJunkPlayerSetup の「出てくる場所を決める」（SpaceJunkPlayerSetup.cs から分けた部分）。</summary>
 public partial class SpaceJunkPlayerSetup
 {
+    public void MoveWithLobbyTestShip(Vector3 position)
+    {
+        SetControlEnabled(false);
+        SetSpawnTransform(position, transform.rotation);
+    }
+
     /// <summary>
     /// **自分のチームのゴールの手前（横一列の自分の場所）**へ移す。見つからなければ円周上へ散らす。
     ///

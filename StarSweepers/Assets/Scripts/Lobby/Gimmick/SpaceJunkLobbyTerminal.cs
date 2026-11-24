@@ -125,7 +125,7 @@ public class SpaceJunkLobbyTerminal : MonoBehaviour
 
         // 色と操作は、開く・閉じるが切り替わったときだけでなく毎フレーム合わせ直している
         ApplyHighlight();
-        SetLocalPlayerControlEnabled(!IsOpen);
+        SetLocalPlayerControlEnabled(!IsOpen && LobbyTestDeparture.Current?.IsBoarding != true);
     }
 
     /// <summary>詳細設定を閉じる。画面の「閉じる」ボタンから呼ばれる。</summary>

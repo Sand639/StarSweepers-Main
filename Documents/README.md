@@ -4,7 +4,7 @@
 | --- | --- |
 | 製作者 | 大槻 海斗 |
 | 作成日 | 2026年8月28日（金） |
-| 最終更新日 | 2026年11月11日（水）　変更者：Claude Code |
+| 最終更新日 | 2026年11月24日（火）　変更者：Claude Code |
 | リポジトリ | https://github.com/Sand639/StarSweepers-Main （本制作用）　旧：https://github.com/Sand639/StarSweepers （保管用） |
 
 > ⚠️ **2026/11/4 に、本制作（宇宙ごみ集め）に必要な物だけを集めた、このリポジトリに移りました。**
@@ -253,12 +253,12 @@ StarSweepers-Main/                     ← リポジトリのルート
     │   │   │                     Match＝試合の進行、Camera、Bot、Effect＝演出、UI＝試合中の表示
     │   │   ├── Common/           どのシーンでも使う土台：Input＝入力、Network＝通信、Settings＝設定・ポーズ画面、UI＝ポインター・フォント・シーンを切り替えるときの演出
     │   │   └── SG_Character/・SG_Stage/  Hansさんのスクリプト（動かす前に本人の了承が要る）
-    │   ├── Resources/            名前で読み込むもの（タイトル・ロビーの画面のプレハブ、ボタンのテーマ、名前タグ）
+    │   ├── Resources/            名前で読み込むもの（タイトル・ロビーの画面のプレハブ、ボタンのテーマ、名前タグ、デブリセットのUI、高単価デブリのルーレットUI）
     │   └── Scenes/               シーン（直下の SpaceJunkMapList.asset は、使うマップの一覧）
     │       ├── MainLoop/             タイトルとロビー（TitleScene・Lobby。2026/11/11 から Lobby。前のロビー SpaceJunkLobby は使っていない）
     │       ├── Stage/            ステージ（`STAGE_Simple`・`STAGE_Train` など。名前の付け方と一覧は `宇宙ごみのマップの作り方.md`）
     │       ├── HansStages/       Hansさんのステージ
-    │       └── Test/             機能ごとの検証用シーン（ビルドには含めない）。いまは `SceneTransitionTest` だけ（ほかはメニューで作る）
+    │       └── Test/             機能ごとの検証用シーン（ビルドには含めない）。いまは `SceneTransitionTest`・`TeamScoreBarUITest`・`DebrisSetUITest`・`StageBarrierTest`・`GoalScoreEffectTest`・`HighValueRouletteUITest`・`ProceduralStarrySkyTest`・`GoalEffectTest`・`SweeperWhipTest`・`ElectricDebrisTest`（ほかはメニューで作る）
     ├── Packages/
     ├── steam_appid.txt           Steam のテスト用の App ID（480）。Steam の外で起動するときに使う
     └── ProjectSettings/
@@ -753,4 +753,12 @@ Unityは `.meta` ファイルで各アセットの参照を管理しているた
 | 11/8（日） | Claude Code | **ドキュメント点検（第4回）。** 依頼文の例に残っていた、このリポジトリに無いシーン名（`SampleScene`）を `STAGE_Simple` に直した。ルールの部分は変えていない |
 | 11/10（火） | Claude Code | リポジトリ構成の図を今の状態に合わせた（`Scripts/Common/UI/` にシーンを切り替えるときの演出が入った、`Scenes/Test/` に検証シーン `SceneTransitionTest` ができた）。ルールの部分は変えていない |
 | 11/11（水） | Claude Code | リポジトリ構成の図の `MainLoop/` を、新しいロビー `Lobby` に合わせた（大槻さんの依頼でロビーを切り替えたため）。ルールの部分は変えていない |
+| 11/11（水） | Claude Code | リポジトリ構成の図を今の状態に合わせた（`Resources/` にデブリセットのUIのプレハブが入った、`Scenes/Test/` の検証シーンに `TeamScoreBarUITest`・`DebrisSetUITest` を足した）。ルールの部分は変えていない |
+| 11/12（木） | Claude Code | リポジトリ構成の図を今の状態に合わせた（`Resources/` に高単価デブリのルーレットUIのプレハブが入った、`Scenes/Test/` の検証シーンに `StageBarrierTest`・`HighValueRouletteUITest` を足した）。ルールの部分は変えていない |
+| 11/12（木） | Claude Code | リポジトリ構成の図の `Scenes/Test/` の検証シーンに `StageBarrierTest`・`GoalScoreEffectTest` を足した（バリアとゴールの得点の演出の検証シーンができたため）。ルールは変えていない |
+| 11/17（火） | Claude Code | リポジトリ構成の図の `Scenes/Test/` の検証シーンに `SweeperWhipTest` を足した（鞭のように曲がる光線の検証シーンができたため）。ルールは変えていない |
+| 11/17（火） | Claude Code | リポジトリ構成の図の `Scenes/Test/` の検証シーンに `ProceduralStarrySkyTest` を足した（計算で作る星空の検証シーンができたため）。ルールは変えていない |
+| 11/17（火） | Claude Code | リポジトリ構成の図の `Scenes/Test/` の検証シーンに `GoalEffectTest` を足した（ゴールの渦の検証シーンができたため）。ルールは変えていない |
+| 11/17（火） | Claude Code | リポジトリ構成の図の `Scenes/Test/` の検証シーン `GoalVortexTest` を `GoalEffectTest` にした（名前から SpaceJunk を外す整理で、検証シーンの名前も変えたため）。ルールは変えていない |
+| 11/21（土） | Claude Code | リポジトリ構成の図の `Scenes/Test/` の検証シーンに `ElectricDebrisTest` を足した（電気のデブリの検証シーンができたため）。ルールは変えていない |
 | 11/24（火） | Qoder（依頼：呉迪芝） | メンバー構成のプランナーに**呉迪芝**を追加した（本人の申告による。`（未記入）` の欄はサブリーダーのものかもしれないので残してある）。ルールの部分は変えていない |

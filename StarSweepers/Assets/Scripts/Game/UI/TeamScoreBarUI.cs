@@ -25,6 +25,22 @@ public sealed class TeamScoreBarUI : MonoBehaviour
     [Tooltip("真ん中の丸の中の、残り時間の文字")]
     [SerializeField] private TMP_Text timeText;
 
+    [Tooltip("いま何ラウンド目かの文字。空なら出さない")]
+    [SerializeField] private TMP_Text roundText;
+
+    [Tooltip("画面の上で使っている範囲（この下の端まで）。空なら時間の文字の親を使う")]
+    [SerializeField] private RectTransform occupiedArea;
+
+    [Header("回合・時間の書き方")]
+    [Tooltip("ラウンドの文字の書き方。{0} がラウンドの番号")]
+    [SerializeField] private string roundFormat = "ROUND {0:00}";
+
+    [Tooltip("残り時間の書き方。MinutesSeconds＝1:23、Seconds＝083 のような秒だけ")]
+    [SerializeField] private TimeStyle timeStyle = TimeStyle.MinutesSeconds;
+
+    [Tooltip("秒だけのときの桁数（3 なら 035）")]
+    [SerializeField, Range(1, 4)] private int secondsDigits = 3;
+
     [Header("見た目")]
     [Tooltip("帯の幅が新しい比率に追いつく速さ。大きいほど速い。0 だとすぐ切り替わる")]
     [SerializeField, Min(0f)] private float smoothSpeed = 6f;
@@ -63,6 +79,9 @@ public sealed class TeamScoreBarUI : MonoBehaviour
     [Tooltip("テストのチーム数")]
     [SerializeField, Range(1, MaxTeams)] private int testTeamCount = 2;
 
+    [Tooltip("テストのラウンドの番号")]
+    [SerializeField, Min(1)] private int testRound = 1;
+
     [Tooltip("テストの得点（チーム番号順）。再生中に書き換えると、バーがその比率へ動く")]
     [SerializeField] private int[] testScores = new int[MaxTeams];
 
@@ -74,6 +93,13 @@ public sealed class TeamScoreBarUI : MonoBehaviour
 
     [Tooltip("自動で得点を足す間隔（秒）")]
     [SerializeField, Min(0.1f)] private float testAutoScoreInterval = 1.5f;
+
+    /// <summary>残り時間の書き方。</summary>
+    public enum TimeStyle
+    {
+        MinutesSeconds,
+        Seconds,
+    }
 
     /// <summary>得点が変わったときに呼ぶ（チーム番号, 新しい得点, 増えた量）。</summary>
     public event Action<int, int, int> ScoreChanged;
@@ -142,10 +168,12 @@ public sealed class TeamScoreBarUI : MonoBehaviour
         OccupiedScreenHeight = 0f;
     }
 
-    /// <summary>画面の上から、時間の丸の下の端までのピクセル数を測る。</summary>
+    /// <summary>画面の上から、使っている範囲の下の端までのピクセル数を測る。</summary>
     private float MeasureOccupiedHeight()
     {
-        RectTransform circle = timeText != null ? timeText.rectTransform.parent as RectTransform : null;
+        RectTransform circle = occupiedArea != null
+            ? occupiedArea
+            : timeText != null ? timeText.rectTransform.parent as RectTransform : null;
         if (circle == null)
         {
             return 0f;
@@ -160,7 +188,7 @@ public sealed class TeamScoreBarUI : MonoBehaviour
 
     private void Update()
     {
-        if (!TryReadValues(out int teamCount, out float remaining))
+        if (RoundResultPlayback.IsPresenting || !TryReadValues(out int teamCount, out float remaining))
         {
             SetVisible(false);
             wasVisible = false;
@@ -178,8 +206,24 @@ public sealed class TeamScoreBarUI : MonoBehaviour
         UpdateShares(snap);
         ApplyLayout();
         ApplyTime(remaining);
+        ApplyRound();
 
         wasVisible = true;
+    }
+
+    /// <summary>いま何ラウンド目かを出す（ラウンドが無いときはテスト用の番号）。</summary>
+    private void ApplyRound()
+    {
+        if (roundText == null)
+        {
+            return;
+        }
+
+        int number = SpaceJunkRound.Current != null && SpaceJunkSession.Current != null
+            ? SpaceJunkSession.Current.CurrentRound
+            : testRound;
+
+        roundText.text = string.Format(roundFormat, Mathf.Max(1, number));
     }
 
     /// <summary>ラウンドかテスト用の値から、出す値を読む。どちらも無ければ false。</summary>
@@ -387,7 +431,9 @@ public sealed class TeamScoreBarUI : MonoBehaviour
 
         // 切り上げて出す（残り 0.3 秒は「0:01」。0:00 になった瞬間に時間切れになるように）
         int total = Mathf.CeilToInt(Mathf.Max(0f, remaining));
-        timeText.text = $"{total / 60}:{total % 60:00}";
+        timeText.text = timeStyle == TimeStyle.Seconds
+            ? total.ToString(new string('0', secondsDigits))
+            : $"{total / 60}:{total % 60:00}";
         timeText.color = remaining <= warnSeconds ? warnTimeColor : timeColor;
     }
 

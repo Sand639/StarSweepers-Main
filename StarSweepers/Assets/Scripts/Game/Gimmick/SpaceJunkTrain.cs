@@ -26,6 +26,16 @@ using UnityEngine;
 /// </summary>
 public class SpaceJunkTrain : MonoBehaviour
 {
+    public enum TrainPattern
+    {
+        Always = 0,
+        SidePair = 1,
+        CenterLarge = 2,
+    }
+
+    [Tooltip("Always は従来どおり。SidePair と CenterLarge は同じ間隔・時刻の設定で使う")]
+    [SerializeField] private TrainPattern pattern = TrainPattern.Always;
+
     /// <summary>走る向き。</summary>
     public enum TrainDirection
     {
@@ -135,7 +145,7 @@ public class SpaceJunkTrain : MonoBehaviour
         // 片側の端から走り始めて、反対の端（2倍の距離）まで行ったら今回の通過は終わり
         float halfLength = Mathf.Max(1f, runHalfLength);
         float travelled = sinceStart * Mathf.Max(0.1f, Mathf.Abs(moveSpeed));
-        bool running = travelled <= halfLength * 2f;
+        bool running = RunsInCycle(index) && travelled <= halfLength * 2f;
 
         if (body.gameObject.activeSelf != running)
         {
@@ -194,6 +204,25 @@ public class SpaceJunkTrain : MonoBehaviour
 
         // 速さがマイナスなら逆向き
         return moveSpeed >= 0f ? south : !south;
+    }
+
+    private bool RunsInCycle(long index)
+    {
+        if (pattern == TrainPattern.Always)
+        {
+            return true;
+        }
+
+        // 同じ通過番号なら、参加者のPCとボットの予測も同じ組み合わせを選ぶ。
+        unchecked
+        {
+            ulong hash = (ulong)index + 0x9E3779B97F4A7C15UL;
+            hash = (hash ^ (hash >> 30)) * 0xBF58476D1CE4E5B9UL;
+            hash = (hash ^ (hash >> 27)) * 0x94D049BB133111EBUL;
+            hash ^= hash >> 31;
+            bool center = (hash & 1UL) != 0;
+            return center == (pattern == TrainPattern.CenterLarge);
+        }
     }
 
     /// <summary>
@@ -259,6 +288,62 @@ public class SpaceJunkTrain : MonoBehaviour
         ThrowController.ReleaseTargetForExplosion(item);
         item.Body.isKinematic = false;
         item.Body.AddForce(velocity, ForceMode.VelocityChange);
+    }
+
+    // ------------------------------------------------------------
+    // ボットに教える情報（読むだけ。列車の動きは変えない）
+    // ------------------------------------------------------------
+
+    /// <summary>線路の真ん中の線から、列車の横のはしまでの距離（m）。</summary>
+    public float HalfWidth => trainSize.x * 0.5f;
+
+    /// <summary>線路の真ん中から、端（現れる・消える場所）までの距離（m）。</summary>
+    public float RunHalfLength => Mathf.Max(1f, runHalfLength);
+
+    /// <summary><paramref name="point"/> が、線路の帯（列車の幅＋<paramref name="margin"/>）の中にあるか。</summary>
+    public bool InBand(Vector3 point, float margin)
+    {
+        Vector3 offset = point - transform.position;
+        return Mathf.Abs(Vector3.Dot(offset, transform.right)) <= HalfWidth + margin
+               && Mathf.Abs(Vector3.Dot(offset, transform.forward)) <= RunHalfLength;
+    }
+
+    /// <summary>
+    /// 列車が <paramref name="point"/> の所を通るまでの秒数（<paramref name="horizon"/> 秒より先・帯の外なら float.MaxValue）。
+    /// 時計から列車の場所を出す計算は <see cref="Update"/> と同じ。
+    /// </summary>
+    public float SecondsUntilPasses(Vector3 point, float margin, float horizon)
+    {
+        if (!InBand(point, margin))
+        {
+            return float.MaxValue;
+        }
+
+        float along = Vector3.Dot(point - transform.position, transform.forward);
+        float interval = Mathf.Max(1f, intervalSeconds);
+        float halfLength = RunHalfLength;
+        float speed = Mathf.Max(0.1f, Mathf.Abs(moveSpeed));
+        double now = SharedClock() - timeOffsetSeconds;
+
+        for (float t = 0f; t <= horizon; t += 0.05f)
+        {
+            double clock = now + t;
+            long index = (long)System.Math.Floor(clock / interval);
+            float travelled = (float)(clock - index * (double)interval) * speed;
+            if (!RunsInCycle(index) || travelled > halfLength * 2f)
+            {
+                continue;
+            }
+
+            float sign = GoesSouth(index) ? -1f : 1f;
+            float trainAlong = -sign * halfLength + sign * travelled;
+            if (Mathf.Abs(trainAlong - along) <= trainSize.z * 0.5f + margin)
+            {
+                return t;
+            }
+        }
+
+        return float.MaxValue;
     }
 
     private void OnDrawGizmos()

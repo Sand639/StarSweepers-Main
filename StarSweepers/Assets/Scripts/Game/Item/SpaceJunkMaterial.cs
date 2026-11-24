@@ -151,6 +151,9 @@ public class SpaceJunkMaterial : MonoBehaviour
     private void Start()
     {
         ApplyColor();
+
+        // 電気系の部品（回路基板など）なら、電気のデブリの能力と見た目を付ける（2026/11/21）
+        ElectricDebris.AttachIfElectric(this);
     }
 
     /// <summary>種類の色を見た目に塗る。</summary>

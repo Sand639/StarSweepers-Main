@@ -19,6 +19,12 @@ public enum SceneTransitionType
 
     [InspectorName("ワイプ（横から幕が引かれる）")]
     Wipe = 1,
+
+    [InspectorName("勝ったチームの色（ラウンドの終わり。仮）")]
+    RoundWinner = 2,
+
+    [InspectorName("丸い色帯（右から覆って左へ抜ける）")]
+    RoundedStripes = 3,
 }
 
 /// <summary>
@@ -36,6 +42,8 @@ public abstract class SceneTransitionEffect
         {
             case SceneTransitionType.Fade: return new FadeTransitionEffect();
             case SceneTransitionType.Wipe: return new WipeTransitionEffect();
+            case SceneTransitionType.RoundWinner: return new RoundWinnerTransitionEffect();
+            case SceneTransitionType.RoundedStripes: return new RoundedStripesTransitionEffect();
         }
 
         Debug.LogWarning($"[TRANSITION] 種類「{type}」の演出が SceneTransitionEffect.Create に書かれていないので、フェードで出します。");

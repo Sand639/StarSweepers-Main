@@ -72,6 +72,11 @@ public partial class SpaceJunkSession
         if (inside)
         {
             playersInTeamZones[playerKey] = zoneTeam;
+            if (LobbyTestDeparture.Current != null)
+            {
+                return;
+            }
+
             if (playerKey == NetworkManager.ServerClientId && !lobbyCountdownActive)
             {
                 BeginLobbyStartCountdown(10f, true);
@@ -94,7 +99,7 @@ public partial class SpaceJunkSession
 
     private void ServerApplyLobbyZoneTeam(ulong playerKey, int team, ulong senderClientId)
     {
-        if (!IsServer || State != SpaceJunkMatchState.Lobby || !HasSlot(playerKey) ||
+        if (!IsServer || State != SpaceJunkMatchState.Lobby || !HasSlot(playerKey) || TestBoardingTime > 0 ||
             LocalMultiplayer.ClientOf(playerKey) != senderClientId ||
             !playersInTeamZones.TryGetValue(playerKey, out int currentTeam) || currentTeam != team)
         {
