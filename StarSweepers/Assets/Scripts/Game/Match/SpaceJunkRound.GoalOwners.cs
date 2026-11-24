@@ -65,7 +65,7 @@ public partial class SpaceJunkRound
     /// </summary>
     private void SetLocalPlayerControlEnabled(bool enabledState)
     {
-        foreach (FishingNetPlayer player in FishingNetPlayer.All)
+        foreach (SweeperNetPlayer player in SweeperNetPlayer.All)
         {
             if (player == null || !player.IsOwner)
             {

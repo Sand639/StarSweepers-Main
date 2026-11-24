@@ -324,7 +324,7 @@ public class GoalEffect : MonoBehaviour
         }
 
         // 引っ掛けられている物・持ち主がまだホストに戻っていない物は、手を離されてから
-        FishingNetSupply supply = item.GetComponent<FishingNetSupply>();
+        NetSupply supply = item.GetComponent<NetSupply>();
         if (supply != null && supply.IsSpawned && (supply.IsClaimed || !supply.IsOwner || !supply.IsServer))
         {
             return;

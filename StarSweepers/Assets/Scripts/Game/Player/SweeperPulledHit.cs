@@ -19,10 +19,10 @@ using UnityEngine;
 ///
 /// ### どのPCが判定するか（オンライン）
 ///
-/// **ぶつかられた人のPCが、自分の体についてだけ判定する**（爆弾の被害と同じ考え方。<see cref="FishingNetBomb"/>）。
+/// **ぶつかられた人のPCが、自分の体についてだけ判定する**（爆弾の被害と同じ考え方。<see cref="NetBomb"/>）。
 /// 自分の画面で当たったら自分が飛ぶので、操作が止まるまでの遅れが無い。ボットの体はホストのPCで判定する。
-/// 「誰が引っ張っているか」は、物資の持ち主の番号（<see cref="FishingNetSupply.HookedByPlayerIndex"/>）で全員にそろっている。
-/// 爆弾の即爆発だけは、ホスト経由で全員に配る（<see cref="FishingNetBomb.RequestDetonate"/>）。
+/// 「誰が引っ張っているか」は、物資の持ち主の番号（<see cref="NetSupply.HookedByPlayerIndex"/>）で全員にそろっている。
+/// 爆弾の即爆発だけは、ホスト経由で全員に配る（<see cref="NetBomb.RequestDetonate"/>）。
 ///
 /// この部品はプレハブに付けなくても、<see cref="SweeperReel"/> が起動時に自分で付ける（値を変えたいときだけプレハブに付ける）。
 /// 詳しくは `Documents/機能ドキュメント/引っ張った物がぶつかった人のスタン.md`。
@@ -69,7 +69,7 @@ public class SweeperPulledHit : MonoBehaviour
     private SweeperReel reel;
     private SweeperShooter shooter;
     private PlayerStun stun;
-    private FishingNetPlayer netPlayer;
+    private SweeperNetPlayer netPlayer;
 
     // この時刻までは当たらない（スタン中・スタン直後）
     private float immuneUntil;
@@ -87,7 +87,7 @@ public class SweeperPulledHit : MonoBehaviour
         reel = GetComponent<SweeperReel>();
         shooter = GetComponent<SweeperShooter>();
         stun = GetComponent<PlayerStun>();
-        netPlayer = GetComponent<FishingNetPlayer>();
+        netPlayer = GetComponent<SweeperNetPlayer>();
     }
 
     private void OnEnable()
@@ -184,7 +184,7 @@ public class SweeperPulledHit : MonoBehaviour
         }
 
         // オンラインで、ほかのPCの人が引っ張っている物（その人の巻き取りはこのPCでは動いていない）
-        FishingNetSupply supply = item.GetComponent<FishingNetSupply>();
+        NetSupply supply = item.GetComponent<NetSupply>();
         if (supply != null && supply.IsSpawned && supply.IsClaimed)
         {
             pullerIndex = supply.HookedByPlayerIndex;
@@ -211,7 +211,7 @@ public class SweeperPulledHit : MonoBehaviour
         if (!hitByTeammates && online && pullerIndex >= 0)
         {
             // チームはロビーでホストが決めたもの（参加番号の並びとは関係ない）
-            int pullerTeam = FishingNetPlayer.TeamOfPlayerIndex(pullerIndex);
+            int pullerTeam = SweeperNetPlayer.TeamOfPlayerIndex(pullerIndex);
             return pullerTeam < 0 || pullerTeam != netPlayer.TeamIndex;
         }
 
@@ -260,7 +260,7 @@ public class SweeperPulledHit : MonoBehaviour
             return;
         }
 
-        FishingNetBomb netBomb = item.GetComponent<FishingNetBomb>();
+        NetBomb netBomb = item.GetComponent<NetBomb>();
         if (netBomb != null && netBomb.IsSpawned)
         {
             netBomb.RequestDetonate();

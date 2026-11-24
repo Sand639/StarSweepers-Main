@@ -76,8 +76,8 @@ public class SweeperOnlineTests
             yield return WaitFor("step1", () => client.IsConnectedClient && FindPlayer(client, client.LocalClientId) != null
                 && FindPlayer(host, client.LocalClientId) != null);
 
-            FishingNetPlayer clientPlayer = FindPlayer(client, client.LocalClientId);
-            FishingNetPlayer clientPlayerOnHost = FindPlayer(host, client.LocalClientId);
+            SweeperNetPlayer clientPlayer = FindPlayer(client, client.LocalClientId);
+            SweeperNetPlayer clientPlayerOnHost = FindPlayer(host, client.LocalClientId);
             Assert.That(clientPlayer.IsOwner, Is.True);
             Assert.That(clientPlayer.GetComponent<SweeperNetSync>(), Is.Not.Null);
             yield return WaitFor("step2", () => clientPlayer.PlayerIndex >= 0);
@@ -90,7 +90,7 @@ public class SweeperOnlineTests
             GameObject supplyObject = Object.Instantiate(supplyPrefab, target, Quaternion.identity);
             NetworkObject supplyNetwork = supplyObject.GetComponent<NetworkObject>();
             supplyNetwork.Spawn();
-            FishingNetSupply hostSupply = supplyObject.GetComponent<FishingNetSupply>();
+            NetSupply hostSupply = supplyObject.GetComponent<NetSupply>();
             ulong supplyId = supplyNetwork.NetworkObjectId;
 
             yield return WaitFor("step3", () => client.SpawnManager.SpawnedObjects.ContainsKey(supplyId));
@@ -186,9 +186,9 @@ public class SweeperOnlineTests
         return manager;
     }
 
-    private static FishingNetPlayer FindPlayer(NetworkManager manager, ulong owner)
+    private static SweeperNetPlayer FindPlayer(NetworkManager manager, ulong owner)
     {
-        foreach (FishingNetPlayer player in FishingNetPlayer.All)
+        foreach (SweeperNetPlayer player in SweeperNetPlayer.All)
         {
             if (player != null && player.IsSpawned && player.NetworkManager == manager
                 && player.OwnerClientId == owner && player.LocalSeat == 0) return player;
@@ -197,7 +197,7 @@ public class SweeperOnlineTests
     }
 
     /// <summary>その体の <see cref="SweeperNetSync"/> が配っている光線の段階（ほかのPCから見た値）。</summary>
-    private static SweeperShooter.ShotPhase SyncedPhase(FishingNetPlayer player)
+    private static SweeperShooter.ShotPhase SyncedPhase(SweeperNetPlayer player)
     {
         SweeperNetSync sync = player.GetComponent<SweeperNetSync>();
         FieldInfo field = typeof(SweeperNetSync).GetField("shotPhase", BindingFlags.Instance | BindingFlags.NonPublic);

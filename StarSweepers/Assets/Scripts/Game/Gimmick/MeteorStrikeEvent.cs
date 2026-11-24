@@ -316,9 +316,9 @@ public class MeteorStrikeEvent : NetworkBehaviour
                 objectHorizontal.Value,
                 objectLift.Value);
 
-            // オンラインの物資（FishingNetSupply）は、引っ掛けを外してから飛ばすところまでホスト側の処理に任せる。
+            // オンラインの物資（NetSupply）は、引っ掛けを外してから飛ばすところまでホスト側の処理に任せる。
             // 1人用の物資は、ここで引っ掛けを外し、物理を動かして飛ばす
-            FishingNetSupply netSupply = item.GetComponent<FishingNetSupply>();
+            NetSupply netSupply = item.GetComponent<NetSupply>();
             if (netSupply != null && netSupply.IsSpawned)
             {
                 netSupply.ServerApplyExplosion(itemVelocity);
@@ -331,7 +331,7 @@ public class MeteorStrikeEvent : NetworkBehaviour
             }
 
             // 爆弾なら導火線に火をつける（オンライン用の爆弾は全員へ同期される口を使う）
-            FishingNetBomb netBomb = item.GetComponent<FishingNetBomb>();
+            NetBomb netBomb = item.GetComponent<NetBomb>();
             if (netBomb != null && netBomb.IsSpawned)
             {
                 netBomb.RequestLightFuse();

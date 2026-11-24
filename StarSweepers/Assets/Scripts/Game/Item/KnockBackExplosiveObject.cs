@@ -95,7 +95,7 @@ public class KnockBackExplosiveObject : ExplosiveObject
         Vector3 velocity = direction.normalized * objectKnockbackSpeed
                          + Vector3.up * objectKnockbackLift;
 
-        FishingNetSupply netSupply = other.GetComponent<FishingNetSupply>();
+        NetSupply netSupply = other.GetComponent<NetSupply>();
         if (netSupply != null && netSupply.IsSpawned)
         {
             // 爆発は各PCで起きるが、物資を飛ばすのはホストだけ。

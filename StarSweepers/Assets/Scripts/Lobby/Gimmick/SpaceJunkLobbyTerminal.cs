@@ -150,7 +150,7 @@ public class SpaceJunkLobbyTerminal : MonoBehaviour
     /// <summary>このPCで操作しているプレイヤーの位置（1台で複数人なら、そのPCの1人目）。</summary>
     private static Transform FindLocalPlayer()
     {
-        foreach (FishingNetPlayer player in FishingNetPlayer.All)
+        foreach (SweeperNetPlayer player in SweeperNetPlayer.All)
         {
             if (player != null && player.IsOwner && player.LocalSeat == 0)
             {
@@ -179,7 +179,7 @@ public class SpaceJunkLobbyTerminal : MonoBehaviour
     /// </summary>
     private void SetLocalPlayerControlEnabled(bool enabledState)
     {
-        foreach (FishingNetPlayer player in FishingNetPlayer.All)
+        foreach (SweeperNetPlayer player in SweeperNetPlayer.All)
         {
             if (player == null || !player.IsOwner)
             {

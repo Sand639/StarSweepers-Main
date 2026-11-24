@@ -101,7 +101,7 @@ GameObject:
   - component: {fileID: 5748546655471369318}
   - component: {fileID: 8089679355230384309}
   m_Layer: 0
-  m_Name: FishingExplosion
+  m_Name: BombExplosion
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0

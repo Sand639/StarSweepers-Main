@@ -80,7 +80,7 @@ using UnityEngine;
 ///
 /// ## オンライン（宇宙ごみのオンラインの体。2026/10/28）
 ///
-/// 物資に <see cref="FishingNetSupply"/> が付いていて通信中なら、今の物資の通信の決まりに合わせる。
+/// 物資に <see cref="NetSupply"/> が付いていて通信中なら、今の物資の通信の決まりに合わせる。
 /// ・当たったら**ホストに引っ掛けを頼み**、認められて持ち主が自分に移ってから巻き取る（Reel Seconds はそこから数える）。
 ///   ほかの人が先に引っ掛けていた・返事が来ないときは、投げずにやめる
 /// ・途中でホストに外された（爆風など）ら、投げずにやめる
@@ -332,10 +332,10 @@ public class SweeperReel : MonoBehaviour
     private PlayerInputSource input;
 
     /// <summary>自分の参加番号を持つ通信上のプレイヤー（オフラインの検証シーンでは null）。</summary>
-    private FishingNetPlayer netPlayer;
+    private SweeperNetPlayer netPlayer;
 
     /// <summary>巻き取っている物資の通信の部品。オンラインで巻き取っている間だけ入る。</summary>
-    private FishingNetSupply supply;
+    private NetSupply supply;
 
     /// <summary>ホストの返事（引っ掛けてよいか）を待っている間。この間は引かない。</summary>
     private bool waitingForClaim;
@@ -428,7 +428,7 @@ public class SweeperReel : MonoBehaviour
     /// </summary>
     public bool CanHook(HookableObject target)
     {
-        FishingNetSupply netSupply = target != null ? target.GetComponent<FishingNetSupply>() : null;
+        NetSupply netSupply = target != null ? target.GetComponent<NetSupply>() : null;
         if (netSupply == null || !netSupply.IsSpawned || !IsOnline)
         {
             return true;
@@ -456,7 +456,7 @@ public class SweeperReel : MonoBehaviour
     {
         playerCollider = GetComponent<Collider>();
         shooter = GetComponent<SweeperShooter>();
-        netPlayer = GetComponent<FishingNetPlayer>();
+        netPlayer = GetComponent<SweeperNetPlayer>();
         input = PlayerInputSource.Get(this);
         windowStart = criticalStart;
         windowLength = criticalLength;
@@ -510,7 +510,7 @@ public class SweeperReel : MonoBehaviour
         }
 
         // オンラインなら、ホストに引っ掛けを頼む。認められるまでは引かない
-        FishingNetSupply netSupply = target.GetComponent<FishingNetSupply>();
+        NetSupply netSupply = target.GetComponent<NetSupply>();
         if (IsOnline && netSupply != null && netSupply.IsSpawned)
         {
             supply = netSupply;
@@ -542,7 +542,7 @@ public class SweeperReel : MonoBehaviour
             return;
         }
 
-        FishingNetBomb netBomb = target.GetComponent<FishingNetBomb>();
+        NetBomb netBomb = target.GetComponent<NetBomb>();
         if (IsOnline && netBomb != null && netBomb.IsSpawned)
         {
             netBomb.RequestLightFuse();
@@ -1344,7 +1344,7 @@ public class SweeperReel : MonoBehaviour
     }
 
     /// <summary>物資をその場に <paramref name="seconds"/> 秒止めてから投げる。止めている間に巻き取りは終わっている（Finish 済み）。</summary>
-    private IEnumerator LaunchAfterStop(Rigidbody target, FishingNetSupply netSupply, Vector3 velocity, float seconds)
+    private IEnumerator LaunchAfterStop(Rigidbody target, NetSupply netSupply, Vector3 velocity, float seconds)
     {
         float until = Time.time + seconds;
         while (Time.time < until)
@@ -1379,7 +1379,7 @@ public class SweeperReel : MonoBehaviour
         Launch(body, supply, (Flat(transform.forward) * forwardSpeed + Vector3.up * forwardLift) * strength);
     }
 
-    private void Launch(Rigidbody target, FishingNetSupply netSupply, Vector3 velocity)
+    private void Launch(Rigidbody target, NetSupply netSupply, Vector3 velocity)
     {
         if (netSupply != null)
         {

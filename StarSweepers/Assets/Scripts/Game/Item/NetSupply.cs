@@ -21,7 +21,7 @@ using UnityEngine;
 /// </summary>
 [RequireComponent(typeof(NetworkObject))]
 [RequireComponent(typeof(HookableObject))]
-public class FishingNetSupply : NetworkBehaviour
+public class NetSupply : NetworkBehaviour
 {
     /// <summary>いま引っ掛けている人の参加番号。**ホストが決める。** -1で誰も掛けていない。</summary>
     private readonly NetworkVariable<int> hookedByPlayerIndex = new NetworkVariable<int>(-1);
@@ -280,7 +280,7 @@ public class FishingNetSupply : NetworkBehaviour
     /// <summary>参加番号 <paramref name="playerIndex"/> の人の体（CharacterController）。見つからなければ null。</summary>
     private static Collider FindThrowerCollider(int playerIndex)
     {
-        foreach (FishingNetPlayer player in FishingNetPlayer.All)
+        foreach (SweeperNetPlayer player in SweeperNetPlayer.All)
         {
             if (player != null && player.PlayerIndex == playerIndex)
             {
@@ -327,7 +327,7 @@ public class FishingNetSupply : NetworkBehaviour
 
         // **頼んできた人が、本当にその参加番号の人か**を確かめる（ほかの人の引っ掛けを外させない）
         // 1台で複数人のときは、同じPCに何人もいるので「参加番号の人が、頼んできたPCの人か」で確かめる
-        FishingNetPlayer sender = FindPlayerByIndex(playerIndex);
+        SweeperNetPlayer sender = FindPlayerByIndex(playerIndex);
         if (sender == null || sender.OwnerClientId != rpcParams.Receive.SenderClientId)
         {
             return;
@@ -378,7 +378,7 @@ public class FishingNetSupply : NetworkBehaviour
     /// </summary>
     private void ServerCheckClaim()
     {
-        FishingNetPlayer claimer = FindPlayerByIndex(hookedByPlayerIndex.Value);
+        SweeperNetPlayer claimer = FindPlayerByIndex(hookedByPlayerIndex.Value);
 
         if (claimer == null)
         {
@@ -410,9 +410,9 @@ public class FishingNetSupply : NetworkBehaviour
     }
 
     /// <summary>参加番号 <paramref name="playerIndex"/> の人。いなければ null。</summary>
-    private static FishingNetPlayer FindPlayerByIndex(int playerIndex)
+    private static SweeperNetPlayer FindPlayerByIndex(int playerIndex)
     {
-        foreach (FishingNetPlayer player in FishingNetPlayer.All)
+        foreach (SweeperNetPlayer player in SweeperNetPlayer.All)
         {
             if (player != null && player.IsSpawned && player.PlayerIndex == playerIndex)
             {

@@ -154,7 +154,7 @@ public class SpaceJunkRadar : MonoBehaviour
         SpaceJunkSession session = SpaceJunkSession.Current;
         float dot = playerDotSize * scale;
 
-        foreach (FishingNetPlayer player in FishingNetPlayer.All)
+        foreach (SweeperNetPlayer player in SweeperNetPlayer.All)
         {
             // 自分（このレーダーが付いているプレイヤー）は、真ん中の矢印で出すので点にしない
             if (player == null || player.transform == transform || !player.gameObject.activeInHierarchy)

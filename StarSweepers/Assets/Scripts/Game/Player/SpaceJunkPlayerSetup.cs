@@ -5,19 +5,19 @@ using UnityEngine.InputSystem.LowLevel;
 /// <summary>
 /// **宇宙ごみ用に、プレイヤーへ上乗せする部品。**
 ///
-/// フックの操作そのものは釣りの部品（<c>FishingNetPlayer</c> / <c>HookController</c> など）を
+/// フックの操作そのものは釣りの部品（<c>SweeperNetPlayer</c> / <c>HookController</c> など）を
 /// **そのまま共用している。** ただし、そのままでは次の2つが合わない。
 ///
 /// ### ① マップに着いても、位置とカメラが合わない
 ///
-/// <c>FishingNetPlayer</c> は「釣り会場に着いたか」を **<c>FishingMatch</c> がいるかどうか**で判断している。
+/// <c>SweeperNetPlayer</c> は「釣り会場に着いたか」を **<c>FishingMatch</c> がいるかどうか**で判断している。
 /// 宇宙ごみのマップには <c>FishingMatch</c> を置かない（釣りの時間制ルールが動いてしまうため）ので、
 /// **着いたことに気づかず、ロビーの位置のまま・カメラも追ってこない。**
 /// → ここで <see cref="SpaceJunkRound"/> が現れたかどうかで同じことをやり直す。
 ///
 /// ### ② チームの色が食い違う
 ///
-/// <c>FishingNetPlayer</c> は**参加した順に2人ずつ**でチームの色を塗る。
+/// <c>SweeperNetPlayer</c> は**参加した順に2人ずつ**でチームの色を塗る。
 /// 宇宙ごみは**ホストが自由にチームを決める**ので、そのままでは色が合わない。
 /// → ここで <see cref="SpaceJunkSession"/> が持っているチームの色に塗り直す。
 ///
@@ -102,7 +102,7 @@ public partial class SpaceJunkPlayerSetup : MonoBehaviour
     // 同じプレハブに付いている釣りの部品（Awake で取る）。無いものは null のまま使う
 
     /// <summary>通信上のプレイヤー（自分のぶんか・何人目か・接続番号）。</summary>
-    private FishingNetPlayer netPlayer;
+    private SweeperNetPlayer netPlayer;
 
     /// <summary>歩く・落ちるの当たり判定。位置を直接動かすときはいったん切る。</summary>
     private CharacterController characterController;
@@ -151,7 +151,7 @@ public partial class SpaceJunkPlayerSetup : MonoBehaviour
 
     private void Awake()
     {
-        netPlayer = GetComponent<FishingNetPlayer>();
+        netPlayer = GetComponent<SweeperNetPlayer>();
         characterController = GetComponent<CharacterController>();
         mover = GetComponent<SweeperMover>();
         input = PlayerInputSource.Get(this);

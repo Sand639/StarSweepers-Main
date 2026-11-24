@@ -277,7 +277,7 @@ public class SpaceJunkTrain : MonoBehaviour
 
     private static void KnockItem(HookableObject item, Vector3 velocity)
     {
-        FishingNetSupply netSupply = item.GetComponent<FishingNetSupply>();
+        NetSupply netSupply = item.GetComponent<NetSupply>();
         if (netSupply != null && netSupply.IsSpawned)
         {
             // 物資を飛ばすのはホストだけ（参加者のPCでは中で何もしない）。引っ掛けられていたら外してから飛ばす

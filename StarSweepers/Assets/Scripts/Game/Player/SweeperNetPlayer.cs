@@ -15,10 +15,10 @@ using UnityEngine;
 /// 光線の様子を配るのは <see cref="SweeperNetSync"/>。このスクリプトは参加者の情報だけを持つ。
 /// </summary>
 [RequireComponent(typeof(NetworkObject))]
-public class FishingNetPlayer : NetworkBehaviour
+public class SweeperNetPlayer : NetworkBehaviour
 {
     /// <summary>いまシーンにいるオンラインプレイヤー全員。人数とチーム分けに使う。</summary>
-    public static readonly List<FishingNetPlayer> All = new List<FishingNetPlayer>();
+    public static readonly List<SweeperNetPlayer> All = new List<SweeperNetPlayer>();
 
     [Header("自分だけが動かすもの")]
     [Tooltip("自分のぶんだけ有効にするスクリプト。他の人のぶんは止める")]
@@ -92,7 +92,7 @@ public class FishingNetPlayer : NetworkBehaviour
     /// <summary>参加番号 <paramref name="index"/> の人のチーム。その人が見つからなければ -1。</summary>
     public static int TeamOfPlayerIndex(int index)
     {
-        foreach (FishingNetPlayer player in All)
+        foreach (SweeperNetPlayer player in All)
         {
             if (player != null && player.PlayerIndex == index)
             {
@@ -244,7 +244,7 @@ public class FishingNetPlayer : NetworkBehaviour
         {
             bool used = false;
 
-            foreach (FishingNetPlayer player in All)
+            foreach (SweeperNetPlayer player in All)
             {
                 if (player != null && player.playerIndex.Value == index)
                 {

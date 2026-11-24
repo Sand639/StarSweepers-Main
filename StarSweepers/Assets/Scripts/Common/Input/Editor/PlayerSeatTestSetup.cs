@@ -20,7 +20,7 @@ public static class PlayerSeatTestSetup
 {
     private const string ScenePath = "Assets/Scenes/Test/PlayerSeatTest.unity";
     private const string PlayerPrefabPath = "Assets/Prefabs/Player/SweeperPlayer.prefab";
-    private const string SupplyPrefabPath = "Assets/Prefabs/Item/FishingSupply.prefab";
+    private const string SupplyPrefabPath = "Assets/Prefabs/Item/TestSupply.prefab";
 
     /// <summary>正方形の床の一辺（m）。四方の壁もこの長さで、床の縁に立てる。</summary>
     private const float FloorSize = 24f;

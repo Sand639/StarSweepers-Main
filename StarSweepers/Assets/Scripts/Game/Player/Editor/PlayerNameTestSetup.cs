@@ -34,7 +34,7 @@ public static class PlayerNameTestSetup
         NetworkManager manager = hud != null ? hud.GetComponent<NetworkManager>() : null;
         if (EditorApplication.isPlaying && manager != null && manager.IsHost && SpaceJunkSession.Current != null)
         {
-            foreach (FishingNetPlayer player in FishingNetPlayer.All)
+            foreach (SweeperNetPlayer player in SweeperNetPlayer.All)
             {
                 if (player == null || !player.IsSpawned || player.NetworkManager != manager) continue;
                 if (player.NamePrefixIndex < 0 || player.NameConnectorIndex < 0 || player.NameSuffixIndex < 0

@@ -5,8 +5,8 @@ using UnityEngine;
 /// <summary>
 /// **プレイヤー（本実装）を、宇宙ごみのオンラインで動かすための上乗せ。**（2026/10/28・小野田さんの依頼）
 ///
-/// 宇宙ごみのオンラインの体（`Assets/Prefabs/Player/SpaceJunkSweeperPlayer.prefab`）にだけ付ける。
-/// 参加番号・名前・チーム分け・出てくる場所・カメラは、今の体と同じ部品（<see cref="FishingNetPlayer"/>・<see cref="SpaceJunkPlayerSetup"/>）がそのまま受け持つ。
+/// プレイヤーの体（`Assets/Prefabs/Player/SweeperPlayer.prefab`）に付いている。通信していないとき（検証用のシーン）は何もしない。
+/// 参加番号・名前・チーム分け・出てくる場所・カメラは、今の体と同じ部品（<see cref="SweeperNetPlayer"/>・<see cref="SpaceJunkPlayerSetup"/>）がそのまま受け持つ。
 /// ここでやるのは次の4つ。
 ///
 /// | すること | どのPCで |
@@ -22,7 +22,7 @@ using UnityEngine;
 /// **その ON/OFF を見て、狙う・撃つも同じにする。**
 /// 止まった瞬間に、出していた光線はしまう（つかんでいた物資は投げずに離す）。
 /// </summary>
-[RequireComponent(typeof(FishingNetPlayer))]
+[RequireComponent(typeof(SweeperNetPlayer))]
 public class SweeperNetSync : NetworkBehaviour
 {
     /// <summary>「巻き取っている物が無い」を表す値。</summary>
@@ -58,7 +58,7 @@ public class SweeperNetSync : NetworkBehaviour
     private readonly NetworkVariable<int> shotStyle = new NetworkVariable<int>(
         (int)SweeperShooter.ShotStyle.Whip, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Owner);
 
-    private FishingNetPlayer netPlayer;
+    private SweeperNetPlayer netPlayer;
     private SweeperPlayer profile;
     private SweeperRing ring;
     private SweeperMover mover;
@@ -83,7 +83,7 @@ public class SweeperNetSync : NetworkBehaviour
 
     private void Awake()
     {
-        netPlayer = GetComponent<FishingNetPlayer>();
+        netPlayer = GetComponent<SweeperNetPlayer>();
         profile = GetComponent<SweeperPlayer>();
         ring = GetComponent<SweeperRing>();
         mover = GetComponent<SweeperMover>();
@@ -275,7 +275,7 @@ public class SweeperNetSync : NetworkBehaviour
                 continue;
             }
 
-            FishingNetSupply netSupply = item.GetComponent<FishingNetSupply>();
+            NetSupply netSupply = item.GetComponent<NetSupply>();
             if (netSupply == null || !netSupply.IsSpawned || netSupply.HookedByPlayerIndex != me)
             {
                 continue;

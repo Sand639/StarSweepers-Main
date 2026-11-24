@@ -15,7 +15,7 @@ public partial class SpaceJunkSession
     // ふつうはつないだPC1台につき1人（NetworkManager の Player Prefab）が出る。
     // 1台で複数人のときは、2人目以降を**ホストが同じプレハブから出し、そのPCを持ち主にする**。
     // 持ち主が同じなので、そのPCで動かせる。誰がどの席（P1・P2…）の機器で動くかは LocalSeat で決まる。
-    // チーム分けの席は、人ごとの番号（FishingNetPlayer.PlayerKey）で作る。
+    // チーム分けの席は、人ごとの番号（SweeperNetPlayer.PlayerKey）で作る。
 
     /// <summary>
     /// **このPCで遊ぶ人数をホストへ伝える。** 足りなければ出してもらい、多ければ消してもらう。
@@ -66,10 +66,10 @@ public partial class SpaceJunkSession
     /// <summary>そのPCの、<paramref name="count"/> 人目より後ろのプレイヤーを消す（席も消す）。</summary>
     private void ServerRemoveExtraLocalPlayers(ulong clientId, int count)
     {
-        // 後ろから回す（消すと FishingNetPlayer.All から抜けるため）
-        for (int i = FishingNetPlayer.All.Count - 1; i >= 0; i--)
+        // 後ろから回す（消すと SweeperNetPlayer.All から抜けるため）
+        for (int i = SweeperNetPlayer.All.Count - 1; i >= 0; i--)
         {
-            FishingNetPlayer player = FishingNetPlayer.All[i];
+            SweeperNetPlayer player = SweeperNetPlayer.All[i];
 
             // デバッグ用のボット（ホストのPCが持ち主）は、人数の「－」では消さない（ボットの数は別に決める）
             if (!IsExtraLocalPlayer(player) || player.OwnerClientId != clientId || player.LocalSeat < count ||
@@ -112,11 +112,11 @@ public partial class SpaceJunkSession
             }
 
             GameObject spawned = Instantiate(prefab);
-            FishingNetPlayer netPlayer = spawned.GetComponent<FishingNetPlayer>();
+            SweeperNetPlayer netPlayer = spawned.GetComponent<SweeperNetPlayer>();
             NetworkObject networkObject = spawned.GetComponent<NetworkObject>();
             if (netPlayer == null || networkObject == null)
             {
-                Debug.LogError("[JUNK] Player Prefab に FishingNetPlayer か NetworkObject がありません。2人目以降を出せません。");
+                Debug.LogError("[JUNK] Player Prefab に SweeperNetPlayer か NetworkObject がありません。2人目以降を出せません。");
                 Destroy(spawned);
                 return;
             }
