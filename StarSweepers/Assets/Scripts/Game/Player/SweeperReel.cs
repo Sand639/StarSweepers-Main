@@ -97,6 +97,9 @@ public class SweeperReel : MonoBehaviour
     [Min(0.3f)]
     [SerializeField] private float stopDistance = 1.4f;
 
+    [Tooltip("光線でつかんでいる間、物資の重力を切る（離したら元に戻す）。オフにすると前のように重力のまま床を引きずる")]
+    [SerializeField] private bool noGravityWhileHeld = true;
+
     [Tooltip("引いている間の物資の回転を弱める強さ（0 で弱めない）。転がりすぎるときに上げる")]
     [Min(0f)]
     [SerializeField] private float spinDamping = 6f;
@@ -283,6 +286,12 @@ public class SweeperReel : MonoBehaviour
 
     private Collider playerCollider;
     private SweeperShooter shooter;
+
+    /// <summary>つかむ前の物資の重力の設定（離したときに戻す）。</summary>
+    private bool itemGravityWas;
+
+    /// <summary>この巻き取りで、物資の重力を切っているか。</summary>
+    private bool gravityCut;
     private HookableObject item;
     private Rigidbody body;
     private float startTime;
@@ -459,13 +468,22 @@ public class SweeperReel : MonoBehaviour
         }
     }
 
-    /// <summary>巻き取りを始める。物資の Rigidbody の物理はそのまま使う（床の上を引きずる）。</summary>
+    /// <summary>つかんだまま体が消えた・止められたときに、物資が浮いたままにならないよう重力だけは戻す。</summary>
+    private void OnDisable()
+    {
+        RestoreGravity();
+    }
+
+    /// <summary>巻き取りを始める。物資の Rigidbody の物理はそのまま使う（つかんでいる間は重力を切る）。</summary>
     public void Begin(HookableObject target)
     {
         if (target == null || target.Body == null)
         {
             return;
         }
+
+        // 前の物の重力を切ったままなら、先に戻す（念のため）
+        RestoreGravity();
 
         item = target;
         body = target.Body;
@@ -504,6 +522,7 @@ public class SweeperReel : MonoBehaviour
         item.SetHooked(true);
         // 手前まで来たときに、自分の体とぶつかって跳ねないようにする
         ThrowPassThrough.Hold(item.gameObject, playerCollider);
+        CutGravity();
         body.WakeUp();
 
         LightFuseIfBomb(target);
@@ -884,7 +903,8 @@ public class SweeperReel : MonoBehaviour
     }
 
     /// <summary>
-    /// 上下は物理（重力）のまま、横だけ決める＝床に置いたまま引きずる。回転は弱める。
+    /// 上下は物理のまま、横だけ決める。回転は弱める。
+    /// （つかんでいる間は重力を切っている（No Gravity While Held）ので、上下は動き出したときの高さのまま。オフなら重力で床に置いたまま引きずる）
     /// 次のステップで「どれだけ動けなかったか」を測るため、いまの位置と動かしたい距離を覚えておく。
     /// </summary>
     private void SetDragVelocity(Vector3 velocity)
@@ -1077,6 +1097,42 @@ public class SweeperReel : MonoBehaviour
         }
 
         return false;
+    }
+
+    /// <summary>
+    /// **つかんでいる間、物資の重力を切る**（2026/11/24・小野田さんの指示）。Begin で呼ぶ。
+    /// 切った瞬間の上下の速さは 0 にする（跳ねている途中でつかんだとき、上へ流れていかないように）。
+    /// No Gravity While Held がオフなら何もしない（前のように重力のまま床を引きずる）。
+    /// </summary>
+    private void CutGravity()
+    {
+        if (!noGravityWhileHeld || body == null)
+        {
+            return;
+        }
+
+        itemGravityWas = body.useGravity;
+        gravityCut = true;
+        body.useGravity = false;
+        if (!body.isKinematic)
+        {
+            body.linearVelocity = new Vector3(body.linearVelocity.x, 0f, body.linearVelocity.z);
+        }
+    }
+
+    /// <summary>切っていた重力を、つかむ前の設定に戻す。Finish（どの終わり方でも通る）で呼ぶ。</summary>
+    private void RestoreGravity()
+    {
+        if (!gravityCut)
+        {
+            return;
+        }
+
+        gravityCut = false;
+        if (body != null)
+        {
+            body.useGravity = itemGravityWas;
+        }
     }
 
     /// <summary>**光線がちぎれる。** ちぎれた見た目を出し（オンラインではほかの人の画面にも）、物資はその場に落とす。</summary>
@@ -1354,6 +1410,9 @@ public class SweeperReel : MonoBehaviour
         {
             supply.RequestRelease(Vector3.zero, 0f, MyIndex);
         }
+
+        // つかんでいる間に切っていた重力を戻す（投げた直後もここを通るので、投げた物はいつもどおり重力で落ちる）
+        RestoreGravity();
 
         if (item != null)
         {
