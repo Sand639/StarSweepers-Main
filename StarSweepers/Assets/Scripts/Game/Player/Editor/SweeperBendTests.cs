@@ -81,8 +81,8 @@ public class SweeperBendTests
             float lastBoxYaw = 0f;
             float lastDistance = 99f;
 
-            // 前へ投げる直前（1.5 秒の少し手前）まで見る
-            while (reel.IsActive && reel.Elapsed < 1.4f)
+            // 手前に着く直前（Reel Seconds の少し手前）まで見る（プレハブの値で着く時間が変わるため、決め打ちしない。2026/11/24）
+            while (reel.IsActive && reel.Elapsed < reel.ReelSeconds - 0.1f)
             {
                 if (turn && !turned && reel.Elapsed > 0.2f)
                 {

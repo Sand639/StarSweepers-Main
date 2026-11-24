@@ -64,6 +64,21 @@ public class NetSupply : NetworkBehaviour
     public override void OnNetworkSpawn()
     {
         ApplyPhysicsAuthority();
+        hookedByPlayerIndex.OnValueChanged += OnHookedByChanged;
+    }
+
+    public override void OnNetworkDespawn()
+    {
+        hookedByPlayerIndex.OnValueChanged -= OnHookedByChanged;
+    }
+
+    /// <summary>誰かが引っ掛けた（引っ掛けた人が変わった）ことを、物資に記録する（つかんだ直後は当たってもスタンさせないのに使う）。</summary>
+    private void OnHookedByChanged(int previous, int current)
+    {
+        if (current >= 0 && current != previous && hookable != null)
+        {
+            hookable.NotePulled();
+        }
     }
 
     public override void OnGainedOwnership()
@@ -127,7 +142,7 @@ public class NetSupply : NetworkBehaviour
         // ホストの記録が「その人が引っ掛け中」のまま残っていた場合に、本人までつかめなくなっていた
         bool takenByOther = IsClaimed && hookedByPlayerIndex.Value != playerIndex;
 
-        if (claimRevision != explosionRevision.Value || takenByOther || hookable.IsVanished)
+        if (claimRevision != explosionRevision.Value || takenByOther || hookable.IsVanished || IsProtected)
         {
             // すでに誰かが掛けている。記録は変えない（頼んだ人は、記録が自分でないのを見て手を離す）
             return;
@@ -160,10 +175,118 @@ public class NetSupply : NetworkBehaviour
     /// </summary>
     public void RequestThrow(Vector3 direction, float force, float lift, int playerIndex,
         bool preserveVelocity = false, Vector3 inheritedVelocity = default,
-        Vector3 inheritedAngularVelocity = default, bool hasReleasePosition = false, Vector3 releasePosition = default)
+        Vector3 inheritedAngularVelocity = default, bool hasReleasePosition = false, Vector3 releasePosition = default,
+        float protectSeconds = 0f)
     {
         RequestThrowServerRpc(direction, force, lift, playerIndex, localClaimRevision,
-            preserveVelocity, inheritedVelocity, inheritedAngularVelocity, hasReleasePosition, releasePosition);
+            preserveVelocity, inheritedVelocity, inheritedAngularVelocity, hasReleasePosition, releasePosition, protectSeconds);
+    }
+
+    /// <summary>
+    /// **この時刻（ホストの時計）までは、誰もつかめない**（2026/11/24）。クリティカルプルで投げた物を、飛んでいる間に奪われないようにする。
+    /// </summary>
+    private readonly NetworkVariable<double> protectedUntil = new NetworkVariable<double>(0d);
+
+    /// <summary>いま誰もつかめない（クリティカルで飛んでいる）間か。</summary>
+    public bool IsProtected => IsSpawned && NetworkManager != null && NetworkManager.ServerTime.Time < protectedUntil.Value;
+
+    // ------------------------------------------------------------
+    // 引っ張り合い（2026/11/24）
+    // ------------------------------------------------------------
+
+    /// <summary>引っ張り合いで後から来た人の参加番号。-1 で引っ張り合いではない。**ホストが決める。**</summary>
+    private readonly NetworkVariable<int> tugChallenger = new NetworkVariable<int>(-1);
+
+    /// <summary>引っ張り合いで後から来た人の参加番号（-1 で引っ張り合いではない）。つかんでいた人は <see cref="HookedByPlayerIndex"/>。</summary>
+    public int TugChallenger => tugChallenger.Value;
+
+    /// <summary>いま引っ張り合いの最中か。この間は**ホストが物資を動かす**（<see cref="SupplyTug"/>）。</summary>
+    public bool IsTugging => tugChallenger.Value >= 0;
+
+    /// <summary>ホストで動いている引っ張り合い。</summary>
+    private SupplyTug serverTug;
+
+    /// <summary>
+    /// **ほかの人がつかんでいる物を、自分もつかんで引っ張り合いにしたい**とホストへ頼む。<see cref="SweeperReel"/> から呼ばれる。
+    /// 認められると <see cref="TugChallenger"/> が自分になる（断られたら変わらないので、<see cref="SweeperReel"/> がそれを見てやめる）。
+    /// </summary>
+    public void RequestTug(int playerIndex)
+    {
+        localClaimRevision = explosionRevision.Value;
+        RequestTugServerRpc(playerIndex, localClaimRevision);
+    }
+
+    [ServerRpc(RequireOwnership = false)]
+    private void RequestTugServerRpc(int playerIndex, uint claimRevision)
+    {
+        if (claimRevision != explosionRevision.Value || !IsClaimed || hookedByPlayerIndex.Value == playerIndex
+            || IsTugging || hookable.IsVanished || IsProtected)
+        {
+            return;
+        }
+
+        SweeperNetPlayer holder = FindPlayerByIndex(hookedByPlayerIndex.Value);
+        SweeperNetPlayer challenger = FindPlayerByIndex(playerIndex);
+        SweeperReel rules = holder != null ? holder.GetComponent<SweeperReel>() : null;
+        if (holder == null || challenger == null || rules == null
+            || !rules.AllowsTug(hookable, holder.TeamIndex, challenger.TeamIndex))
+        {
+            return;
+        }
+
+        tugChallenger.Value = playerIndex;
+        TakeBackOwnership();
+        serverTug = SupplyTug.Begin(hookable, holder.transform, challenger.transform, rules.TugSettings, ServerEndTug);
+        if (serverTug == null)
+        {
+            tugChallenger.Value = -1;
+        }
+    }
+
+    /// <summary>
+    /// **ホストだけ。** 引っ張り合いが決着した。勝った人を「つかんでいる人」にして、物資の持ち主もその人へ移す
+    /// （その人のPCの巻き取りが、いつもの引き寄せに戻って続きを引く）。両方切れたら誰も持たない。
+    /// </summary>
+    private void ServerEndTug(int result)
+    {
+        serverTug = null;
+        if (!IsServer || !IsTugging)
+        {
+            return;
+        }
+
+        int holder = hookedByPlayerIndex.Value;
+        int challenger = tugChallenger.Value;
+        tugChallenger.Value = -1;
+
+        int winner = result == SupplyTug.HolderLost ? challenger : result == SupplyTug.ChallengerLost ? holder : -1;
+        SweeperNetPlayer winnerPlayer = winner >= 0 ? FindPlayerByIndex(winner) : null;
+        if (winnerPlayer == null)
+        {
+            hookedByPlayerIndex.Value = -1;
+            return;
+        }
+
+        hookedByPlayerIndex.Value = winner;
+        if (winnerPlayer.OwnerClientId != NetworkManager.ServerClientId)
+        {
+            NetworkObject.ChangeOwnership(winnerPlayer.OwnerClientId);
+        }
+    }
+
+    /// <summary>**ホストだけ。** 引っ張り合いを、決着させずに止める（爆風で外れた・消えたなど）。</summary>
+    private void ServerStopTug()
+    {
+        if (serverTug != null)
+        {
+            serverTug.Stop();
+            serverTug = null;
+        }
+
+        if (IsServer && IsSpawned && tugChallenger.Value >= 0)
+        {
+            tugChallenger.Value = -1;
+        }
     }
 
     /// <summary>
@@ -172,13 +295,19 @@ public class NetSupply : NetworkBehaviour
     [ServerRpc(RequireOwnership = false)]
     private void RequestThrowServerRpc(Vector3 direction, float force, float lift,
         int playerIndex, uint claimRevision, bool preserveVelocity, Vector3 inheritedVelocity,
-        Vector3 inheritedAngularVelocity, bool hasReleasePosition, Vector3 releasePosition,
+        Vector3 inheritedAngularVelocity, bool hasReleasePosition, Vector3 releasePosition, float protectSeconds,
         ServerRpcParams rpcParams = default)
     {
-        // 掛けている本人からの指示だけを受け付ける（爆発をまたいだ古い指示も捨てる）
-        if (claimRevision != explosionRevision.Value || hookedByPlayerIndex.Value != playerIndex)
+        // 掛けている本人からの指示だけを受け付ける（爆発をまたいだ古い指示も捨てる）。引っ張り合いの最中は投げられない
+        if (claimRevision != explosionRevision.Value || hookedByPlayerIndex.Value != playerIndex || IsTugging)
         {
             return;
+        }
+
+        // クリティカルで投げた物は、飛んでいる間だれもつかめない（2026/11/24）
+        if (protectSeconds > 0f)
+        {
+            protectedUntil.Value = NetworkManager.ServerTime.Time + protectSeconds;
         }
 
         TakeBackOwnership();
@@ -229,6 +358,19 @@ public class NetSupply : NetworkBehaviour
     private void RequestReleaseServerRpc(Vector3 direction, float pullForce,
         int playerIndex, uint claimRevision, ServerRpcParams rpcParams = default)
     {
+        // 引っ張り合いの最中に片方が手を離した（スタンなど）：相手の勝ち（2026/11/24）
+        if (IsTugging && claimRevision == explosionRevision.Value
+            && (playerIndex == tugChallenger.Value || playerIndex == hookedByPlayerIndex.Value))
+        {
+            int result = playerIndex == tugChallenger.Value ? SupplyTug.ChallengerLost : SupplyTug.HolderLost;
+            if (serverTug != null)
+            {
+                serverTug.Stop();
+            }
+            ServerEndTug(result);
+            return;
+        }
+
         // 掛けている本人からの指示だけを受け付ける（爆発をまたいだ古い指示も捨てる）
         if (claimRevision != explosionRevision.Value || hookedByPlayerIndex.Value != playerIndex)
         {
@@ -258,6 +400,7 @@ public class NetSupply : NetworkBehaviour
 
         // 「強制的に外した回数」を進める。これより前の番号を添えて届く指示は、古いものとして捨てられる
         explosionRevision.Value += 1;
+        ServerStopTug();
         ReleaseForExplosionClientRpc(explosionRevision.Value);
         // ホストと専用サーバーはここで手元の状態を戻す。
         hookable.SetHooked(false);
@@ -384,8 +527,16 @@ public class NetSupply : NetworkBehaviour
         {
             Debug.LogWarning($"[NET][答え合わせ] {name}：引っ掛けていた参加番号 {hookedByPlayerIndex.Value} の人が" +
                              "もういないので、引っ掛けを外しました。");
+            ServerStopTug();
             hookedByPlayerIndex.Value = -1;
             TakeBackOwnership();
+            ownerMismatchCount = 0;
+            return;
+        }
+
+        // 引っ張り合いの最中は、ホストが持ち主のまま動かしているので食い違って当然（直さない）
+        if (IsTugging)
+        {
             ownerMismatchCount = 0;
             return;
         }
@@ -450,6 +601,7 @@ public class NetSupply : NetworkBehaviour
         }
 
         despawnScheduled = true;
+        ServerStopTug();
         hookedByPlayerIndex.Value = -1;
         HideClientRpc();
         StartCoroutine(DespawnLater());
@@ -487,6 +639,7 @@ public class NetSupply : NetworkBehaviour
             return;
         }
 
+        ServerStopTug();
         hookedByPlayerIndex.Value = -1;
         BeginAbsorbClientRpc(startTime, seconds, pillarMotion);
     }

@@ -59,6 +59,46 @@ public class SweeperRing : MonoBehaviour
     [Tooltip("Art/Materials/SweeperRing.mat を入れる。空なら再生したときに作る")]
     [SerializeField] private Material material;
 
+    /// <summary>形ごとの見た目の値（2026/11/24）。</summary>
+    [System.Serializable]
+    public struct ShapeLook
+    {
+        [Tooltip("どの形の値か")]
+        public RingShape shape;
+
+        [Tooltip("リングの外側の直径（m）")]
+        [Min(0.05f)]
+        public float size;
+
+        [Tooltip("ふちの太さ（m）")]
+        [Min(0.005f)]
+        public float thickness;
+
+        [Tooltip("星のくぼみ（星のときだけ使う）")]
+        [Range(0.2f, 0.9f)]
+        public float starInner;
+
+        [Tooltip("床からどれだけ浮かせるか（m）")]
+        [Min(0f)]
+        public float lift;
+    }
+
+    [Header("形ごとの見た目（2026/11/24）")]
+    [Tooltip("ON：下の表に形があれば、その形の大きさ・太さ・浮かせる高さを使う（三角や星は円より小さく見えるので、形ごとに合わせる）。表に無い形と OFF のときは、上の共通の値")]
+    [SerializeField] private bool useShapeLooks = true;
+
+    [SerializeField] private ShapeLook[] shapeLooks =
+    {
+        new ShapeLook { shape = RingShape.Circle, size = 1.4f, thickness = 0.1f, starInner = 0.5f, lift = 0.02f },
+        new ShapeLook { shape = RingShape.Triangle, size = 1.7f, thickness = 0.11f, starInner = 0.5f, lift = 0.021f },
+        new ShapeLook { shape = RingShape.Square, size = 1.3f, thickness = 0.1f, starInner = 0.5f, lift = 0.022f },
+        new ShapeLook { shape = RingShape.Star, size = 1.75f, thickness = 0.11f, starInner = 0.5f, lift = 0.023f },
+        new ShapeLook { shape = RingShape.Hexagon, size = 1.45f, thickness = 0.1f, starInner = 0.5f, lift = 0.024f },
+    };
+
+    /// <summary>リングの濃さ（0〜1。リキャスト中に薄くするのに使う）。</summary>
+    private float dim = 1f;
+
     private static readonly int ColorId = Shader.PropertyToID("_Color");
     private static readonly int ShapeId = Shader.PropertyToID("_Shape");
     private static readonly int ThicknessId = Shader.PropertyToID("_Thickness");
@@ -71,7 +111,44 @@ public class SweeperRing : MonoBehaviour
     private MaterialPropertyBlock block;
 
     /// <summary>リングの外側の半径（m）。狙いの帯は、ここから伸ばす。</summary>
-    public float Radius => size * 0.5f;
+    public float Radius => CurrentLook.size * 0.5f;
+
+    /// <summary>いまの形で使う見た目の値（表に形があればその値、無ければ共通の値）。</summary>
+    private ShapeLook CurrentLook
+    {
+        get
+        {
+            if (useShapeLooks && shapeLooks != null)
+            {
+                foreach (ShapeLook look in shapeLooks)
+                {
+                    if (look.shape == shape)
+                    {
+                        return look;
+                    }
+                }
+            }
+
+            return new ShapeLook { shape = shape, size = size, thickness = thickness, starInner = starInner, lift = lift };
+        }
+    }
+
+    /// <summary>リングの濃さ（0〜1）。1 でいつもどおり。</summary>
+    public float Dim
+    {
+        get => dim;
+        set
+        {
+            float clamped = Mathf.Clamp01(value);
+            if (Mathf.Approximately(clamped, dim))
+            {
+                return;
+            }
+
+            dim = clamped;
+            ApplyLook();
+        }
+    }
 
     /// <summary>形。</summary>
     public RingShape Shape
@@ -97,11 +174,12 @@ public class SweeperRing : MonoBehaviour
             return;
         }
 
-        visual.position = transform.position + Vector3.up * lift;
+        ShapeLook look = CurrentLook;
+        visual.position = transform.position + Vector3.up * look.lift;
         visual.rotation = rotateWithBody
             ? Quaternion.Euler(0f, transform.eulerAngles.y, 0f)
             : Quaternion.identity;
-        visual.localScale = Vector3.one * size;
+        visual.localScale = Vector3.one * look.size;
     }
 
     /// <summary>色を変える（<see cref="SweeperPlayer"/> がチームの色を入れる）。</summary>
@@ -137,16 +215,20 @@ public class SweeperRing : MonoBehaviour
             return;
         }
 
+        ShapeLook look = CurrentLook;
+        Color shown = color;
+        shown.a *= dim;
+
         block ??= new MaterialPropertyBlock();
         meshRenderer.GetPropertyBlock(block);
-        block.SetColor(ColorId, color);
+        block.SetColor(ColorId, shown);
         block.SetFloat(ShapeId, (float)shape);
         // 太さはシェーダーでは「板の半分を 1 とした割合」で渡す
-        block.SetFloat(ThicknessId, Mathf.Clamp(thickness / Mathf.Max(0.01f, size * 0.5f), 0.01f, 1f));
+        block.SetFloat(ThicknessId, Mathf.Clamp(look.thickness / Mathf.Max(0.01f, look.size * 0.5f), 0.01f, 1f));
         block.SetFloat(FillAlphaId, fillAlpha);
         // 四角は頂点が真上だとひし形になるので、45度回して辺を前に向ける
         block.SetFloat(RotationId, shape == RingShape.Square ? 45f : 0f);
-        block.SetFloat(StarInnerId, starInner);
+        block.SetFloat(StarInnerId, look.starInner);
         meshRenderer.SetPropertyBlock(block);
     }
 

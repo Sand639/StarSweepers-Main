@@ -360,6 +360,12 @@ public class MeteorStrikeEvent : NetworkBehaviour
         {
             stun.Stun(stunSeconds);
         }
+
+        // 当たった瞬間のエフェクト（オンラインでは全員の画面に出る。2026/11/24）。新しい体（SweeperMover）だけ
+        if (launchable is SweeperMover mover && mover != null)
+        {
+            SweeperHitEffects.For(mover).PlayKnockback(velocity);
+        }
     }
 
     /// <summary>このPCが物資を飛ばしてよいか。1人用なら自分、通信中ならホストだけ。</summary>

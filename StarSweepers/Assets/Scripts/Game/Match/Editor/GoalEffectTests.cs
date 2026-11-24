@@ -163,7 +163,9 @@ public class GoalEffectTests
             float deadline = Time.realtimeSinceStartup + 6f;
             while ((hostItem != null || clientItem != null) && Time.realtimeSinceStartup < deadline)
             {
-                if (clientItem != null && clientItem.GetComponent<Renderer>() is Renderer r && r.enabled)
+                // 見た目は子のモデルに付いている（2026/11/24 にデブリのモデルを入れてから）
+                Renderer r = clientItem != null ? clientItem.GetComponentInChildren<Renderer>() : null;
+                if (r != null && r.enabled)
                 {
                     minClientScale = Mathf.Min(minClientScale, clientItem.transform.localScale.x / clientStartScale.x);
                 }

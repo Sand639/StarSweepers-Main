@@ -29,18 +29,46 @@ using UnityEngine;
 /// </summary>
 public class SweeperPulledHit : MonoBehaviour
 {
-    [Header("ぶつかったときの効果")]
-    [Tooltip("ぶつかった人が動けなくなる秒数（移動・光線・持つことができない）")]
+    [Header("ぶつかったときの効果（いちばん速くぶつかったとき）")]
+    [Tooltip("ぶつかった人が動けなくなる秒数（移動・光線・持つことができない）。Speed Scaling が ON なら、Max Stun Speed 以上でぶつかったときの秒数")]
     [Min(0f)]
-    [SerializeField] private float stunSeconds = 1.5f;
+    [SerializeField] private float stunSeconds = 1.8f;
 
-    [Tooltip("横方向に吹き飛ばす速さ（m/秒）")]
+    [Tooltip("横方向に吹き飛ばす速さ（m/秒）。Speed Scaling が ON なら、いちばん速くぶつかったときの値")]
     [Min(0f)]
-    [SerializeField] private float knockbackSpeed = 9f;
+    [SerializeField] private float knockbackSpeed = 11f;
 
-    [Tooltip("上向きに飛ばす速さ（m/秒）。0 で横だけ")]
+    [Tooltip("上向きに飛ばす速さ（m/秒）。0 で横だけ。Speed Scaling が ON なら、いちばん速くぶつかったときの値")]
     [Min(0f)]
-    [SerializeField] private float knockbackLift = 4f;
+    [SerializeField] private float knockbackLift = 4.5f;
+
+    [Header("ぶつかった速さで強さを変える（2026/11/24）")]
+    [Tooltip("ON：引っ張られている物の速さで、スタンの秒数と吹き飛ばしを変える（遅ければスタンしない）。OFF：いつも上のいちばん強い値")]
+    [SerializeField] private bool speedScaling = true;
+
+    [Tooltip("これより遅い物（m/秒）にぶつかっても、スタンも吹き飛ばしもしない（爆弾は速さに関係なく即爆発する）")]
+    [Min(0f)]
+    [SerializeField] private float minStunSpeed = 1.5f;
+
+    [Tooltip("この速さ（m/秒）以上でぶつかったら、いちばん強い（上の値）")]
+    [Min(0.01f)]
+    [SerializeField] private float maxStunSpeed = 9f;
+
+    [Tooltip("Min Stun Speed ちょうどでぶつかったときのスタンの秒数")]
+    [Min(0f)]
+    [SerializeField] private float minStunSeconds = 0.6f;
+
+    [Tooltip("Min Stun Speed ちょうどでぶつかったときの横の吹き飛ばし（m/秒）")]
+    [Min(0f)]
+    [SerializeField] private float minKnockbackSpeed = 4f;
+
+    [Tooltip("Min Stun Speed ちょうどでぶつかったときの上向きの速さ（m/秒）")]
+    [Min(0f)]
+    [SerializeField] private float minKnockbackLift = 2f;
+
+    [Tooltip("つかまれてからこの秒数の間は、ぶつかっても当たらない（つかんだ直後の、まだ動き出していない物で止まらないように）")]
+    [Min(0f)]
+    [SerializeField] private float grabGraceSeconds = 0.25f;
 
     [Tooltip("スタンが解けてから、また当たるようになるまでの秒数（同じ物に何度も当たり続けないように）")]
     [Min(0f)]
@@ -152,6 +180,17 @@ public class SweeperPulledHit : MonoBehaviour
                 continue;
             }
 
+            // つかまれた直後・遅すぎる物には当たらない（爆弾は遅くても当たったら即爆発させる。2026/11/24）
+            if (Time.time - item.PulledSince < grabGraceSeconds)
+            {
+                continue;
+            }
+            bool bomb = item.GetComponent<ExplosiveObject>() != null;
+            if (speedScaling && !bomb && item.MeasuredSpeed < minStunSpeed)
+            {
+                continue;
+            }
+
             if (TryFindPuller(item, out puller, out pullerIndex) && CanBeHitBy(puller, pullerIndex))
             {
                 return item;
@@ -177,6 +216,12 @@ public class SweeperPulledHit : MonoBehaviour
             SweeperReel otherReel = other.reel;
             if (otherReel != null && otherReel.IsActive && !otherReel.IsWaitingForClaim && otherReel.Item == item)
             {
+                // 両手で持っている物は「引っ張っている最中」ではない（2026/11/24）
+                if (otherReel.IsCarrying)
+                {
+                    return false;
+                }
+
                 puller = other;
                 pullerIndex = other.netPlayer != null && other.netPlayer.IsSpawned ? other.netPlayer.PlayerIndex : -1;
                 return true;
@@ -188,6 +233,11 @@ public class SweeperPulledHit : MonoBehaviour
         if (supply != null && supply.IsSpawned && supply.IsClaimed)
         {
             pullerIndex = supply.HookedByPlayerIndex;
+            if (SweeperNetSync.IsPlayerCarrying(pullerIndex))
+            {
+                pullerIndex = -1;
+                return false;
+            }
             return true;
         }
 
@@ -230,10 +280,12 @@ public class SweeperPulledHit : MonoBehaviour
         }
 
         // 電気のデブリなら、そちらの値（長く痺れる・ほぼ吹き飛ばない）を使う
+        // 速いほど強い（2026/11/24）。いちばん遅い（Min Stun Speed）で 0、Max Stun Speed 以上で 1
+        float power = speedScaling ? StrengthForSpeed(item.MeasuredSpeed, minStunSpeed, maxStunSpeed) : 1f;
         ElectricDebris electric = item.GetComponent<ElectricDebris>();
-        float hitStun = electric != null ? electric.StunSeconds : stunSeconds;
-        float hitSpeed = electric != null ? electric.KnockbackSpeed : knockbackSpeed;
-        float hitLift = electric != null ? electric.KnockbackLift : knockbackLift;
+        float hitStun = electric != null ? electric.StunSeconds : Mathf.Lerp(minStunSeconds, stunSeconds, power);
+        float hitSpeed = electric != null ? electric.KnockbackSpeed : Mathf.Lerp(minKnockbackSpeed, knockbackSpeed, power);
+        float hitLift = electric != null ? electric.KnockbackLift : Mathf.Lerp(minKnockbackLift, knockbackLift, power);
 
         Vector3 from = item.Body != null ? item.Body.worldCenterOfMass : item.transform.position;
         Vector3 velocity = KnockbackVelocity(from, transform.position, transform.forward, hitSpeed, hitLift);
@@ -243,6 +295,8 @@ public class SweeperPulledHit : MonoBehaviour
         if (electric != null)
         {
             electric.PlayShock(transform, hitStun);
+            // ほかの人の画面にも、体に電気が走るのを出す（2026/11/24）
+            GetComponent<SweeperNetSync>()?.BroadcastShock(hitStun);
         }
 
         if (bombsExplodeOnHit)
@@ -269,6 +323,12 @@ public class SweeperPulledHit : MonoBehaviour
         {
             bomb.ExplodeNow();
         }
+    }
+
+    /// <summary>ぶつかった速さから、強さ（0〜1）を出す。<paramref name="min"/> 以下で 0、<paramref name="max"/> 以上で 1。</summary>
+    public static float StrengthForSpeed(float speed, float min, float max)
+    {
+        return max > min ? Mathf.Clamp01((speed - min) / (max - min)) : (speed >= min ? 1f : 0f);
     }
 
     /// <summary>

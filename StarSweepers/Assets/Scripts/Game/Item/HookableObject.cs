@@ -107,6 +107,69 @@ public class HookableObject : MonoBehaviour
         {
             Vanish();
         }
+
+        MeasureSpeed();
+    }
+
+    // ---- 動いている速さ（引っ張っている物がぶつかったときの強さに使う。2026/11/24） ----
+
+    /// <summary>
+    /// **いま動いている速さ（m/秒）。** 位置の変化から測る（オンラインのほかの人が動かしている物は、こちらでは物理が止まっていて
+    /// Rigidbody の速さが 0 のままなので、位置の変化で見る）。少しならしてある。
+    /// </summary>
+    public float MeasuredSpeed { get; private set; }
+
+    /// <summary>引っ張られ始めた時刻（このPCで引っ掛けた・オンラインで誰かが引っ掛けたと届いた時刻）。</summary>
+    public float PulledSince { get; private set; } = -100f;
+
+    private Vector3 lastSpeedPosition;
+    private bool hasSpeedSample;
+
+    /// <summary>速さをならす強さ（大きいほど、すぐ今の速さになる）。</summary>
+    private const float SpeedSmoothing = 15f;
+
+    private void MeasureSpeed()
+    {
+        Vector3 position = transform.position;
+        float dt = Time.deltaTime;
+        if (hasSpeedSample && dt > 0f)
+        {
+            float speed = (position - lastSpeedPosition).magnitude / dt;
+            MeasuredSpeed = Mathf.Lerp(MeasuredSpeed, speed, 1f - Mathf.Exp(-SpeedSmoothing * dt));
+        }
+
+        lastSpeedPosition = position;
+        hasSpeedSample = true;
+    }
+
+    /// <summary>この時刻（Time.time）までは、誰もつかめない（クリティカルで投げた物。2026/11/24）。</summary>
+    public float ProtectedUntil { get; private set; } = -100f;
+
+    /// <summary>いま誰もつかめない間か（このPCの記録。オンラインではホストの記録 <see cref="NetSupply.IsProtected"/> も見る）。</summary>
+    public bool IsProtected
+    {
+        get
+        {
+            if (Time.time < ProtectedUntil)
+            {
+                return true;
+            }
+
+            NetSupply netSupply = GetComponent<NetSupply>();
+            return netSupply != null && netSupply.IsProtected;
+        }
+    }
+
+    /// <summary>この秒数のあいだ、誰もつかめないようにする（このPCの記録）。</summary>
+    public void Protect(float seconds)
+    {
+        ProtectedUntil = Mathf.Max(ProtectedUntil, Time.time + seconds);
+    }
+
+    /// <summary>引っ張られ始めたことを記録する（<see cref="NetSupply"/> がオンラインで誰かが引っ掛けたと知ったときにも呼ぶ）。</summary>
+    public void NotePulled()
+    {
+        PulledSince = Time.time;
     }
 
     /// <summary>消えていない物資が、いまシーンにいくつあるか。</summary>
@@ -126,6 +189,11 @@ public class HookableObject : MonoBehaviour
     /// <summary>フックされた／外れた、を記録する。<see cref="HookController"/> から呼ばれる。</summary>
     public void SetHooked(bool hooked)
     {
+        if (hooked && !IsHooked)
+        {
+            NotePulled();
+        }
+
         IsHooked = hooked;
     }
 
