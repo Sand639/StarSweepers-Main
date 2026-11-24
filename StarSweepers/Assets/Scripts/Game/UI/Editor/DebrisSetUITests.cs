@@ -89,6 +89,19 @@ public class DebrisSetUITests
     }
 
     [Test]
+    public void TitleDots_GrowThenShrinkAndLoop()
+    {
+        // 0.2 秒ごとに 1→6 と増え、5→2 と減って、また 1 から
+        int[] expected = { 1, 2, 3, 4, 5, 6, 5, 4, 3, 2, 1, 2 };
+        for (int i = 0; i < expected.Length; i++)
+        {
+            Assert.That(DebrisSetUI.TitleDots(i * 0.2f + 0.1f, 0.2f, 6), Is.EqualTo(expected[i]), $"{i} 段目の点の数が違う");
+        }
+
+        Assert.That(DebrisSetUI.TitleDots(float.PositiveInfinity, 0.2f, 6), Is.InRange(1, 6), "とても大きな秒数で範囲を外れる");
+    }
+
+    [Test]
     public void Prefab_IsInResourcesAndWired()
     {
         GameObject prefab = Resources.Load<GameObject>(DebrisSetUI.PrefabResourcePath);
@@ -108,14 +121,25 @@ public class DebrisSetUITests
         Assert.That(panels.arraySize, Is.EqualTo(DebrisSetUI.MaxTeams));
         for (int p = 0; p < panels.arraySize; p++)
         {
-            UnityEditor.SerializedProperty slots = panels.GetArrayElementAtIndex(p).FindPropertyRelative("slots");
+            UnityEditor.SerializedProperty panel = panels.GetArrayElementAtIndex(p);
+            foreach (string part in new[] { "root", "body", "arm", "panel", "bracket", "title" })
+            {
+                Assert.That(panel.FindPropertyRelative(part).objectReferenceValue, Is.Not.Null, $"枠{p}の {part} が空");
+            }
+
+            UnityEditor.SerializedProperty slots = panel.FindPropertyRelative("slots");
             Assert.That(slots.arraySize, Is.EqualTo(DebrisSetUI.MaxSlots), $"枠{p}のマスの数が足りない");
             for (int n = 0; n < slots.arraySize; n++)
             {
                 UnityEditor.SerializedProperty slot = slots.GetArrayElementAtIndex(n);
-                foreach (string part in new[] { "root", "item", "nextItem", "check" })
+                Assert.That(slot.FindPropertyRelative("root").objectReferenceValue, Is.Not.Null, $"枠{p}のマス{n}の root が空");
+                foreach (string card in new[] { "card", "nextCard" })
                 {
-                    Assert.That(slot.FindPropertyRelative(part).objectReferenceValue, Is.Not.Null, $"枠{p}のマス{n}の {part} が空");
+                    foreach (string part in new[] { "root", "group", "background", "item", "cover", "check" })
+                    {
+                        Assert.That(slot.FindPropertyRelative(card).FindPropertyRelative(part).objectReferenceValue, Is.Not.Null,
+                            $"枠{p}のマス{n}の {card}.{part} が空");
+                    }
                 }
             }
         }
