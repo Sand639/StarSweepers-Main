@@ -337,8 +337,8 @@ MonoBehaviour:
     m_Bits: 4294967295
   backDistance: 6
   backArcHeight: 3.2
-  throwFollowMotion: 1
-  throwFollowNear: 0.15
+  throwFollowMotion: 0
+  throwFollowNear: 0
   throwFollowSwitch: 0
   forwardSpeed: 12
   forwardLift: 1.5
