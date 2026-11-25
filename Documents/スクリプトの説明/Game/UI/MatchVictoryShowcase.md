@@ -26,6 +26,7 @@
 - **3D は層 29 に、マップから離れた高さ 3000m に作る。** 結果画面（`RoundWinnerResultUI`）は層 30 を使っているので重ねない。明かりも層 29 だけを照らす。
 - 3D はカメラで `RenderTexture` に描き、画面（並び順 30001）に貼る。**結果画面の色帯（30000）より手前、`SceneTransition`（32766）より奥**の順番を崩さないこと。崩すと、ロビーへ戻る色帯の上に演出が残る。
 - 体の写しは、背の高さを Member Height にそろえ、足を台に乗せる（モデルの大きさや縮んでいる最中でもそろう）。服の色は `CharacterColorController` の値ごと写るので、塗り直さなくてよい。
+- **Enter で飛ばすと** `Update` が始まりの時刻をずらして最後の画にし、すぐ `onFinished` を呼ぶ。`WasSkipped` が true になる。ホストのPCで true になると、`SpaceJunkSession.PresentMatchVictory` がほかの人を待たずに先へ進む。
 - 再生していないとき（画面なしの Unity で撮るとき）も動くよう、消すのは `DestroySafe` を使う。
 - 検証シーンの `MatchVictoryShowcaseTester` は、プレハブ `SweeperPlayer` から体のモデルだけを写して服を塗り、見えない所にしまってから渡す（試合でプレイヤーの体を写すのと同じ形）。
 
@@ -34,3 +35,4 @@
 | 日付 | 変更者 | 内容 |
 | --- | --- | --- |
 | 2026/11/25 | Claude Code | 新規作成（大槻さんの依頼で勝利演出を試作したため） |
+| 2026/11/25 | Claude Code | Enter で飛ばす仕組み（`WasSkipped`）を書き足した |

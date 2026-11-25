@@ -37,7 +37,7 @@
 | `SpaceJunkSession.SlotCheck.cs` | 答え合わせの間隔と回数（`slotCheckTimer`・`slotMismatchCount`・`SlotCheckInterval`・`SlotMismatchRepairCount`） |
 | `SpaceJunkSession.Bots.cs` | ボットの番号の始まりと数の上限（`BotSeatStart`・`MaxBots`） |
 | `SpaceJunkSession.HostSettings.cs` | ホストが入れられる値の範囲（`MaxRoundsToWin`・`MinRoundSeconds`・`MaxRoundSeconds`） |
-| `SpaceJunkSession.VictoryShowcase.cs` | メンバー紹介の完了待ち（`victoryViewersFinished`・`victoryShowcaseId`） |
+| `SpaceJunkSession.VictoryShowcase.cs` | メンバー紹介の完了待ち（`victoryViewersFinished`・`victoryShowcaseId`・`localVictoryShowcase`＝このPCの演出。ホストが Enter で飛ばしたかを見る） |
 
 逆に、**ロビーのカウントダウンの変数（`playersInTeamZones`・`lobbyCountdown…`）は入口のファイルにあるが、使うのは `SpaceJunkSession.LobbyZones.cs`**。
 
@@ -51,7 +51,7 @@
 - クラスの説明（`///` のコメント）は、入口のファイルの先頭にある。
 - **ボットの頭は、新しい体用の `SweeperBot` だけ**（`SpaceJunkSession.Bots.cs`）。古い体用のボットは 2026/11/7 に消したので、新しい体のプレハブが見つからず古い体で出たボットは、頭が付かず動かない（警告が出る）。
 - **試合を始める（`ServerStartMatch`）と、すぐにはマップへ移らない。** 状態を「試合中」にしてから `SceneTransition.PlayForEveryone(LoadNextMap)` で全員の画面を覆い、覆いきったら（約0.5秒後）`LoadNextMap` が呼ばれる（`SpaceJunkSession.Match.cs`）。演出の仕組みは `スクリプトの説明/Common/UI/SceneTransition.md`。
-- **試合の勝ちが決まると、ロビーへ戻る前に2つの演出を順に待つ**（`ReturnToLobbyAfterDelay`）。①結果画面（`PresentRoundResult`）②勝ったチームのメンバー紹介（`PresentMatchVictory`。25秒で打ち切り）。演出そのものは `スクリプトの説明/Game/UI/MatchVictoryShowcase.md`。
+- **試合の勝ちが決まると、ロビーへ戻る前に2つの演出を順に待つ**（`ReturnToLobbyAfterDelay`）。①結果画面（`PresentRoundResult`）②勝ったチームのメンバー紹介（`PresentMatchVictory`。ホストが Enter で飛ばすか、25秒で打ち切り）。演出そのものは `スクリプトの説明/Game/UI/MatchVictoryShowcase.md`。
 
 ## 変更ログ
 

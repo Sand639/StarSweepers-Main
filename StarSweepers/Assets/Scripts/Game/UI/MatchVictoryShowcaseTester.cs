@@ -4,7 +4,7 @@ using UnityEngine.InputSystem;
 
 /// <summary>
 /// **勝利演出（メンバー紹介）を、試合をせずに試すための部品。** 検証シーン `Scenes/Test/MatchVictoryShowcaseTest` に置いてある。
-/// 再生すると、仮の名前のメンバーで演出が始まる。スペースキーで最初から、1〜4 キーで勝ったチームを変えて流し直す。
+/// 再生すると、仮の名前のメンバーで演出が始まる。スペースキーで最初から、1〜4 キーで勝ったチームを変えて流し直す。Enter で飛ばせる。
 /// </summary>
 public class MatchVictoryShowcaseTester : MonoBehaviour
 {

@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.InputSystem;
 using UnityEngine.UI;
 
 /// <summary>
@@ -9,6 +10,7 @@ using UnityEngine.UI;
 /// 遠くに3Dの台を作り、勝ったチームのメンバーの体の写しを並べる。
 /// カメラが1人ずつ寄って名前の帯を出し（その人がジャンプして一回転）、最後は引きの画で全員が跳ねて「WIN!」と紙吹雪。
 /// 3Dの絵はテクスチャに描いて、いちばん手前の画面に貼る（試合中の表示の上に出すため）。
+/// **Enter を押すと飛ばせる**（最後の画まで進めて、すぐ終わったことにする）。
 ///
 /// 各PCで同じように再生する（通信はしない）。始める合図は <c>SpaceJunkSession.VictoryShowcase.cs</c>。
 /// 試すときは検証シーン `Scenes/Test/MatchVictoryShowcaseTest`。詳しくは `Documents/機能ドキュメント/勝利演出（メンバー紹介）.md`。
@@ -50,6 +52,9 @@ public sealed class MatchVictoryShowcase : MonoBehaviour
 
     /// <summary>演出が終わった（最後の画で止まっている）か。</summary>
     public bool IsFinished { get; private set; }
+
+    /// <summary>このPCで Enter を押して飛ばしたか。</summary>
+    public bool WasSkipped { get; private set; }
 
     /// <summary>3Dの台を写すカメラ（確認用に外から撮るときに使う）。</summary>
     public Camera ShowcaseCamera => showcaseCamera;
@@ -162,6 +167,7 @@ public sealed class MatchVictoryShowcase : MonoBehaviour
         finished = onFinished;
         finishedAt = -1;
         IsFinished = false;
+        WasSkipped = false;
 
         Build(members);
         startTime = Time.unscaledTimeAsDouble;
@@ -178,6 +184,16 @@ public sealed class MatchVictoryShowcase : MonoBehaviour
         if (renderTexture != null && (renderTexture.width != ScreenWidth || renderTexture.height != ScreenHeight))
         {
             CreateRenderTexture(ScreenWidth, ScreenHeight);
+        }
+
+        // Enter で飛ばす：最後の画（WIN!）まで進めて、すぐ終わったことにする
+        Keyboard keyboard = Keyboard.current;
+        if (!IsFinished && keyboard != null &&
+            (keyboard.enterKey.wasPressedThisFrame || keyboard.numpadEnterKey.wasPressedThisFrame))
+        {
+            WasSkipped = true;
+            startTime = Time.unscaledTimeAsDouble - TotalSeconds;
+            finishedAt = Time.unscaledTimeAsDouble - 0.3;
         }
 
         DrawAt((float)(Time.unscaledTimeAsDouble - startTime));
