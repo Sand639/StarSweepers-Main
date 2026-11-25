@@ -1,6 +1,7 @@
 using System.Text;
 using Unity.Netcode;
 using UnityEngine;
+using UnityEngine.InputSystem;
 
 /// <summary>
 /// つながっている間、**通信の様子を画面に出す**表示。
@@ -14,6 +15,8 @@ using UnityEngine;
 ///   80ms〜   … 遅れが分かる。当たり判定の作り方を考える必要がある
 ///
 /// これは確認用の表示なので、**本番の画面には出さない**（Show Hud を切る）。
+///
+/// **ふだんは隠れていて、0 キー（テンキーの 0 も可）を押すたびに出す／隠すが切り替わる**（2026/11/25・大槻さん）。
 /// </summary>
 [RequireComponent(typeof(NetworkManager))]
 public class NetworkStatusHud : MonoBehaviour
@@ -43,6 +46,9 @@ public class NetworkStatusHud : MonoBehaviour
     /// <summary>次に文章を作り直す時刻（`Time.unscaledTime`）。</summary>
     private float nextRefreshTime;
 
+    /// <summary>いま出しているか。ふだんは隠しておき、0 キーで切り替える。</summary>
+    private bool visible;
+
     private void Awake()
     {
         manager = GetComponent<NetworkManager>();
@@ -50,7 +56,13 @@ public class NetworkStatusHud : MonoBehaviour
 
     private void Update()
     {
-        if (!showHud || manager == null || Time.unscaledTime < nextRefreshTime)
+        Keyboard keyboard = Keyboard.current;
+        if (keyboard != null && (keyboard.digit0Key.wasPressedThisFrame || keyboard.numpad0Key.wasPressedThisFrame))
+        {
+            visible = !visible;
+        }
+
+        if (!showHud || !visible || manager == null || Time.unscaledTime < nextRefreshTime)
         {
             return;
         }
@@ -61,7 +73,7 @@ public class NetworkStatusHud : MonoBehaviour
 
     private void OnGUI()
     {
-        if (!showHud || string.IsNullOrEmpty(cachedText))
+        if (!showHud || !visible || string.IsNullOrEmpty(cachedText))
         {
             return;
         }
