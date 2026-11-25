@@ -205,7 +205,7 @@ public class SpaceJunkConveyor : MonoBehaviour
 
         for (int i = 0; i < count; i++)
         {
-            FishingPlayerController player = overlapBuffer[i].GetComponentInParent<FishingPlayerController>();
+            SweeperMover player = overlapBuffer[i].GetComponentInParent<SweeperMover>();
             if (player == null || !player.isActiveAndEnabled)
             {
                 continue;

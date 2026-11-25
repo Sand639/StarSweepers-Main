@@ -75,7 +75,7 @@ public class SpaceJunkCameraTestDummy : MonoBehaviour
         // キーを押している（入力の長さがほぼ 0 でない）ときだけ、キーの向きに歩く
         if (input.sqrMagnitude > 0.01f)
         {
-            // 画面の向きに合わせる（本物の FishingPlayerController と同じ）
+            // 画面の向きに合わせる（本物の SweeperMover と同じ）
             Camera view = Camera.main;
             float yaw = view != null ? view.transform.eulerAngles.y : 0f;
             move = Quaternion.Euler(0f, yaw, 0f) * new Vector3(input.x, 0f, input.y).normalized;

@@ -287,7 +287,7 @@ public class SpaceJunkGoal : NetworkBehaviour
         staying[item] = Time.time;
 
         // 引っ掛けたまま持ち込まれたものは数えない（手を離されたら渦が吸い込む）
-        FishingNetSupply netSupply = item.GetComponent<FishingNetSupply>();
+        NetSupply netSupply = item.GetComponent<NetSupply>();
         if (item.IsHooked || (netSupply != null && netSupply.IsClaimed))
         {
             return;
@@ -315,7 +315,7 @@ public class SpaceJunkGoal : NetworkBehaviour
 
         staying.Remove(item);
         SpaceJunkMaterial material = item.GetComponent<SpaceJunkMaterial>();
-        FishingNetSupply netSupply = item.GetComponent<FishingNetSupply>();
+        NetSupply netSupply = item.GetComponent<NetSupply>();
 
         bool counted = !IsClosed && material != null && SpaceJunkRound.Current != null
                     && SpaceJunkRound.Current.ServerCollect(OwnerTeam, material.Kind, item.GetComponent<NetworkObject>());

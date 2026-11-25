@@ -246,7 +246,7 @@ public class SpaceJunkTrain : MonoBehaviour
 
         foreach (Collider hit in hits)
         {
-            FishingPlayerController player = hit.GetComponentInParent<FishingPlayerController>();
+            SweeperMover player = hit.GetComponentInParent<SweeperMover>();
             if (player != null)
             {
                 if (hitThisRun.Add(player.gameObject))
@@ -277,7 +277,7 @@ public class SpaceJunkTrain : MonoBehaviour
 
     private static void KnockItem(HookableObject item, Vector3 velocity)
     {
-        FishingNetSupply netSupply = item.GetComponent<FishingNetSupply>();
+        NetSupply netSupply = item.GetComponent<NetSupply>();
         if (netSupply != null && netSupply.IsSpawned)
         {
             // 物資を飛ばすのはホストだけ（参加者のPCでは中で何もしない）。引っ掛けられていたら外してから飛ばす
@@ -285,7 +285,7 @@ public class SpaceJunkTrain : MonoBehaviour
             return;
         }
 
-        ThrowController.ReleaseTargetForExplosion(item);
+        item.SetHooked(false);
         item.Body.isKinematic = false;
         item.Body.AddForce(velocity, ForceMode.VelocityChange);
     }

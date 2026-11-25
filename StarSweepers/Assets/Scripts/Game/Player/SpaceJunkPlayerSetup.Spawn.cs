@@ -14,17 +14,10 @@ public partial class SpaceJunkPlayerSetup
     /// <summary>
     /// **自分のチームのゴールの手前（横一列の自分の場所）**へ移す。見つからなければ円周上へ散らす。
     ///
-    /// **移す前に、フックを手元に戻して、つかんでいる物資も離す**（2026/9/22）。
-    /// R キー・落下・ラウンドの始まり・ロビーへ戻ったとき、のどれでもここを通るので、
-    /// 物資をつかんだまま戻ったり、伸ばしたフックが次のラウンドに残ったりしない。
+    /// 出していた光線は、大きく動いたのを見て <see cref="SweeperNetSync"/> がしまう（つかんでいた物資は投げずに離す）。
     /// </summary>
     private void MoveToSpawnPoint()
     {
-        if (hookController != null)
-        {
-            hookController.ResetHook();
-        }
-
         // ロビーでは、シーン内のポイント自身が持つ番号から場所を探す。
         if (IsInLobbyScene() && netPlayer != null)
         {

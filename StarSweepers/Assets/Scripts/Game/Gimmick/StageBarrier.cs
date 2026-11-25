@@ -366,7 +366,7 @@ public class StageBarrier : MonoBehaviour
             }
 
             // ほかの人のプレイヤーは当たり判定が切れているので、位置と距離で調べる
-            foreach (FishingNetPlayer player in FishingNetPlayer.All)
+            foreach (SweeperNetPlayer player in SweeperNetPlayer.All)
             {
                 if (player == null || !player.isActiveAndEnabled)
                 {

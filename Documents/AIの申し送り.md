@@ -5,6 +5,7 @@
 > 今の場所は `実装計画/フォルダ整理の対応表.md` で読み替えること（過去の記録そのものは書き換えていない）。
 > 📌 **Kyo さんの隣で作業しているAIへ：大槻さんからの伝言がある**（2026/11/7。下の「次のAIへの伝言」の先頭）。
 > **2026/11/7 に、ステージの名前を付け直した**（`STAGE_01` → `STAGE_Simple` など）。これより前の記録に出てくる `STAGE_01`〜`09` は、`宇宙ごみのマップの作り方.md` の「ステージの名前」の表で読み替えること。
+> **2026/11/24 に、古い体と釣りの部品を片付けた**（`FishingNetPlayer` → `SweeperNetPlayer` など。体のプレハブは `SweeperPlayer.prefab` の1つ）。これより前の記録に出てくる `HookController`・`FishingPlayerController`・`SpaceJunkSweeperPlayer.prefab` などは、`実装計画/古い体と釣りの片付けの対応表.md` で読み替えること。
 
 **AIがAIのために書くノート。** 人間向けの説明は他のドキュメントに任せてよい。
 
@@ -170,9 +171,56 @@
 
 ---
 
+## 古い体と釣りの部品を片付けた（2026/11/24）
+
+小野田さんの依頼で、古い体（`Game/Hook/`）・釣りの試合役・`FishingPlayerController` などを消し、`Fishing〜` の名前を付け替え、
+体のプレハブを `SweeperPlayer.prefab` の1つにまとめた。何を消して何に変えたかは `実装計画/古い体と釣りの片付けの対応表.md`。
+
+### やり方（スクリプトを消す・名前を変えるときは、この順でやるとよい）
+
+1. **先にコードだけ直す**：消すクラスを呼んでいる所を、残すクラスへ付け替える（ギミックの `FishingPlayerController` → `SweeperMover` など）。
+2. **消すスクリプトは、中身を `#if false` ～ `#endif` で囲む。** 消す予定のスクリプトは、1で直したコードとかみ合わずにコンパイルが通らなくなる。
+   コンパイルが通らないと、画面なしの Unity は `-executeMethod` を動かさずに止まる。囲めばクラスごと消えるので、ほかは通る。
+3. **画面なしの Unity（1回目）**で、シーンから要らないプレハブを外し、`AssetDatabase.DeleteAsset` でスクリプトとプレハブを消す。
+4. **画面なしの Unity（2回目）**で、プレハブに残った「読めない部品」を `GameObjectUtility.RemoveMonoBehavioursWithMissingScript` で外す。
+   ⚠ **1回目では 0 個しか外れなかった。** スクリプトのファイルが残っている（中身が `#if false` なだけ）間は「読めない部品」と見なされない。**ファイルを消した次の起動で外す。**
+5. コードの**クラス名を変える** → **画面なしの Unity（3回目）**で `AssetDatabase.RenameAsset` でファイル名を合わせる → **4回目**で `GetComponent` で部品が結びついているか確かめる。
+   ⚠ **クラス名を変えたあとに、4のような「読めない部品を外す」処理を動かさないこと。** ファイル名がクラス名と違う間は、その部品が「読めない部品」に見えて、消されてしまう。
+
+### はまった所
+
+- **`PrefabUtility.SaveAsPrefabAsset` で保存し直すと、一番上の物の名前がファイル名に変わる**（`NetworkManager` → `SpaceJunkNetworkManager`）。中身の並びも変わって差分が 200 行になった。
+  参照を1つ書き換えるだけなら、**プレハブの文字の1行を書き換える**ほうが安全（Player Prefab の `{fileID: …, guid: …}` を、新しい体の一番上の物の番号と `.meta` の guid にした）。
+  一番上の物の番号は、`m_Father: {fileID: 0}` の Transform の `m_GameObject` で分かる。
+- シーンを Unity で保存し直すと、**物の並び順が変わって差分が大きく見える**ことがある（`STAGE_Train2` が 259 行）。
+  行を並べ替えて比べ（`diff <(git show HEAD:… | sort) <(sort …)`）、増えた行が無ければ、中身の変化は外した分だけ。
+- 消す前に `git branch -r --no-merged origin/develop` で、**ほかの人のブランチが同じファイルを触っていないか**を見ること。
+  今回は `codex/player-face-assignment`（TIARA1230 さん、11/19）が `FishingNetPlayer.cs` を変えていた（`リスクリスト.md` に登録）。
+
 ## 失敗したこと・気をつけること
 
 > こういう手順でやったら失敗した、という記録。次に来たAIへの警告。
+
+### スタンは通信で配られていなかった（2026/11/24 に直した）
+
+`PlayerStun.Stun` は、ぶつかられた人のPCで呼ばれるだけで、**他の人の画面では赤い点滅も頭の印も出なかった**（吹き飛ぶ動きは位置が届くので見える）。
+2026/11/24 に `SweeperNetSync` の `stunUntil`（本人が書く「解ける時刻」）で配るようにした。**新しく見た目やエフェクトを足すときも、通信に載せないと自分にしか見えない。**
+手本は `SweeperNetSync` のクリティカルの光（`EffectServerRpc → EffectClientRpc`）と、吹き飛び・痺れ（`ImpactServerRpc → ImpactClientRpc`）。
+小野田さんのプレイヤー・デブリ調整14項目は `実装計画/プレイヤーとデブリの調整項目の調査.md`（すべて実装済み）。
+
+### 画面なしのテストで、物を動かすのに Time.deltaTime を使わない（2026/11/24）
+
+引っ張り合いのテスト（`SupplyTugTests`）で、体を `position += 速さ × Time.deltaTime` で動かしたら、ほとんど動かず失敗した（11/4 の行と同じ原因：画面なしの `-runTests` では `yield return null` のたびにゲームのフレームが進むとは限らず、`Time.deltaTime` が当てにならない）。
+**「始めた実際の時刻からの経過（`Time.realtimeSinceStartup - start`）× 速さ」で位置を決める**と安定した。
+
+### Netcode は、新しく作ったプレハブを自動で通信の一覧に入れる（2026/11/24）
+
+物資のプレハブを `AssetDatabase.CopyAsset` で写して作ったら、`DefaultNetworkPrefabs.asset` に**自動で入った**（Netcode の取り込みの仕組み）。自分で `NetworkPrefabsList.Add` しようとしたら「もう入っている」になった。
+写したプレハブの `NetworkObject` の番号（GlobalObjectIdHash）は、写した直後は元と同じなので、`OnValidate` を呼ぶか保存し直して**番号が重なっていないか必ず確かめる**（道具：`調査の道具/プレイヤーとデブリの調整を入れる.cs.txt` の最後で一覧を出している）。
+
+### この PC（小野田さん）には Python が入っていない（2026/11/24）
+
+`python` を打つと Microsoft Store の案内が出るだけで、何も動かない（エラーにもならないので気づきにくい。出力に「Python」とだけ出る）。文字の置き換えは `sed` かエディタの道具でやる。
 
 ### プレハブがマージで止まったら、3つの版を文字として重ねてみる（2026/11/18）
 
@@ -206,6 +254,9 @@
 
 | 日付 | 書いたAI | 何をしようとして | どう失敗したか | どうすればよかったか |
 | --- | --- | --- | --- | --- |
+| 2026/11/25 | Claude Code | 大槻さんの「試合の背景の星のエフェクトが無い」を調べた | **11/18 のロビーのブランチ（`Sou-Lobby`、PR #28）のマージで、全マップ共通の空の素材 `Resources/SpaceJunkSkybox.mat` が、計算で作る星空（11/17）より前の版に上書きされていた。** Hans さんの空を回す部品 `Script_SkyboxRotation` が `RenderSettings.skybox`（＝この共通の素材）を書き換えて保存するため、古い develop から作ったブランチでこの素材に差分ができ、マージのときに古いほうが採用されたと思われる。この部品は今も `STAGE_Train2`・`HansStages/` の2つ・`WuStage/longstage_01・02` に付いている | マージで `SpaceJunkSkybox.mat` がぶつかったら、**シェーダーが `StarSweepers/ProceduralStarrySky`（guid `8c5d0e83…`）の版を残す**。マージのあとは `grep m_Shader StarSweepers/Assets/Resources/SpaceJunkSkybox.mat` で確かめる。11/25 に `f4959c4` の中身へ戻し、試合では写しを空に貼るようにした（`SpaceJunkSkybox.cs`）。**戻すときの注意：Unity を開いたままだと、閉じるときに Unity が手元の古い版でファイルを上書きする**（1回目はこれでコミットに入らなかった）。Unity を閉じてから戻し、`git hash-object` と `git rev-parse :パス` が同じかを確かめてからコミットする。同じ 11/18 のマージではロビーのゴールの演出も消えていたので、**このマージで消えた物がほかにもあるかもしれない** |
+| 2026/11/25 | Claude Code | 本人が Unity エディタを開いている間に、コンパイルが通るかを確かめた（画面なしの Unity は、エディタが開いていると使えない。`Temp/UnityLockfile` があり、`Unity.exe -projectpath …` の処理が動いていれば開いている） | Git Bash から `dotnet.exe exec csc.dll @写したrsp` を動かしたら、①`/nostdlib` などの `/` 始まりの引数がフォルダの名前に化けた ②`/d/011_Unity/…/csc.dll` の形のパスを dotnet が見つけられなかった | `Library/Bee/artifacts/1900b0aE.dag/Assembly-CSharp.rsp` を作業用の場所へ写し、**`-out:` と `-refout:` の両方**を作業用の場所に書き換える（`-refout` を残すと、エディタの使う ref.dll を上書きしてしまう）。動かすときは `MSYS_NO_PATHCONV=1` を付け、パスは `D:/011_Unity/Editor/6000.3.14f1/Editor/Data/NetCoreRuntime/dotnet.exe exec D:/…/DotNetSdkRoslyn/csc.dll "@写したrsp"` のように `D:/` の形で書く。rsp はエディタが最後にコンパイルしたときのファイルの一覧なので、**新しく足した .cs が入っているか**を `grep` で確かめること |
+| 2026/11/25 | Claude Code | 勝利演出（`MatchVictoryShowcase`。3D をテクスチャに描き、いちばん手前の画面 Screen Space Overlay に貼る形）を、画面なしの Unity（`-batchmode -quit -executeMethod`）で時刻ごとに撮って確かめた | 失敗ではなく、うまくいったやり方の記録。**Screen Space Overlay の画面はカメラの `Render()` では写らない**ので、そのままでは文字や名前の帯が撮れない | 撮る道具の中だけ、画面を `RenderMode.ScreenSpaceCamera` にして UI の層（5）だけ写すカメラを渡し、`演出.DrawAt(秒)` → `Canvas.ForceUpdateCanvases()` → 3D のカメラの `Render()` → UI のカメラの `Render()` の順に呼んで、`ReadPixels` で PNG にする。Screen.width が小さい（画面なし）ときは、演出のテクスチャを 1920×1080 で作るようにしておく。再生していないので `Destroy` は使えず `DestroyImmediate`、`OnDestroy` も呼ばれないので作った物は道具の中で消す。体のモデルは Animator が進まず腕を広げた形で写るが、再生中は待機のアニメーションになる。道具（一時的なエディタ用スクリプト）は使い終わったら .meta ごと消す |
 | 2026/11/18 | Claude Code | Hans さんの服の色・表情の部品（`SG_Character/`）をプレイヤーのプレハブに付けた。本体のフォルダには別の作業（未コミット）があったので、`git worktree` で develop から別フォルダを作り、`Library` を持たずに画面なしの Unity で開いた | ①**ファイル名とクラス名が違う MonoBehaviour**（`Script_CharacterColor.cs` の中が `CharacterColorController`）は、そのままではプレハブに付けられない ②その部品は `MaterialPropertyBlock` で `_SuitColor` を上書きするので、`PlayerStun` が `material` の `_SuitColor` を赤くしても**上書きに隠れて点滅が見えなくなる**ところだった（気づいて `PlayerStun` を直した） ③`Library` 無しの最初の起動は全部の取り込みで **約 6 分**かかった | ①`AssetDatabase.RenameAsset` でファイル名をクラス名に合わせる（2026/11/17 の行のやり方。中身・GUID は変わらず、git では名前の変更として出る）。付けるのは**次の起動**で ②同じ体に `MaterialPropertyBlock` で色を塗る部品が2つあるときは、**同じ項目を両方が触っていないか**を見る。体の色を変える部品を足したら、スタン・爆弾の点滅など「体を一時的に塗る所」を `bodyRenderers`・`material.SetColor` で検索して確かめる ③worktree で急ぐなら、2026/11/17 の行のとおり `Library` を robocopy する |
 | 2026/11/17 | Claude Code | ゴールの渦のスクリプト・プレハブ・検証シーンの名前から SpaceJunk を外した（`SpaceJunkGoalVortex` → `GoalEffect` など）。`Assets/` の中は OS のファイル操作で名前を変えてはいけない決まり | 失敗ではなく、うまくいったやり方の記録 | ①先に**コードの中のクラス名と参照だけ**を書き換える（ファイル名はまだ古いまま。C# はこれでもコンパイルが通る） ②一時的なエディタ用スクリプトで `AssetDatabase.RenameAsset(古いパス, 新しい名前)` を呼び、画面なしの Unity（`-batchmode -quit -executeMethod`）で動かす。.cs も .prefab も .unity も、.meta の番号（guid）がそのまま残る ③**もう一度別に起動して**（読み込み直しのあとで）`MonoScript.GetClass()` が新しいクラスを返すか、プレハブとシーンの中の部品が `GetComponent` で取れるかを確かめる。プレハブ・シーンの中の物の名前を変えるのもこの2回目でやる。git では「名前の変更（R）」として出る |
 | 2026/11/17 | Claude Code | ゴールの渦の、1つの Unity の中でホストと参加者をつなぐテストで、ゴールの角に置いた物資が引き寄せられて吸い込まれるかを確かめた（すり鉢を足したあとに流し直した） | 1回目は通ったのに、2回目は「8秒以内に吸い込まれない」で失敗した。ホストの写しと参加者の写しが同じ場所に重なり、押し合わないようにする処理（`Physics.IgnoreCollision`）を 0.3 秒待ってからかけていたので、その間に押されてゴールの外へ出ることがあった | 1つの Unity の中で2つの写しを出すテストでは、**参加者の写しが出たらすぐ**（`WaitFor` で出たのを待ってから、待ち時間を置かずに）押し合わないようにする。この表の 2026/10/28 の行（`SweeperOnlineTests`）の④と同じ理由 |
@@ -409,13 +460,16 @@
    - これらの名前を使っているスクリプトが40本ほどある（同じドキュメントの「まとめ」の 2）。**一度にやらず、段階を分ける。**
    - **新しい体でも使っている物を消さないこと。** 消す前後に `調査の道具/スクリプトの使われ方の一覧を作る.py` で確かめる。
    - 消したら一緒に片付ける物：`SpaceJunkSession.Bots.cs` と `SweeperOnlineSwitch` の「新しい体が無ければ古い体で出す」分岐、`リスクリスト.md` の 2026/11/7 の行。
+   - **済んだ（2026/11/24・Claude Code。小野田さんの依頼）**：古い体・`SweeperOnlineSwitch`・ボットの分岐を片付け、リスクリストの行も解消にした。消した物は `実装計画/古い体と釣りの片付けの対応表.md`。
 2. **使われていないスクリプトと、動かない道具を消す。** 候補は `スクリプトの使われ方の一覧.md` の「× 使われていない」（`PlayerController`・`PlayerViewSwitcher`・`CameraObstacleAvoid`・`SeeThrough`・`ScorePocket`・`InputSeatTestHud`・`PlayerNameTestHud`）と、
    それを呼んでいる検証シーン用の道具（`FishingSceneBuilder` など。元にする釣りのマップがこのリポジトリに無いので動かない）。消す前の注意は `使われていないファイルの調査.md`。
    **`MovingPlate`・`MovableBlock` はソウさんの制作物なので、本人に確認してから。**
+   - **一部済んだ（2026/11/24）**：`ScorePocket` と、釣りのシーンを作る道具（`FishingSceneBuilder` は共通の部品だけ残して `SceneBuildTools` に、`FishingNetSceneBuilder` などは消した）。ほかの候補はまだ。
 3. **コメントに残っている前のステージ名を直す。** `SpaceJunkCameraModeSwitch`・`SpaceJunkCameraSetup`・`SpaceJunkTeamFollowCamera`・`SpaceJunkMatchUI`・`SpaceJunkRadar` の5本（`STAGE_01〜05` と書いてある。動きには関わらない）。
 4. **長いスクリプトを、区切りのよいときに機能ごとのファイルに分ける**（`LiquidBeam` 1,304行・`SweeperBot` 1,146行）。分けたら `スクリプトの説明/` に、ファイルの分け方と変数の置き場所を書く
    （書き方は `スクリプトの説明/このフォルダの使い方.md`、道具は `調査の道具/クラスをファイルごとに分ける.py`）。作業中で動かしにくければ、分けなくてよい。
 5. **名前の付け直し（`SpaceJunk〜` を短くする・`Fishing〜` を実態に合う名前にする）は、まだやらない。** 古い体を消したあとに、大槻さんが新旧の名前の対応表を決めてから進める。
+   - **⚠ 2026/11/24：`Fishing〜` の付け直しは、小野田さんの依頼で古い体と一緒にやってしまった**（ブランチ `feature/adjust-parameter-onoda`。**同じ日に小野田さんの指示で develop へマージした**）。付けた名前は `実装計画/古い体と釣りの片付けの対応表.md`。**この名前でよいかを大槻さんに確認中**（`質問リスト.md`）。`SpaceJunk〜` を短くするのは、まだやっていない。
 
 **やり方の決まり**
 
@@ -596,3 +650,11 @@
 | 2026/11/17 | Claude Code（依頼：大槻 海斗） | 「失敗したこと」の表に、`Assets/` の中の名前を Unity の名前変更で付け直すやり方を書いた |
 | 2026/11/18 | Claude Code（依頼：小野田 喬） | 「失敗したこと」の表に、ファイル名とクラス名が違う部品をプレハブに付けたときのことと、体の色を塗る部品どうしがぶつかる件を書いた |
 | 2026/11/18 | Claude Code（依頼：小野田 喬） | 「失敗したこと」に、プレハブがマージで止まったときに3つの版を文字として重ねる方法を足した |
+| 2026/11/24 | Claude Code（依頼：小野田 喬） | 「古い体と釣りの部品を片付けた」の節（スクリプトを消す・名前を変えるときの順番と、はまった所）と、先頭の案内を足した |
+| 2026/11/24 | Claude Code（依頼：小野田 喬） | 大槻さんの伝言の5に、develop へマージしたことを書き足した |
+| 2026/11/24 | Claude Code（依頼：小野田 喬） | 「失敗したこと」に、スタンが通信で配られていないことと、調整項目の調査の場所を書いた |
+| 2026/11/24 | Claude Code（依頼：小野田 喬） | スタンの通信を直したことに書き換え、Time.deltaTime をテストで使わない・Netcode がプレハブを自動で一覧に入れる・このPCに Python が無い、の3つを足した |
+| 2026/11/25 | Claude Code | 「失敗したこと」に、画面なしの Unity で Screen Space Overlay の画面ごと演出を撮るやり方を書いた |
+| 2026/11/25 | Claude Code | 「失敗したこと」に、エディタが開いているときに csc でコンパイルを確かめる手順（パスの書き方・-refout も書き換える）を足した |
+| 2026/11/25 | Claude Code | 「失敗したこと」に、空の素材が古いブランチのマージで上書きされたことを書いた |
+| 2026/11/25 | Claude Code | 空の素材の申し送りに、Unity を開いたまま戻すと上書きされることを書き足した |

@@ -29,4 +29,13 @@ public class SweeperPulledHitTests
 
         Assert.That(v.z, Is.EqualTo(-9f).Within(0.001f), "向きが決まらないときは、その人の後ろへ飛ぶ");
     }
+
+    /// <summary>ぶつかった速さで強さが変わる（2026/11/24）：いちばん遅い所で 0、いちばん速い所で 1、その間はまっすぐ増える。</summary>
+    [Test]
+    public void StrengthGrowsWithSpeed()
+    {
+        Assert.That(SweeperPulledHit.StrengthForSpeed(1f, 1.5f, 9f), Is.EqualTo(0f), "遅すぎる物は強さ 0");
+        Assert.That(SweeperPulledHit.StrengthForSpeed(5.25f, 1.5f, 9f), Is.EqualTo(0.5f).Within(0.001f), "真ん中の速さで 0.5");
+        Assert.That(SweeperPulledHit.StrengthForSpeed(20f, 1.5f, 9f), Is.EqualTo(1f), "速すぎても 1 まで");
+    }
 }

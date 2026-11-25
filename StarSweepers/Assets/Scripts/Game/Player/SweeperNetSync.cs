@@ -5,8 +5,8 @@ using UnityEngine;
 /// <summary>
 /// **プレイヤー（本実装）を、宇宙ごみのオンラインで動かすための上乗せ。**（2026/10/28・小野田さんの依頼）
 ///
-/// 宇宙ごみのオンラインの体（`Assets/Prefabs/Player/SpaceJunkSweeperPlayer.prefab`）にだけ付ける。
-/// 参加番号・名前・チーム分け・出てくる場所・カメラは、今の体と同じ部品（<see cref="FishingNetPlayer"/>・<see cref="SpaceJunkPlayerSetup"/>）がそのまま受け持つ。
+/// プレイヤーの体（`Assets/Prefabs/Player/SweeperPlayer.prefab`）に付いている。通信していないとき（検証用のシーン）は何もしない。
+/// 参加番号・名前・チーム分け・出てくる場所・カメラは、今の体と同じ部品（<see cref="SweeperNetPlayer"/>・<see cref="SpaceJunkPlayerSetup"/>）がそのまま受け持つ。
 /// ここでやるのは次の4つ。
 ///
 /// | すること | どのPCで |
@@ -18,11 +18,11 @@ using UnityEngine;
 ///
 /// ### 体の止め方について
 ///
-/// 試合の係などは、今の体の歩く部品（<see cref="FishingPlayerController"/>）の ON/OFF で体を止める。
-/// 新しい体にもその部品を「重力と吹き飛ばしの受け口」として残してあるので、**その ON/OFF を見て、Sweeper の操作（歩く・狙う・撃つ）も同じにする。**
+/// 試合の係などは、歩く部品（<see cref="SweeperMover"/>）の ON/OFF で体を止める。
+/// **その ON/OFF を見て、狙う・撃つも同じにする。**
 /// 止まった瞬間に、出していた光線はしまう（つかんでいた物資は投げずに離す）。
 /// </summary>
-[RequireComponent(typeof(FishingNetPlayer))]
+[RequireComponent(typeof(SweeperNetPlayer))]
 public class SweeperNetSync : NetworkBehaviour
 {
     /// <summary>「巻き取っている物が無い」を表す値。</summary>
@@ -58,16 +58,32 @@ public class SweeperNetSync : NetworkBehaviour
     private readonly NetworkVariable<int> shotStyle = new NetworkVariable<int>(
         (int)SweeperShooter.ShotStyle.Whip, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Owner);
 
-    private FishingNetPlayer netPlayer;
+    /// <summary>本人が物資を両手で持っているか（2026/11/24）。ほかの人のPCで「持っている物にぶつかってもスタンしない」に使う。</summary>
+    private readonly NetworkVariable<bool> carrying = new NetworkVariable<bool>(
+        false, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Owner);
+
+    /// <summary>
+    /// **スタンが解ける時刻（ホストの時計）。** 本人のPCでスタンしたら書く。ほかの人のPCでは、これを見て点滅と星だけ出す（2026/11/24）。
+    /// 前はスタンを配っておらず、ほかの人の画面ではスタンして見えなかった。
+    /// </summary>
+    private readonly NetworkVariable<double> stunUntil = new NetworkVariable<double>(
+        0d, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Owner);
+
+    /// <summary>ほかのPCから届いた知らせの種類（<see cref="ImpactClientRpc"/>）。</summary>
+    private enum ImpactKind
+    {
+        Knockback = 0,
+        Shock = 1
+    }
+
+    private SweeperNetPlayer netPlayer;
     private SweeperPlayer profile;
     private SweeperRing ring;
     private SweeperMover mover;
     private SweeperAim aim;
     private SweeperShooter shooter;
     private SweeperReel reel;
-
-    /// <summary>重力と吹き飛ばしを受け持つ、今の体の歩く部品。これの ON/OFF に Sweeper の操作を合わせる。</summary>
-    private FishingPlayerController body;
+    private PlayerStun stun;
 
     private bool controlAllowed = true;
     private Vector3 lastPosition;
@@ -86,14 +102,14 @@ public class SweeperNetSync : NetworkBehaviour
 
     private void Awake()
     {
-        netPlayer = GetComponent<FishingNetPlayer>();
+        netPlayer = GetComponent<SweeperNetPlayer>();
         profile = GetComponent<SweeperPlayer>();
         ring = GetComponent<SweeperRing>();
         mover = GetComponent<SweeperMover>();
         aim = GetComponent<SweeperAim>();
         shooter = GetComponent<SweeperShooter>();
         reel = GetComponent<SweeperReel>();
-        body = GetComponent<FishingPlayerController>();
+        stun = GetComponent<PlayerStun>();
     }
 
     public override void OnNetworkSpawn()
@@ -106,6 +122,10 @@ public class SweeperNetSync : NetworkBehaviour
             {
                 reel.EffectShown += OnEffectShown;
             }
+            if (stun != null)
+            {
+                stun.Stunned += OnStunned;
+            }
         }
         else
         {
@@ -114,6 +134,7 @@ public class SweeperNetSync : NetworkBehaviour
             {
                 aim.SetCursorVisible(false);
             }
+            stunUntil.OnValueChanged += OnRemoteStunChanged;
         }
 
         ApplyProfile();
@@ -124,6 +145,104 @@ public class SweeperNetSync : NetworkBehaviour
         if (reel != null)
         {
             reel.EffectShown -= OnEffectShown;
+        }
+        if (stun != null)
+        {
+            stun.Stunned -= OnStunned;
+        }
+        stunUntil.OnValueChanged -= OnRemoteStunChanged;
+    }
+
+    // ------------------------------------------------------------
+    // スタン・吹き飛ばし・痺れの見た目を全員に（2026/11/24）
+    // ------------------------------------------------------------
+
+    /// <summary>参加番号 <paramref name="playerIndex"/> の人が、いま物資を両手で持っているか（ほかのPCの人でも分かる）。</summary>
+    public static bool IsPlayerCarrying(int playerIndex)
+    {
+        foreach (SweeperNetPlayer player in SweeperNetPlayer.All)
+        {
+            if (player != null && player.IsSpawned && player.PlayerIndex == playerIndex)
+            {
+                SweeperNetSync sync = player.GetComponent<SweeperNetSync>();
+                return sync != null && sync.carrying.Value;
+            }
+        }
+
+        return false;
+    }
+
+    /// <summary>本人のPCでスタンした：解ける時刻を書いて、ほかの人の画面にも出してもらう。</summary>
+    private void OnStunned(float seconds)
+    {
+        if (!IsSpawned || !IsOwner || NetworkManager == null)
+        {
+            return;
+        }
+
+        double until = NetworkManager.ServerTime.Time + seconds;
+        if (until > stunUntil.Value)
+        {
+            stunUntil.Value = until;
+        }
+    }
+
+    /// <summary>ほかの人の体：スタンが届いたら、残りの秒数だけ点滅と星を出す（見た目だけ）。</summary>
+    private void OnRemoteStunChanged(double previous, double current)
+    {
+        if (stun == null || NetworkManager == null)
+        {
+            return;
+        }
+
+        float remaining = (float)(current - NetworkManager.ServerTime.Time);
+        if (remaining > 0.05f)
+        {
+            stun.Stun(remaining, false);
+        }
+    }
+
+    /// <summary>吹き飛ばされた瞬間のエフェクトを、ほかの人の画面にも出す（本人のPC・ホストのボットから呼ぶ）。</summary>
+    public void BroadcastKnockback(Vector3 point, float strength)
+    {
+        if (IsSpawned && IsOwner)
+        {
+            ImpactServerRpc((int)ImpactKind.Knockback, point, strength);
+        }
+    }
+
+    /// <summary>電気のデブリで痺れた見た目（体に電気が走る）を、ほかの人の画面にも出す。</summary>
+    public void BroadcastShock(float seconds)
+    {
+        if (IsSpawned && IsOwner)
+        {
+            ImpactServerRpc((int)ImpactKind.Shock, transform.position, seconds);
+        }
+    }
+
+    [ServerRpc]
+    private void ImpactServerRpc(int kind, Vector3 point, float value)
+    {
+        ImpactClientRpc(kind, point, value);
+    }
+
+    [ClientRpc]
+    private void ImpactClientRpc(int kind, Vector3 point, float value)
+    {
+        // 本人の画面にはもう出ている
+        if (IsOwner)
+        {
+            return;
+        }
+
+        switch ((ImpactKind)kind)
+        {
+            case ImpactKind.Knockback:
+                SweeperHitEffects.For(this).ShowKnockback(point, value);
+                break;
+            case ImpactKind.Shock:
+                ElectricSparks.Spawn(transform, value);
+                break;
         }
     }
 
@@ -228,10 +347,10 @@ public class SweeperNetSync : NetworkBehaviour
     // 体が止められたとき（自分のぶん）
     // ------------------------------------------------------------
 
-    /// <summary>今の体の歩く部品が止められていたら、Sweeper の操作（歩く・狙う・撃つ）も止める。戻ったら戻す。</summary>
+    /// <summary>歩く部品が止められていたら、狙う・撃つも止める。戻ったら戻す。</summary>
     private void FollowBodyLock()
     {
-        bool allowed = body == null || body.enabled;
+        bool allowed = mover == null || mover.enabled;
         if (allowed == controlAllowed)
         {
             return;
@@ -241,7 +360,6 @@ public class SweeperNetSync : NetworkBehaviour
 
         // 撃つ部品は止まるときに光線をしまう（つかんでいた物資は投げずに離す）
         if (shooter != null) shooter.enabled = allowed;
-        if (mover != null) mover.enabled = allowed;
         if (aim != null) aim.enabled = allowed;
     }
 
@@ -280,7 +398,7 @@ public class SweeperNetSync : NetworkBehaviour
                 continue;
             }
 
-            FishingNetSupply netSupply = item.GetComponent<FishingNetSupply>();
+            NetSupply netSupply = item.GetComponent<NetSupply>();
             if (netSupply == null || !netSupply.IsSpawned || netSupply.HookedByPlayerIndex != me)
             {
                 continue;
@@ -320,6 +438,12 @@ public class SweeperNetSync : NetworkBehaviour
         if (shotStyle.Value != (int)shooter.Style)
         {
             shotStyle.Value = (int)shooter.Style;
+        }
+
+        bool carryingNow = reel != null && reel.IsCarrying;
+        if (carrying.Value != carryingNow)
+        {
+            carrying.Value = carryingNow;
         }
 
         if (phase == SweeperShooter.ShotPhase.Idle)

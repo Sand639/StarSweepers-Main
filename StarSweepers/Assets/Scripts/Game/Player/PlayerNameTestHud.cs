@@ -37,7 +37,7 @@ public class PlayerNameTestHud : MonoBehaviour
         GUILayout.BeginArea(new Rect(20f, 20f, 650f, Screen.height - 40f), GUI.skin.box);
         GUILayout.Label("Player name / network test");
         GUILayout.Label(startAsClient ? "Client" : "Host (auto started)");
-        foreach (FishingNetPlayer player in FishingNetPlayer.All)
+        foreach (SweeperNetPlayer player in SweeperNetPlayer.All)
         {
             if (player == null || !player.IsSpawned || player.NetworkManager != manager) continue;
             string displayed = session != null ? session.NameOf(player.PlayerKey) : player.DisplayName;

@@ -607,45 +607,6 @@ public class PullAblePlateTests
     }
 
     /// <summary>
-    /// 柱にフックを掛けているプレイヤーのフック（HookController）が無効にされたら → 柱の「掛かっている」も外れるはず
-    /// （外れないと、その柱を誰も引っ掛けられなくなる）。
-    /// ※ HookController の private の attachedPullable・OnDisable を名前で指定している。名前を変えるとこのテストが壊れる
-    /// </summary>
-    [Test]
-    public void DisablingHookControllerReleasesAttachedPullPoint()
-    {
-        GameObject plateObject = CreatePlate(out PullAblePlate plate);
-        CreatePullPoint(plate, PullAblePlateDirection.Right, out PullAblePlatePullPoint point);
-        // 非表示にしてから付けて、フック本来の準備（Awake・OnEnable で照準や入力を探す処理）が動かないようにする。
-        // ここで見たいのは、OnDisable の片付けだけ
-        GameObject playerObject = new GameObject("Player");
-        playerObject.SetActive(false);
-        HookController hook = playerObject.AddComponent<HookController>();
-
-        try
-        {
-            // 「この柱にフックが掛かっている」状態を、柱とフックの両方に作る
-            point.SetHooked(true);
-            typeof(HookController).GetField(
-                    "attachedPullable",
-                    BindingFlags.Instance | BindingFlags.NonPublic)
-                ?.SetValue(hook, point);
-
-            typeof(HookController).GetMethod(
-                    "OnDisable",
-                    BindingFlags.Instance | BindingFlags.NonPublic)
-                ?.Invoke(hook, null);
-
-            Assert.That(point.IsHooked, Is.False);
-        }
-        finally
-        {
-            Object.DestroyImmediate(plateObject);
-            Object.DestroyImmediate(playerObject);
-        }
-    }
-
-    /// <summary>
     /// 固定の箱の手前で止まった床を、反対（左）へ引っ張ったら → 触れている箱に止められず、ほぼ 2m 離れられるはず
     /// （進む向きと反対を向いた面は「止まる相手」にしない決まり。でないと一度ぶつかった床が動けなくなる）。
     /// </summary>

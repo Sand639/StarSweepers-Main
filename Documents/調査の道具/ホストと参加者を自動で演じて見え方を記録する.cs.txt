@@ -119,7 +119,7 @@ public static class TempSpawnProbe
         transport.SetConnectionData("127.0.0.1", Port, "127.0.0.1");
     }
 
-    private static int OwnerCount => FishingNetPlayer.All.Select(p => p.OwnerClientId).Distinct().Count();
+    private static int OwnerCount => SweeperNetPlayer.All.Select(p => p.OwnerClientId).Distinct().Count();
 
     private static void TickHost(int step, float waited)
     {
@@ -149,6 +149,8 @@ public static class TempSpawnProbe
             case 3: // ロビーで 8 秒いっしょにいる（その間に参加者役がロビーを記録する）
                 if (waited < 8f) return;
                 Dump("lobby");
+                // ロビーの「出発の乗り込み」（2026/11/19〜）があると、全員がチームの床で準備するまで始まらない。道具では乗り込みの係を外して、すぐ始める
+                if (LobbyTestDeparture.Current != null) Object.DestroyImmediate(LobbyTestDeparture.Current);
                 SpaceJunkSession.Current.ServerStartMatch();
                 Next(4);
                 break;
@@ -217,8 +219,8 @@ public static class TempSpawnProbe
     private static void Dump(string label)
     {
         NetworkManager manager = NetworkManager.Singleton;
-        Debug.Log($"[PROBE] ==== {Mode} {label}（シーン：{SceneManager.GetActiveScene().name}）プレイヤー {FishingNetPlayer.All.Count} 人／自分の番号 {(manager != null ? manager.LocalClientId : 999)} frame={Time.frameCount} ====");
-        foreach (FishingNetPlayer p in FishingNetPlayer.All)
+        Debug.Log($"[PROBE] ==== {Mode} {label}（シーン：{SceneManager.GetActiveScene().name}）プレイヤー {SweeperNetPlayer.All.Count} 人／自分の番号 {(manager != null ? manager.LocalClientId : 999)} frame={Time.frameCount} ====");
+        foreach (SweeperNetPlayer p in SweeperNetPlayer.All)
         {
             Renderer[] rs = p.GetComponentsInChildren<Renderer>(true);
             Renderer[] shown = rs.Where(r => r.enabled && r.gameObject.activeInHierarchy).ToArray();

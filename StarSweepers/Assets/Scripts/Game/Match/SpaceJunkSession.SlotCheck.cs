@@ -78,7 +78,7 @@ public partial class SpaceJunkSession
         }
 
         // 1台で複数人のときの2人目以降（ホストが追加で出したプレイヤー）にも、席があるか
-        foreach (FishingNetPlayer player in FishingNetPlayer.All)
+        foreach (SweeperNetPlayer player in SweeperNetPlayer.All)
         {
             if (IsExtraLocalPlayer(player) && TeamSlotIndex(player.PlayerKey) < 0)
             {
@@ -110,7 +110,7 @@ public partial class SpaceJunkSession
             }
         }
 
-        foreach (FishingNetPlayer player in FishingNetPlayer.All)
+        foreach (SweeperNetPlayer player in SweeperNetPlayer.All)
         {
             if (IsExtraLocalPlayer(player) && TeamSlotIndex(player.PlayerKey) < 0)
             {
@@ -148,15 +148,15 @@ public partial class SpaceJunkSession
     }
 
     /// <summary>1台で複数人のときに、ホストが追加で出した2人目以降のプレイヤーか。</summary>
-    private static bool IsExtraLocalPlayer(FishingNetPlayer player)
+    private static bool IsExtraLocalPlayer(SweeperNetPlayer player)
     {
         return player != null && player.IsSpawned && player.LocalSeat > 0;
     }
 
     /// <summary>人ごとの番号から、そのプレイヤーの体を探す。いなければ null。</summary>
-    private static FishingNetPlayer FindPlayerByKey(ulong key)
+    private static SweeperNetPlayer FindPlayerByKey(ulong key)
     {
-        foreach (FishingNetPlayer player in FishingNetPlayer.All)
+        foreach (SweeperNetPlayer player in SweeperNetPlayer.All)
         {
             if (player != null && player.IsSpawned && player.PlayerKey == key)
             {

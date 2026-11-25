@@ -93,7 +93,7 @@ public class SpaceJunkForceRespawnButton : NetworkBehaviour
 
     private static Transform FindLocalPlayer()
     {
-        foreach (FishingNetPlayer player in FishingNetPlayer.All)
+        foreach (SweeperNetPlayer player in SweeperNetPlayer.All)
         {
             if (player != null && player.IsOwner && player.LocalSeat == 0)
             {

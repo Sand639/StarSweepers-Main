@@ -40,7 +40,7 @@ public partial class SpaceJunkSession
         get
         {
             int count = 0;
-            foreach (FishingNetPlayer player in FishingNetPlayer.All)
+            foreach (SweeperNetPlayer player in SweeperNetPlayer.All)
             {
                 if (player != null && player.IsSpawned && player.LocalSeat >= BotSeatStart)
                 {
@@ -71,10 +71,10 @@ public partial class SpaceJunkSession
         count = Mathf.Clamp(count, 0, MaxBots);
         ulong hostId = NetworkManager.LocalClientId;
 
-        // 多すぎるぶんを消す（後ろから回す。消すと FishingNetPlayer.All から抜けるため）
-        for (int i = FishingNetPlayer.All.Count - 1; i >= 0; i--)
+        // 多すぎるぶんを消す（後ろから回す。消すと SweeperNetPlayer.All から抜けるため）
+        for (int i = SweeperNetPlayer.All.Count - 1; i >= 0; i--)
         {
-            FishingNetPlayer player = FishingNetPlayer.All[i];
+            SweeperNetPlayer player = SweeperNetPlayer.All[i];
             if (player == null || !player.IsSpawned || player.LocalSeat < BotSeatStart + count)
             {
                 continue;
@@ -85,8 +85,8 @@ public partial class SpaceJunkSession
             player.NetworkObject.Despawn(true);
         }
 
-        // ボットも人と同じ体で出す（2026/11/5 から新しい体。頭は体に合わせて付け替える。下の AttachBotBrain）
-        GameObject prefab = SweeperOnlineSwitch.BotPrefabOr(NetworkManager.NetworkConfig.PlayerPrefab);
+        // ボットも人と同じ体で出す（頭は下の AttachBotBrain で付ける）
+        GameObject prefab = NetworkManager.NetworkConfig.PlayerPrefab;
         if (prefab == null)
         {
             Debug.LogError("[JUNK] NetworkManager に Player Prefab が入っていないので、ボットを出せません。");
@@ -109,11 +109,11 @@ public partial class SpaceJunkSession
             }
 
             GameObject spawned = Instantiate(prefab);
-            FishingNetPlayer netPlayer = spawned.GetComponent<FishingNetPlayer>();
+            SweeperNetPlayer netPlayer = spawned.GetComponent<SweeperNetPlayer>();
             NetworkObject networkObject = spawned.GetComponent<NetworkObject>();
             if (netPlayer == null || networkObject == null)
             {
-                Debug.LogError("[JUNK] Player Prefab に FishingNetPlayer か NetworkObject がありません。ボットを出せません。");
+                Debug.LogError("[JUNK] Player Prefab に SweeperNetPlayer か NetworkObject がありません。ボットを出せません。");
                 Destroy(spawned);
                 return;
             }

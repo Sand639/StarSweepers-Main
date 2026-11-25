@@ -32,7 +32,7 @@ public class ExplosiveObject : MonoBehaviour
     [Tooltip("巻き込まれたプレイヤーが動けなくなる秒数")]
     [SerializeField] private float playerStunSeconds = 2f;
 
-    [Tooltip("爆発の見た目。Prefabs/Effect/FishingExplosion を入れる")]
+    [Tooltip("爆発の見た目。Prefabs/Effect/BombExplosion を入れる")]
     [SerializeField] private ExplosionEffect explosionEffectPrefab;
 
     [Header("危なさの見せ方")]
@@ -163,7 +163,7 @@ public class ExplosiveObject : MonoBehaviour
     /// <summary>
     /// **導火線を待たずに、いますぐ爆発させる。**（2026/11/21）
     /// 引っ張られている爆弾が人にぶつかったときに呼ばれる（<see cref="SweeperPulledHit"/>）。
-    /// オンラインでは直接呼ばず、<see cref="FishingNetBomb.RequestDetonate"/> を通して全員の画面で呼ぶ。
+    /// オンラインでは直接呼ばず、<see cref="NetBomb.RequestDetonate"/> を通して全員の画面で呼ぶ。
     /// もう消えている（爆発した・ゴールに入った）爆弾では何もしない。
     /// </summary>
     public void ExplodeNow()
@@ -179,7 +179,7 @@ public class ExplosiveObject : MonoBehaviour
     /// <summary>
     /// 爆発する。見た目を出す → 範囲内に効果を与える → 火を消して見た目を戻す → 消える、の順。
     /// オンラインでも**各PCが自分で導火線を数えて、自分の画面で爆発させる**
-    /// （<see cref="FishingNetBomb"/>。配っているのは「火がついた」ことだけ）。
+    /// （<see cref="NetBomb"/>。配っているのは「火がついた」ことだけ）。
     /// </summary>
     private void Explode()
     {
@@ -195,7 +195,7 @@ public class ExplosiveObject : MonoBehaviour
 
         // オンラインでは、ホストが「火を消した」ことも全員に配る
         // （消さないと、途中から入ってきた人に燃えたままの状態が届いてしまう）
-        FishingNetBomb netBomb = GetComponent<FishingNetBomb>();
+        NetBomb netBomb = GetComponent<NetBomb>();
         if (netBomb != null)
         {
             netBomb.ServerResetFuse();

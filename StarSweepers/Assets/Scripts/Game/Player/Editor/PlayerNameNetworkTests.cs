@@ -13,10 +13,10 @@ public class PlayerNameNetworkTests
     public IEnumerator Names_AreAssignedPerPlayerAndReachClientsIncludingLateJoiners()
     {
         // 未実装の段階でもコンパイルでき、欠けている入口を失敗として示す。
-        Assert.That(typeof(FishingNetPlayer).GetMethod("SetName"), Is.Not.Null);
+        Assert.That(typeof(SweeperNetPlayer).GetMethod("SetName"), Is.Not.Null);
         yield return new EnterPlayMode();
 
-        GameObject template = new GameObject("NameTestPlayer", typeof(NetworkObject), typeof(FishingNetPlayer));
+        GameObject template = new GameObject("NameTestPlayer", typeof(NetworkObject), typeof(SweeperNetPlayer));
         typeof(NetworkObject).GetField("GlobalObjectIdHash", BindingFlags.Instance | BindingFlags.NonPublic)
             .SetValue(template.GetComponent<NetworkObject>(), 314159u);
         GameObject sessionTemplate = new GameObject("NameTestSession", typeof(NetworkObject), typeof(SpaceJunkSession));
@@ -29,7 +29,7 @@ public class PlayerNameNetworkTests
             managers.Add(host);
             Assert.That(host.StartHost(), Is.True);
             yield return WaitFor(() => FindPlayer(host, 0, 0) != null);
-            FishingNetPlayer hostPlayer = FindPlayer(host, 0, 0);
+            SweeperNetPlayer hostPlayer = FindPlayer(host, 0, 0);
             Assert.That(HasName(hostPlayer), Is.True);
             Assert.That(SetName(hostPlayer, 1, 0, 2), Is.True);
             Assert.That(hostPlayer.DisplayName, Is.EqualTo("深淵の勇者"));
@@ -67,7 +67,7 @@ public class PlayerNameNetworkTests
             yield return WaitFor(() => client.IsConnectedClient && FindPlayer(client, 0, 0) != null);
             yield return WaitFor(() => FindPlayer(client, 0, 0).DisplayName == "深淵の勇者");
             yield return WaitFor(() => FindPlayer(client, client.LocalClientId, 0) != null);
-            FishingNetPlayer clientPlayer = FindPlayer(client, client.LocalClientId, 0);
+            SweeperNetPlayer clientPlayer = FindPlayer(client, client.LocalClientId, 0);
             yield return WaitFor(() => HasName(clientPlayer));
 
             Assert.That(SetName(clientPlayer, 2, 0, 0), Is.True);
@@ -86,7 +86,7 @@ public class PlayerNameNetworkTests
             // 同じ接続の2人目も、1人目と別の番号を持つ。
             GameObject extraObject = Object.Instantiate(template);
             NetworkObject extraNetwork = extraObject.GetComponent<NetworkObject>();
-            FishingNetPlayer extra = extraObject.GetComponent<FishingNetPlayer>();
+            SweeperNetPlayer extra = extraObject.GetComponent<SweeperNetPlayer>();
             extra.ServerInitLocalSeat(1);
             extraNetwork.SpawnWithOwnership(0);
             Assert.That(SetName(extra, 0, 0, 1), Is.True);
@@ -151,9 +151,9 @@ public class PlayerNameNetworkTests
         return null;
     }
 
-    private static FishingNetPlayer FindPlayer(NetworkManager manager, ulong owner, int seat)
+    private static SweeperNetPlayer FindPlayer(NetworkManager manager, ulong owner, int seat)
     {
-        foreach (FishingNetPlayer player in FishingNetPlayer.All)
+        foreach (SweeperNetPlayer player in SweeperNetPlayer.All)
         {
             if (player != null && player.IsSpawned && player.NetworkManager == manager
                 && player.OwnerClientId == owner && player.LocalSeat == seat) return player;
@@ -161,16 +161,16 @@ public class PlayerNameNetworkTests
         return null;
     }
 
-    private static bool HasName(FishingNetPlayer player)
+    private static bool HasName(SweeperNetPlayer player)
     {
-        return (int)typeof(FishingNetPlayer).GetProperty("NamePrefixIndex").GetValue(player) >= 0
-            && (int)typeof(FishingNetPlayer).GetProperty("NameConnectorIndex").GetValue(player) >= 0
-            && (int)typeof(FishingNetPlayer).GetProperty("NameSuffixIndex").GetValue(player) >= 0;
+        return (int)typeof(SweeperNetPlayer).GetProperty("NamePrefixIndex").GetValue(player) >= 0
+            && (int)typeof(SweeperNetPlayer).GetProperty("NameConnectorIndex").GetValue(player) >= 0
+            && (int)typeof(SweeperNetPlayer).GetProperty("NameSuffixIndex").GetValue(player) >= 0;
     }
 
-    private static bool SetName(FishingNetPlayer player, int prefix, int connector, int suffix)
+    private static bool SetName(SweeperNetPlayer player, int prefix, int connector, int suffix)
     {
-        return (bool)typeof(FishingNetPlayer).GetMethod("SetName")
+        return (bool)typeof(SweeperNetPlayer).GetMethod("SetName")
             .Invoke(player, new object[] { prefix, connector, suffix });
     }
 

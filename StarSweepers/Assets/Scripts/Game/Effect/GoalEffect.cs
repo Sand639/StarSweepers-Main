@@ -324,7 +324,7 @@ public class GoalEffect : MonoBehaviour
         }
 
         // 引っ掛けられている物・持ち主がまだホストに戻っていない物は、手を離されてから
-        FishingNetSupply supply = item.GetComponent<FishingNetSupply>();
+        NetSupply supply = item.GetComponent<NetSupply>();
         if (supply != null && supply.IsSpawned && (supply.IsClaimed || !supply.IsOwner || !supply.IsServer))
         {
             return;
@@ -744,11 +744,15 @@ public class GoalEffect : MonoBehaviour
         views.Clear();
         Scene scene = gameObject.scene;
 
+        // 始まりの演出中（ゴールが着地してから START! まで）は出さず、START! で出し始める（2026/11/25・大槻さん）
+        SpaceJunkRound round = SpaceJunkRound.Current;
+        bool intro = round != null && round.gameObject.scene == scene && round.IsIntro;
+
         foreach (SpaceJunkGoal goal in SpaceJunkGoal.All)
         {
             if (goal != null && goal.gameObject.scene == scene && !goal.IsClosed)
             {
-                views.Add(new GoalView { Goal = goal, TeamColor = SpaceJunkTeams.TeamColor(goal.OwnerTeam), Shown = IsVisualShown(goal) });
+                views.Add(new GoalView { Goal = goal, TeamColor = SpaceJunkTeams.TeamColor(goal.OwnerTeam), Shown = !intro && IsVisualShown(goal) });
             }
         }
 

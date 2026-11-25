@@ -144,6 +144,7 @@ public partial class SpaceJunkSession
     {
         // 上と同じ理由で、止まらない時計で数える
         yield return PresentRoundResult(matchResultSeconds);
+        yield return PresentMatchVictory(); // 勝ったチームのメンバー紹介（SpaceJunkSession.VictoryShowcase.cs）
 
         if (!IsServer)
         {

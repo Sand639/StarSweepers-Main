@@ -333,7 +333,7 @@ public class SpaceJunkWholeStageCamera : SpaceJunkCameraMode
             if (renderer.transform.IsChildOf(transform) ||
                 renderer.GetComponentInParent<Canvas>() != null ||
                 renderer.GetComponentInParent<HookableObject>() != null ||
-                renderer.GetComponentInParent<FishingPlayerController>() != null ||
+                renderer.GetComponentInParent<SweeperMover>() != null ||
                 renderer.GetComponentInParent<SpaceJunkTrain>() != null ||
                 renderer.GetComponentInParent<SpaceJunkCameraTestDummy>() != null)
             {

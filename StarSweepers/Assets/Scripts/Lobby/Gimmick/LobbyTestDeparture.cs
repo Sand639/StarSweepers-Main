@@ -13,8 +13,8 @@ public sealed class LobbyTestDeparture : MonoBehaviour
 
     private const float BoardingPause = 0.75f;
     private const float FlightSeconds = 2.5f;
-    private readonly Dictionary<FishingNetPlayer, SweeperNameTag> marks = new();
-    private readonly List<FishingNetPlayer> removedMarks = new();
+    private readonly Dictionary<SweeperNetPlayer, SweeperNameTag> marks = new();
+    private readonly List<SweeperNetPlayer> removedMarks = new();
     private Vector3 blueStart;
     private Vector3 redStart;
 
@@ -68,7 +68,7 @@ public sealed class LobbyTestDeparture : MonoBehaviour
         }
 
         RemoveUnusedMarks(session);
-        foreach (FishingNetPlayer player in FishingNetPlayer.All)
+        foreach (SweeperNetPlayer player in SweeperNetPlayer.All)
         {
             if (player == null || !player.IsSpawned || player.NetworkManager != manager)
             {
@@ -122,7 +122,7 @@ public sealed class LobbyTestDeparture : MonoBehaviour
                t * t * t * exit;
     }
 
-    private static bool IsOverDeck(FishingNetPlayer player, BoxCollider deck)
+    private static bool IsOverDeck(SweeperNetPlayer player, BoxCollider deck)
     {
         Vector3 local = deck.transform.InverseTransformPoint(player.transform.position) - deck.center;
         return Mathf.Abs(local.x) <= deck.size.x * 0.5f &&
@@ -131,7 +131,7 @@ public sealed class LobbyTestDeparture : MonoBehaviour
                local.y <= deck.size.y * 0.5f;
     }
 
-    private void ShowMark(FishingNetPlayer player)
+    private void ShowMark(SweeperNetPlayer player)
     {
         if (marks.ContainsKey(player))
         {
@@ -151,7 +151,7 @@ public sealed class LobbyTestDeparture : MonoBehaviour
     {
         foreach (var entry in marks)
         {
-            FishingNetPlayer player = entry.Key;
+            SweeperNetPlayer player = entry.Key;
             if (session == null || player == null || !player.IsSpawned || !session.IsTestReady(player.PlayerKey))
             {
                 if (entry.Value != null)
@@ -162,7 +162,7 @@ public sealed class LobbyTestDeparture : MonoBehaviour
             }
         }
 
-        foreach (FishingNetPlayer player in removedMarks)
+        foreach (SweeperNetPlayer player in removedMarks)
         {
             marks.Remove(player);
         }

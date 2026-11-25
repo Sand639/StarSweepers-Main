@@ -72,14 +72,9 @@ public partial class SweeperBot : MonoBehaviour
     [Range(0f, 1f)]
     [SerializeField] private float criticalChance = 0.5f;
 
-    [Tooltip("クリティカルを狙ったとき、成功する割合（0〜1）。失敗すると受付のあとに押して、ふつうの距離に落ちる")]
+    [Tooltip("クリティカルを狙ったとき、成功する割合（0〜1）。失敗すると押さずに手前まで引き、そのまま後ろへ引っ張り切る（ふつうの距離に落ちる）")]
     [Range(0f, 1f)]
     [SerializeField] private float criticalSuccess = 0.7f;
-
-    [Tooltip("ふつうに後ろへ投げるとき、クリティカルの受付が終わってから押すまでの秒数。" +
-             "物資が手前まで来てから押すので、毎回だいたい同じ距離に落ちる（空気の抵抗があると、遠くで押すほど手前に落ちるため）")]
-    [Min(0f)]
-    [SerializeField] private float pressAfterWindow = 0.05f;
 
     [Tooltip("まだ一度も投げていないとき、後ろへ投げた物が「Back Distance の何倍」の所で止まると見積もるか。" +
              "投げたあとは、実際に止まった所を覚えて、それを使う（物資の空気の抵抗・重力の変化・滑りで、計算どおりには飛ばないため）")]
@@ -156,7 +151,7 @@ public partial class SweeperBot : MonoBehaviour
     private const float WatchMinSeconds = 0.6f;
 
     private VirtualPlayerInput pad;
-    private FishingNetPlayer netPlayer;
+    private SweeperNetPlayer netPlayer;
     private CharacterController body;
     private SweeperShooter shooter;
     private SweeperReel reel;
@@ -249,7 +244,7 @@ public partial class SweeperBot : MonoBehaviour
     private void Awake()
     {
         pad = GetComponent<VirtualPlayerInput>();
-        netPlayer = GetComponent<FishingNetPlayer>();
+        netPlayer = GetComponent<SweeperNetPlayer>();
         body = GetComponent<CharacterController>();
         shooter = GetComponent<SweeperShooter>();
         reel = GetComponent<SweeperReel>();
@@ -296,7 +291,7 @@ public partial class SweeperBot : MonoBehaviour
             return;
         }
 
-        if (!SpaceJunkRound.PlayAllowed || !FishingMatch.PlayAllowed || GamePause.BlocksInput || !shooter.enabled)
+        if (!SpaceJunkRound.PlayAllowed || GamePause.BlocksInput || !shooter.enabled)
         {
             pad.Move = Vector2.zero;
             pad.SetPull(false);
@@ -318,7 +313,8 @@ public partial class SweeperBot : MonoBehaviour
                 if (Time.time >= pauseUntil)
                 {
                     // 押したのに狙い始めなかった（スタン中など）ときは、いったん離す（押した瞬間しか効かないため）
-                    hold = HandleSeek() && !pad.PullHeld;
+                    // リキャスト中は押さない（2026/11/24）
+                    hold = HandleSeek() && !pad.PullHeld && shooter.RecastReady;
                 }
                 else
                 {
@@ -631,7 +627,7 @@ public partial class SweeperBot : MonoBehaviour
             return false;
         }
 
-        FishingNetSupply netSupply = item.GetComponent<FishingNetSupply>();
+        NetSupply netSupply = item.GetComponent<NetSupply>();
         return netSupply == null || !netSupply.IsSpawned || !netSupply.IsClaimed;
     }
 
@@ -854,7 +850,7 @@ public partial class SweeperBot : MonoBehaviour
             return true;
         }
 
-        if (pressedThisReel || pressAt < 0f || reel.IsWaitingForClaim || reel.Elapsed < pressAt)
+        if (pressedThisReel || (pressAt < 0f && pressAt != PressWhenNear) || reel.IsWaitingForClaim || reel.Elapsed < DuePressTime())
         {
             return false;
         }
@@ -902,7 +898,7 @@ public partial class SweeperBot : MonoBehaviour
         return true;
     }
 
-    /// <summary>引き寄せ始めてから何秒で押すか。押さない（前へ投げる）なら -1。</summary>
+    /// <summary>引き寄せ始めてから何秒で押すか。押さない（手前まで来たら後ろへ引っ張り切る）なら -1、両手で持って前へ投げるなら <see cref="PressWhenNear"/>。</summary>
     private float ChoosePressTime(HookableObject item)
     {
         // 重い物は投げられないので、すぐ離す（ボットは狙わないが、通り道で当たることがある）
@@ -911,32 +907,47 @@ public partial class SweeperBot : MonoBehaviour
             return 0f;
         }
 
-        // 爆弾は後ろ（自分のゴールの側）へ投げない
+        // 爆弾は後ろ（自分のゴールの側）へ投げない。手前まで来たら両手で持って、前（ゴールと反対）へ投げる（2026/11/24）
         if (item.GetComponent<ExplosiveObject>() != null)
         {
-            return -1f;
+            return PressWhenNear;
         }
 
         // 狙っていた素材と違う物に当たったときは、ふつうに後ろへ投げる
         ThrowPlan current = item == target ? plan : ThrowPlan.Back;
 
-        // ふつうに後ろへ投げるのは、クリティカルの受付が終わった直後（物資がもう手前に来ている）。
-        // クリティカルを狙って失敗したときも同じ時に押すので、落ちる所はふつうと同じになる
-        float latest = Mathf.Max(0f, reel.ReelSeconds - 0.1f);
-        float afterWindow = Mathf.Min(reel.CriticalWindowEnd + pressAfterWindow, latest);
+        // ふつうに後ろへ投げるのは、押さずに手前まで来たとき（2026/11/24 から、押さなければそのまま後ろへ引っ張り切る）。
+        // 手前で押すと両手で持って前へ投げてしまうので押さない。クリティカルを狙って失敗したときも押さない（落ちる所はふつうと同じ）
         switch (current)
         {
             case ThrowPlan.Forward:
-                return -1f;
+                return PressWhenNear;
 
             case ThrowPlan.Critical:
                 return Random.value < criticalSuccess
                     ? Mathf.Lerp(reel.CriticalWindowStart, reel.CriticalWindowEnd, Random.Range(0.3f, 0.7f))
-                    : afterWindow;
+                    : -1f;
 
             default:
-                return afterWindow;
+                return -1f;
         }
+    }
+
+    /// <summary><see cref="ChoosePressTime"/> の答えで「両手で持つ距離に入ったら押す（前へ投げる）」の印。</summary>
+    private const float PressWhenNear = -2f;
+
+    /// <summary>
+    /// いつ押すか（引き寄せ始めてからの秒数）。「両手で持つ距離に入ったら」のときは、引き寄せの様子から計算する
+    /// （オンラインでは、ホストに認められてから距離を測り直すので、押す直前に計算する）。
+    /// </summary>
+    private float DuePressTime()
+    {
+        if (pressAt != PressWhenNear)
+        {
+            return pressAt;
+        }
+
+        return Mathf.Min(reel.NearThrowStartTime + 0.05f, Mathf.Max(0f, reel.ReelSeconds - 0.08f));
     }
 
     // ------------------------------------------------------------

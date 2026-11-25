@@ -81,7 +81,7 @@ public class SpaceJunkGoalCarrier
     public List<FlyingGoal> Goals { get; } = new List<FlyingGoal>();
 
     /// <summary>乗っているプレイヤーと、奥を向いたときの左右の位置（ゴールエリアが動いている間、毎フレーム作り直す）。</summary>
-    public List<(FishingNetPlayer player, float across)> Riders { get; } = new List<(FishingNetPlayer, float)>();
+    public List<(SweeperNetPlayer player, float across)> Riders { get; } = new List<(SweeperNetPlayer, float)>();
 
     /// <summary>飛んでくる元の向き（奥）。</summary>
     public Vector3 Backward { get; private set; } = Vector3.forward;
@@ -295,7 +295,7 @@ public class SpaceJunkGoalCarrier
 
         Scene active = SceneManager.GetActiveScene();
 
-        foreach (FishingNetPlayer player in FishingNetPlayer.All)
+        foreach (SweeperNetPlayer player in SweeperNetPlayer.All)
         {
             if (player == null || !player.IsSpawned)
             {

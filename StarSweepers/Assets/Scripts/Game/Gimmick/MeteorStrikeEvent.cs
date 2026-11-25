@@ -14,7 +14,7 @@ using UnityEngine;
 ///
 /// ・攻撃の条件（着弾の時刻・半径・飛ばす強さ）はホストが <see cref="InitializeServer"/> で決め、NetworkVariable で全員へ配る
 /// ・**着弾の時刻は全員で同期された時計（ServerTime）で持つ**ので、予告・落下・着弾がどのPCでも同じタイミングになる
-/// ・プレイヤーの吹き飛ばしは**それぞれのPCが自分の体だけ**受け取る（<c>FishingPlayerController.Launch</c> が他人の体では何もしない）
+/// ・プレイヤーの吹き飛ばしは**それぞれのPCが自分の体だけ**受け取る（<c>SweeperMover.Launch</c> が他人の体では何もしない）
 /// ・素材・爆弾を飛ばすのは**ホストだけ**（物資の動きはホストが決めているため）。消すのもホストだけ
 ///
 /// 1人用（NetworkManager が無いとき）でも、同じ流れでそのまま動く。
@@ -280,7 +280,7 @@ public class MeteorStrikeEvent : NetworkBehaviour
 
         foreach (Collider hit in hits)
         {
-            FishingPlayerController player = hit.GetComponentInParent<FishingPlayerController>();
+            SweeperMover player = hit.GetComponentInParent<SweeperMover>();
             if (player != null && player.isActiveAndEnabled && handledPlayers.Add(player.gameObject))
             {
                 // 爆心のちょうど真上にいて向きが決まらないときは、その人の向いている方へ飛ばす
@@ -316,22 +316,22 @@ public class MeteorStrikeEvent : NetworkBehaviour
                 objectHorizontal.Value,
                 objectLift.Value);
 
-            // オンラインの物資（FishingNetSupply）は、引っ掛けを外してから飛ばすところまでホスト側の処理に任せる。
+            // オンラインの物資（NetSupply）は、引っ掛けを外してから飛ばすところまでホスト側の処理に任せる。
             // 1人用の物資は、ここで引っ掛けを外し、物理を動かして飛ばす
-            FishingNetSupply netSupply = item.GetComponent<FishingNetSupply>();
+            NetSupply netSupply = item.GetComponent<NetSupply>();
             if (netSupply != null && netSupply.IsSpawned)
             {
                 netSupply.ServerApplyExplosion(itemVelocity);
             }
             else
             {
-                ThrowController.ReleaseTargetForExplosion(item);
+                item.SetHooked(false);
                 item.Body.isKinematic = false;
                 item.Body.AddForce(itemVelocity, ForceMode.VelocityChange);
             }
 
             // 爆弾なら導火線に火をつける（オンライン用の爆弾は全員へ同期される口を使う）
-            FishingNetBomb netBomb = item.GetComponent<FishingNetBomb>();
+            NetBomb netBomb = item.GetComponent<NetBomb>();
             if (netBomb != null && netBomb.IsSpawned)
             {
                 netBomb.RequestLightFuse();
@@ -359,6 +359,12 @@ public class MeteorStrikeEvent : NetworkBehaviour
         if (stun != null && stunSeconds > 0f)
         {
             stun.Stun(stunSeconds);
+        }
+
+        // 当たった瞬間のエフェクト（オンラインでは全員の画面に出る。2026/11/24）。新しい体（SweeperMover）だけ
+        if (launchable is SweeperMover mover && mover != null)
+        {
+            SweeperHitEffects.For(mover).PlayKnockback(velocity);
         }
     }
 

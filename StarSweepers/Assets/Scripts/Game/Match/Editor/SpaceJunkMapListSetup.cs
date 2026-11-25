@@ -78,7 +78,7 @@ public static class SpaceJunkMapListSetup
             return list;
         }
 
-        FishingSceneBuilder.EnsureFolder(SpaceJunkSetup.MapSceneFolder);
+        SceneBuildTools.EnsureFolder(SpaceJunkSetup.MapSceneFolder);
 
         list = ScriptableObject.CreateInstance<SpaceJunkMapList>();
         AssetDatabase.CreateAsset(list, ListPath);
@@ -291,7 +291,7 @@ public static class SpaceJunkMapListSetup
         {
             foreach (SpaceJunkLobbyUI ui in root.GetComponentsInChildren<SpaceJunkLobbyUI>(true))
             {
-                FishingSceneBuilder.SetRef(ui, "mapList", list);
+                SceneBuildTools.SetRef(ui, "mapList", list);
                 wired++;
             }
         }

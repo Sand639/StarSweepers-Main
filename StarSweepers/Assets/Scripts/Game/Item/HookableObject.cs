@@ -11,7 +11,7 @@ using UnityEngine;
 /// 引き寄せ・投げの処理そのものは <see cref="ThrowController"/> にある。
 /// こちらは「引っ掛けられる物かどうか」「糸を結ぶ位置」「点数」「消える」だけを持つ。
 ///
-/// **物資はスポナー（<see cref="FishingObjectSpawner"/>）が次々に出す。**
+/// **物資はスポナー（<see cref="SpaceJunkSpawner"/>）が次々に出す。**
 /// 消えた物資は戻ってこない（Respawn Seconds が 0 のとき）。
 /// </summary>
 [RequireComponent(typeof(Rigidbody))]
@@ -107,6 +107,69 @@ public class HookableObject : MonoBehaviour
         {
             Vanish();
         }
+
+        MeasureSpeed();
+    }
+
+    // ---- 動いている速さ（引っ張っている物がぶつかったときの強さに使う。2026/11/24） ----
+
+    /// <summary>
+    /// **いま動いている速さ（m/秒）。** 位置の変化から測る（オンラインのほかの人が動かしている物は、こちらでは物理が止まっていて
+    /// Rigidbody の速さが 0 のままなので、位置の変化で見る）。少しならしてある。
+    /// </summary>
+    public float MeasuredSpeed { get; private set; }
+
+    /// <summary>引っ張られ始めた時刻（このPCで引っ掛けた・オンラインで誰かが引っ掛けたと届いた時刻）。</summary>
+    public float PulledSince { get; private set; } = -100f;
+
+    private Vector3 lastSpeedPosition;
+    private bool hasSpeedSample;
+
+    /// <summary>速さをならす強さ（大きいほど、すぐ今の速さになる）。</summary>
+    private const float SpeedSmoothing = 15f;
+
+    private void MeasureSpeed()
+    {
+        Vector3 position = transform.position;
+        float dt = Time.deltaTime;
+        if (hasSpeedSample && dt > 0f)
+        {
+            float speed = (position - lastSpeedPosition).magnitude / dt;
+            MeasuredSpeed = Mathf.Lerp(MeasuredSpeed, speed, 1f - Mathf.Exp(-SpeedSmoothing * dt));
+        }
+
+        lastSpeedPosition = position;
+        hasSpeedSample = true;
+    }
+
+    /// <summary>この時刻（Time.time）までは、誰もつかめない（クリティカルで投げた物。2026/11/24）。</summary>
+    public float ProtectedUntil { get; private set; } = -100f;
+
+    /// <summary>いま誰もつかめない間か（このPCの記録。オンラインではホストの記録 <see cref="NetSupply.IsProtected"/> も見る）。</summary>
+    public bool IsProtected
+    {
+        get
+        {
+            if (Time.time < ProtectedUntil)
+            {
+                return true;
+            }
+
+            NetSupply netSupply = GetComponent<NetSupply>();
+            return netSupply != null && netSupply.IsProtected;
+        }
+    }
+
+    /// <summary>この秒数のあいだ、誰もつかめないようにする（このPCの記録）。</summary>
+    public void Protect(float seconds)
+    {
+        ProtectedUntil = Mathf.Max(ProtectedUntil, Time.time + seconds);
+    }
+
+    /// <summary>引っ張られ始めたことを記録する（<see cref="NetSupply"/> がオンラインで誰かが引っ掛けたと知ったときにも呼ぶ）。</summary>
+    public void NotePulled()
+    {
+        PulledSince = Time.time;
     }
 
     /// <summary>消えていない物資が、いまシーンにいくつあるか。</summary>
@@ -126,6 +189,11 @@ public class HookableObject : MonoBehaviour
     /// <summary>フックされた／外れた、を記録する。<see cref="HookController"/> から呼ばれる。</summary>
     public void SetHooked(bool hooked)
     {
+        if (hooked && !IsHooked)
+        {
+            NotePulled();
+        }
+
         IsHooked = hooked;
     }
 
@@ -133,7 +201,7 @@ public class HookableObject : MonoBehaviour
     /// **この物を消す。** ポケットに入ったとき・爆発に巻き込まれたとき・場外に落ちたときに呼ばれる。
     ///
     /// ・オンライン … 見た目を消し、**ホストが少し待ってから全員の画面から削除する**
-    ///   （<see cref="FishingNetSupply.ServerDespawnSoon"/>）
+    ///   （<see cref="NetSupply.ServerDespawnSoon"/>）
     /// ・1人用 … Respawn Seconds が 0 なら削除。0 より大きければ、その秒数後に元の場所へ戻る
     /// </summary>
     public void Vanish()
@@ -150,7 +218,7 @@ public class HookableObject : MonoBehaviour
         SetHooked(false);
 
         // ---- オンライン ----
-        FishingNetSupply netSupply = GetComponent<FishingNetSupply>();
+        NetSupply netSupply = GetComponent<NetSupply>();
         if (netSupply != null && netSupply.IsSpawned)
         {
             // オンラインで勝手に Destroy すると通信側がエラーになるので、
