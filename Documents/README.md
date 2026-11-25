@@ -253,7 +253,7 @@ StarSweepers-Main/                     ← リポジトリのルート
     │   │   │                     Match＝試合の進行、Camera、Bot、Effect＝演出、UI＝試合中の表示
     │   │   ├── Common/           どのシーンでも使う土台：Input＝入力、Network＝通信、Settings＝設定・ポーズ画面、UI＝ポインター・フォント・シーンを切り替えるときの演出
     │   │   └── SG_Character/・SG_Stage/  Hansさんのスクリプト（動かす前に本人の了承が要る）
-    │   ├── Resources/            名前で読み込むもの（タイトル・ロビーの画面のプレハブ、ボタンのテーマ、名前タグ、デブリセットのUI、高単価デブリのルーレットUI）
+    │   ├── Resources/            名前で読み込むもの（タイトル・ロビーの画面のプレハブ、ボタンのテーマ、名前タグ、デブリセットのUI、高単価デブリのルーレットUI、カウントダウンの画像）
     │   └── Scenes/               シーン（直下の SpaceJunkMapList.asset は、使うマップの一覧）
     │       ├── MainLoop/             タイトルとロビー（TitleScene・Lobby。2026/11/11 から Lobby。前のロビー SpaceJunkLobby は使っていない）
     │       ├── Stage/            ステージ（`STAGE_Simple`・`STAGE_Train` など。名前の付け方と一覧は `宇宙ごみのマップの作り方.md`）
@@ -763,3 +763,4 @@ Unityは `.meta` ファイルで各アセットの参照を管理しているた
 | 11/21（土） | Claude Code | リポジトリ構成の図の `Scenes/Test/` の検証シーンに `ElectricDebrisTest` を足した（電気のデブリの検証シーンができたため）。ルールは変えていない |
 | 11/24（火） | Qoder（依頼：呉迪芝） | メンバー構成のプランナーに**呉迪芝**を追加した（本人の申告による。`（未記入）` の欄はサブリーダーのものかもしれないので残してある）。ルールの部分は変えていない |
 | 11/25（水） | Claude Code | リポジトリ構成の図の `Scenes/Test/` の検証シーンに `MatchVictoryShowcaseTest` を足した（勝利演出のメンバー紹介の検証シーンができたため）。ルールは変えていない |
+| 11/25（水） | Claude Code | リポジトリ構成の図の `Resources/` に、カウントダウンの画像のプレハブを足した（試合前の 3・2・1・START! を画像にしたため）。ルールは変えていない |
