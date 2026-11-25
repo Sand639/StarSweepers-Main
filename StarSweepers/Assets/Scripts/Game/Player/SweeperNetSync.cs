@@ -157,6 +157,9 @@ public class SweeperNetSync : NetworkBehaviour
     // スタン・吹き飛ばし・痺れの見た目を全員に（2026/11/24）
     // ------------------------------------------------------------
 
+    /// <summary>この体の人が、いま物資を両手で持っているか（ほかのPCの人の体でも分かる。アニメーションの切り替えに使う。2026/11/25）。</summary>
+    public bool IsCarrying => carrying.Value;
+
     /// <summary>参加番号 <paramref name="playerIndex"/> の人が、いま物資を両手で持っているか（ほかのPCの人でも分かる）。</summary>
     public static bool IsPlayerCarrying(int playerIndex)
     {

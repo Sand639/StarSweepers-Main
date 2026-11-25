@@ -187,7 +187,7 @@ public class SweeperReel : MonoBehaviour
     [Tooltip("押してから、物資が両手の位置に来るまでの秒数")]
     [SerializeField] private float carryInSeconds = 0.1f;
 
-    [Tooltip("両手の位置に来てから投げるまでの秒数（投げる動きの溜め。アニメーションが来たら合わせる）")]
+    [Tooltip("両手の位置に来てから投げるまでの秒数（投げる動きの溜め。投げるアニメーション AN_Throw の振り下ろす瞬間＝約 0.73 秒に、Carry In Seconds と合わせて合わせる）")]
     [SerializeField] private float carryWindup = 0.25f;
 
     [Tooltip("投げた物が落ちる所：プレイヤーの中心から向いている方向へ何 m（ふつうの引っ張りの Back Distance くらい。クリティカルより弱く）")]
@@ -195,6 +195,12 @@ public class SweeperReel : MonoBehaviour
 
     [Tooltip("投げた物の放物線のいちばん高い所（足元から m）")]
     [SerializeField] private float carryArcHeight = 2.4f;
+
+    [Tooltip("投げるアニメーション（Throw）を流している間は、持った物を両手の真ん中に合わせて動かす（2026/11/25）。OFF なら上の位置のまま")]
+    [SerializeField] private bool carryWithHands = true;
+
+    [Tooltip("両手に合わせるとき、両手の真ん中からさらに体の前へ何 m ずらすか（物が体にめり込まないように）")]
+    [SerializeField] private float carryHandsForward = 0.3f;
 
     [Header("前へ投げる（距離で変わる操作で、押さなかったとき）")]
     [Tooltip("前へ飛ばす速さ（m/秒）")]
@@ -384,6 +390,7 @@ public class SweeperReel : MonoBehaviour
 
     private Collider playerCollider;
     private SweeperShooter shooter;
+    private SweeperAnimation animationPlayer;
 
     /// <summary>つかむ前の物資の重力の設定（離したときに戻す）。</summary>
     private bool itemGravityWas;
@@ -825,6 +832,7 @@ public class SweeperReel : MonoBehaviour
     {
         playerCollider = GetComponent<Collider>();
         shooter = GetComponent<SweeperShooter>();
+        animationPlayer = GetComponent<SweeperAnimation>();
         netPlayer = GetComponent<SweeperNetPlayer>();
         input = PlayerInputSource.Get(this);
         windowStart = CriticalStartSeconds;
@@ -1009,8 +1017,19 @@ public class SweeperReel : MonoBehaviour
         CarryStarted?.Invoke();
     }
 
-    /// <summary>両手で持つ位置（体の前・胸の高さ）。</summary>
-    private Vector3 CarryPoint => transform.position + Flat(transform.forward) * carryForward + Vector3.up * carryHeight;
+    /// <summary>両手で持つ位置。投げるアニメーションを流している間は両手の真ん中（の少し前）、それ以外は体の前・胸の高さ。</summary>
+    private Vector3 CarryPoint
+    {
+        get
+        {
+            if (carryWithHands && animationPlayer != null && animationPlayer.TryGetHandsCenter(out Vector3 hands))
+            {
+                return hands + Flat(transform.forward) * carryHandsForward;
+            }
+
+            return transform.position + Flat(transform.forward) * carryForward + Vector3.up * carryHeight;
+        }
+    }
 
     /// <summary>
     /// **両手で持った物を、向いている方向へ投げる**（2026/11/24）。落ちる所はプレイヤーの中心から前へ Carry Throw Distance。

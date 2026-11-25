@@ -385,7 +385,7 @@ MonoBehaviour:
   carryForward: 0.75
   carryHeight: 0.8
   carryInSeconds: 0.1
-  carryWindup: 0.25
+  carryWindup: 0.63
   carryThrowDistance: 7
   carryArcHeight: 2.4
   forwardSpeed: 12
@@ -450,9 +450,9 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::SweeperAnimation
   animator: {fileID: 0}
-  shootState: A_SHOOT
-  aimState: A_AIM_01
-  idleState: 
+  shootState: Shoot
+  aimState: AimWalk
+  idleState: Idle
   speedParameter: Speed
   crossFade: 0.05
   remoteSmoothing: 10
