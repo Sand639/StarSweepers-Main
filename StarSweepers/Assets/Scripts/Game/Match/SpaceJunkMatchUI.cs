@@ -1,4 +1,3 @@
-using Unity.Netcode;
 using UnityEngine;
 
 /// <summary>
@@ -6,14 +5,14 @@ using UnityEngine;
 ///
 /// 出しているもの：
 ///
-///   ・**いま何ラウンド目か**と、何本先取か
 ///   ・**残り時間**（残り10秒を切ると赤くなる。チームの得点バー <see cref="TeamScoreBarUI"/> を置いたステージでは、バーの丸に任せて出さない）
-///   ・得点制 … **チームごとの得点**と、**イベントの進み具合**（デブリセットなら、お題のデブリの印）
 ///   ・**イベントの始まる前のカウントダウンと、始まった合図**
-///   ・3種類ルール … **チームごとに、どの素材をそろえたか**（3種類ぶんの印）
-///   ・**チームごとのラウンドの勝ち数**
+///   ・**復活までの秒数**
 ///   ・決着後 … **このラウンドを取ったチーム**（引き分けならその旨）
 ///   ・試合が終わったら … **試合に勝ったチーム**
+///
+/// 2026/11/25 に、画面の左のチームごとの行（チーム名・得点・勝ち数・素材の印・お題の進み具合）と、
+/// 落ちたときの戻り方・カメラ切り替えの案内、真ん中の上の「第 ○ ラウンド（○ 本先取）」を消した（大槻さん）。
 ///
 /// 数える／勝敗を決めるのは <see cref="SpaceJunkRound"/> と <see cref="SpaceJunkSession"/>（ホスト）。
 /// こちらはその値を出すだけで、判定は一切していない。
@@ -39,22 +38,17 @@ public class SpaceJunkMatchUI : MonoBehaviour
 
     // 文字の見た目（GUI.skin は OnGUI の中でしか使えないので、最初の OnGUI で作る。PrepareStyles）
 
-    /// <summary>ラウンド数・イベントの一行など、上の見出し。</summary>
+    /// <summary>イベントの一行など、上の見出し。</summary>
     private GUIStyle titleStyle;
 
     /// <summary>残り時間の大きな数字。</summary>
     private GUIStyle timerStyle;
 
-    /// <summary>左のチームごとの行・案内。</summary>
-    private GUIStyle lineStyle;
-
     /// <summary>真ん中に出す大きな文字（決着・復活まで・イベント発生）。</summary>
     private GUIStyle resultStyle;
 
-    // 見出し・イベントの一行・左のチームの行の高さ。チームの得点バーが出ているときはその下へずらす
-    private float titleY = 8f;
+    // イベントの一行の高さ。チームの得点バーが出ているときはその下へずらす
     private float eventY = 70f;
-    private float listY = 96f;
     private bool timerOnBar;
 
     private void OnGUI()
@@ -82,20 +76,16 @@ public class SpaceJunkMatchUI : MonoBehaviour
         // チームの得点バーが画面の上を使っていれば、その下から並べる（バーの高さも縮める前の大きさに直す）
         float barBottom = TeamScoreBarUI.OccupiedScreenHeight / scale;
         timerOnBar = barBottom > 0f;
-        titleY = timerOnBar ? barBottom + 4f : 8f;
         eventY = timerOnBar ? barBottom + 28f : 70f;
-        listY = timerOnBar ? Mathf.Max(96f, barBottom + 56f) : 96f;
 
-        // 高単価デブリのルーレット（HighValueRouletteUI）が出ている間は、真ん中の見出しとイベントの一行をその下へずらす（左のチームの行はそのまま）
+        // 高単価デブリのルーレット（HighValueRouletteUI）が出ている間は、イベントの一行をその下へずらす
         float rouletteBottom = HighValueRouletteUI.OccupiedScreenHeight / scale;
         if (rouletteBottom > 0f)
         {
-            titleY = Mathf.Max(titleY, rouletteBottom + 4f);
             eventY = Mathf.Max(eventY, rouletteBottom + 28f);
         }
 
-        DrawHeader(round, viewWidth);
-        DrawTeamProgress(round, viewWidth);
+        DrawTimer(round, viewWidth);
 
         if (round.Phase == SpaceJunkRoundPhase.Playing)
         {
@@ -139,11 +129,6 @@ public class SpaceJunkMatchUI : MonoBehaviour
             };
         }
 
-        if (lineStyle == null)
-        {
-            lineStyle = new GUIStyle(GUI.skin.label) { fontSize = 13 };
-        }
-
         if (resultStyle == null)
         {
             resultStyle = new GUIStyle(GUI.skin.label)
@@ -156,17 +141,9 @@ public class SpaceJunkMatchUI : MonoBehaviour
         }
     }
 
-    /// <summary>画面の上に、ラウンド数と残り時間を出す。</summary>
-    private void DrawHeader(SpaceJunkRound round, float viewWidth)
+    /// <summary>画面の上に、残り時間を出す。</summary>
+    private void DrawTimer(SpaceJunkRound round, float viewWidth)
     {
-        SpaceJunkSession session = SpaceJunkSession.Current;
-
-        string title = session != null
-            ? $"第 {session.CurrentRound} ラウンド　（{session.RoundsToWin} 本先取）"
-            : "ラウンド中";
-
-        GUI.Label(new Rect(0f, titleY, viewWidth, 24f), title, titleStyle);
-
         // 残り時間は、チームの得点バーの丸に出ているので、ここでは出さない
         if (timerOnBar)
         {
@@ -183,173 +160,6 @@ public class SpaceJunkMatchUI : MonoBehaviour
         GUI.Label(new Rect(0f, 30f, viewWidth, 40f), $"{minutes}:{seconds:00}", timerStyle);
 
         GUI.color = saved;
-    }
-
-    /// <summary>
-    /// 画面の左に、チームごとの進み具合を出す。
-    /// **そろえた種類には色がつき、まだのものは暗いまま。**
-    /// </summary>
-    private void DrawTeamProgress(SpaceJunkRound round, float viewWidth)
-    {
-        SpaceJunkSession session = SpaceJunkSession.Current;
-        int teamCount = session != null ? session.TeamCount : 1;
-        int myTeam = MyTeam();
-
-        // 上の見出し（ラウンド数 8〜32・残り時間 30〜70・イベントの一行 70〜94）の下から並べる
-        float y = listY;
-
-        // 左から 12、幅 260・高さ 240 の枠の中に、上から順に並べる
-        GUILayout.BeginArea(new Rect(12f, y, 260f, 240f));
-
-        for (int team = 0; team < teamCount; team++)
-        {
-            Color saved = GUI.color;
-            GUI.color = SpaceJunkTeams.TeamColor(team);
-
-            // 自分のチームの行にだけ ▶ を付ける（ほかの行は同じ幅の空白で頭をそろえる）
-            string mark = team == myTeam ? "▶ " : "　 ";
-            int wins = session != null ? session.RoundWinsOf(team) : 0;
-
-            // 得点制 … 得点とイベントの進み具合。3種類ルール（下）… そろえた素材の印
-            if (round.Rule == SpaceJunkWinRule.Score)
-            {
-                GUILayout.Label($"{mark}{SpaceJunkTeams.TeamName(team)}　{round.ScoreOf(team)} 点　（{wins} 本）", lineStyle);
-                GUI.color = saved;
-
-                DrawEventProgress(round, team);
-                GUILayout.Space(4f);
-                continue;
-            }
-
-            GUILayout.Label($"{mark}{SpaceJunkTeams.TeamName(team)}　（{wins} 本）", lineStyle);
-
-            GUI.color = saved;
-
-            // 素材の種類ぶんの印（そのマップで出る種類だけ）
-            GUILayout.BeginHorizontal();
-            GUILayout.Space(16f);
-
-            for (int i = 0; i < SpaceJunkMaterials.Count; i++)
-            {
-                SpaceJunkMaterialKind kind = SpaceJunkMaterials.FromIndex(i);
-
-                // そのマップで出ない種類は出さない
-                if (!SpaceJunkMaterials.IsUsed(kind))
-                {
-                    continue;
-                }
-
-                bool has = round.HasKind(team, kind);
-
-                // そろえた種類は素材の色、まだの種類は暗い灰色
-                Color kindSaved = GUI.color;
-                GUI.color = has
-                    ? SpaceJunkMaterials.Color(kind)
-                    : new Color(0.35f, 0.35f, 0.38f);
-
-                GUILayout.Label(has ? $"■ {SpaceJunkMaterials.Name(kind)}" : $"□ {SpaceJunkMaterials.Name(kind)}",
-                                lineStyle);
-
-                GUI.color = kindSaved;
-            }
-
-            GUILayout.EndHorizontal();
-            GUILayout.Space(4f);
-        }
-
-        // **落ちて戻れなくなったときの案内。** マップの外へ落ちることがあるので出しておく
-        if (!string.IsNullOrEmpty(SpaceJunkPlayerSetup.LocalResetKeyName))
-        {
-            GUILayout.Space(4f);
-            GUILayout.Label($"落ちたら［{SpaceJunkPlayerSetup.LocalResetKeyName}］で戻れます", lineStyle);
-        }
-
-        // **カメラの切り替えの案内。** 切り替えられるカメラ（STAGE_01〜05）のときだけ出す
-        if (!string.IsNullOrEmpty(SpaceJunkCameraModeSwitch.LocalToggleKeyName))
-        {
-            GUILayout.Label($"［{SpaceJunkCameraModeSwitch.LocalToggleKeyName}］でカメラ切り替え　{SpaceJunkCameraModeSwitch.LocalModeSummary}", lineStyle);
-        }
-
-        GUILayout.EndArea();
-    }
-
-    /// <summary>
-    /// 得点制のとき、**イベントの進み具合**を出す。
-    /// デブリセットなら「お題 1/3 → +10　■■□ ■ □」のように、入れた数と、素材の色の印を並べる
-    /// （■＝もう入れた、□＝まだ）。順不同のときは、種類ごとにまとめて並べている。
-    /// </summary>
-    private void DrawEventProgress(SpaceJunkRound round, int team)
-    {
-        if (round.ActiveEvent != SpaceJunkEventKind.DebrisSet || !round.IsEventRunning)
-        {
-            return;
-        }
-
-        // お題を画像で出す UI（DebrisSetUI）が出ている間は、この文字の行は出さない
-        if (DebrisSetUI.IsShowing)
-        {
-            return;
-        }
-
-        GUILayout.BeginHorizontal();
-        GUILayout.Space(16f);
-
-        Color saved = GUI.color;
-        GUI.color = new Color(0.85f, 0.85f, 0.9f);
-        GUILayout.Label($"お題 {round.SetDoneOf(team)}/{round.SetGoalOf(team)} → +{round.SetBonusOf(team)}", lineStyle, GUILayout.ExpandWidth(false));
-
-        if (round.SetOrdered)
-        {
-            // 順番どおり … お題を左から順に並べる。次に入れる1個は ▶ を付けて目立たせる
-            int size = round.SetSizeOf(team);
-            int step = round.SetStepOf(team);
-
-            for (int n = 0; n < size; n++)
-            {
-                SpaceJunkMaterialKind kind = SpaceJunkMaterials.FromIndex(round.SetItemAt(team, n));
-                Color color = SpaceJunkMaterials.Color(kind);
-
-                // 次の1個より先のものは、色を 7 割の明るさに落として控えめにする
-                if (n > step)
-                {
-                    color = new Color(color.r * 0.7f, color.g * 0.7f, color.b * 0.7f, 1f);
-                }
-
-                GUI.color = color;
-
-                // step … 次に入れる番目（0 から）。それより前＝入れた（■）、ちょうど＝次（▶□）、後ろ＝まだ（□）
-                string mark = n < step ? "■" : n == step ? "▶□" : "□";
-                GUILayout.Label(mark, lineStyle, GUILayout.ExpandWidth(false));
-            }
-
-            GUI.color = saved;
-            GUILayout.FlexibleSpace();
-            GUILayout.EndHorizontal();
-            return;
-        }
-
-        for (int k = 0; k < SpaceJunkMaterials.Count; k++)
-        {
-            SpaceJunkMaterialKind kind = SpaceJunkMaterials.FromIndex(k);
-            int required = round.SetRequiredOf(team, kind);
-            int done = round.SetProgressOf(team, kind);
-
-            if (required <= 0)
-            {
-                continue;
-            }
-
-            // 入れた数だけ ■、残りを □（入れすぎても ■ は必要な数まで、□ がマイナスにならないよう 0 で止める）
-            Color color = SpaceJunkMaterials.Color(kind);
-            string marks = new string('■', Mathf.Min(done, required)) + new string('□', Mathf.Max(0, required - done));
-
-            GUI.color = color;
-            GUILayout.Label(marks, lineStyle, GUILayout.ExpandWidth(false));
-        }
-
-        GUI.color = saved;
-        GUILayout.FlexibleSpace();
-        GUILayout.EndHorizontal();
     }
 
     /// <summary>
@@ -500,21 +310,5 @@ public class SpaceJunkMatchUI : MonoBehaviour
         }
 
         return string.Join("／", parts);
-    }
-
-    /// <summary>
-    /// このPCで操作している人のチーム。分からなければ -1。
-    /// 接続番号で引くので、1台で複数人のときは**そのPCの1人目**のチームになる。
-    /// </summary>
-    private static int MyTeam()
-    {
-        NetworkManager manager = NetworkManager.Singleton;
-
-        if (manager == null || SpaceJunkSession.Current == null)
-        {
-            return -1;
-        }
-
-        return SpaceJunkSession.Current.TeamOf(manager.LocalClientId);
     }
 }
