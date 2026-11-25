@@ -206,7 +206,7 @@
 Hans さんの動きのアニメーション5つ（Shoot・Pull・Throw・Drop・DropLoot）は、**体 `SK_Character` と骨の名前が違い、Animator に入れても体が1本も動かなかった**（Idle・Move・Aimwalk は当たる）。エラーも警告も出ないので、見た目を確かめないと気づけない。
 
 - 確かめ方：画面なしの Unity で `AnimationUtility.GetCurveBindings(clip)` の `path` を、体のモデルの `transform.Find(path)` で引く。null が多ければ当たっていない。あわせて `clip.SampleAnimation(体, 時刻)` → `Camera.Render()` でポーズを画像にすると、腕がねじれていないかまで見られる（スクラッチに書く一時スクリプトで十分）。
-- 今回の違い：いちばん上（`GRP_ExportScale_DO_NOT_TOUCH/CTRL_Global/JNT_Tool` ↔ `SCL_Root/JNT_Root`）と、**右腕が `JNT_Shoulder_L2/JNT_Arm_L/JNT_Hand_L`（左の名前）**。
+- 今回の違い：いちばん上（`GRP_ExportScale_DO_NOT_TOUCH/CTRL_Global/JNT_Tool` ↔ `SCL_Root/JNT_Root`）と、**右腕が `JNT_Shoulder_L2/JNT_Arm_L/JNT_Hand_L`（左の名前）**。**ただし原因はアニメーション側ではなく、`Assets/` の体のモデル `SK_Character.fbx` が、リグを直す前の古い版のままだったこと**（2026/11/25 にデザイナーさんに確認。新しい5つが正しい）。**骨が当たらないときは、アニメーションと体のどちらが新しいかを先に聞く**こと。
 - 対応：FBX と取り込みの設定は変えず（Hans さんの素材の決まり）、`SweeperAnimationSetup`（メニュー「プレイヤーの動きのアニメーションを取り込む」）で**骨の名前だけ置き換えた複製 `.anim`** を作った。新しい FBX が来たら、まずこの道具を通し、ログに「体に無い骨 〇本」が出たら置き換えの表 `PathRules` を足す。
 
 ### 画面なしのテストでは、体の骨がアニメーションしない（2026/11/25）
@@ -664,3 +664,4 @@ Hans さんの動きのアニメーション5つ（Shoot・Pull・Throw・Drop�
 | 2026/11/24 | Claude Code（依頼：小野田 喬） | 「失敗したこと」に、スタンが通信で配られていないことと、調整項目の調査の場所を書いた |
 | 2026/11/24 | Claude Code（依頼：小野田 喬） | スタンの通信を直したことに書き換え、Time.deltaTime をテストで使わない・Netcode がプレハブを自動で一覧に入れる・このPCに Python が無い、の3つを足した |
 | 2026/11/25 | Claude Code（依頼：小野田 喬） | 「失敗したこと」に、もらったアニメーションの骨が体に当たらなかったこと（確かめ方と複製の道具）と、画面なしのテストで骨がアニメーションしないことを足した |
+| 2026/11/25 | Claude Code（依頼：小野田 喬） | 骨が当たらなかった件に、原因は体のモデルが古いことだったと書き足した |
