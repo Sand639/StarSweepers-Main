@@ -22,6 +22,7 @@
 | `SpaceJunkSession.LobbyTest.cs` | 検証用ロビーの準備完了、乗る位置、出発時刻 |
 | `SpaceJunkSession.LocalPlayers.cs` | 1台のPCで複数人 |
 | `SpaceJunkSession.ResultPresentation.cs` | 赤青の結果演出の配信と全員の完了待ち |
+| `SpaceJunkSession.VictoryShowcase.cs` | 試合に勝ったチームのメンバー紹介（勝利演出）の配信と全員の完了待ち |
 | `SpaceJunkSession.Match.cs` | ラウンドの進行（ホストだけ） |
 | `SpaceJunkSession.SlotCheck.cs` | 席の答え合わせ（ホストだけ） |
 
@@ -36,6 +37,7 @@
 | `SpaceJunkSession.SlotCheck.cs` | 答え合わせの間隔と回数（`slotCheckTimer`・`slotMismatchCount`・`SlotCheckInterval`・`SlotMismatchRepairCount`） |
 | `SpaceJunkSession.Bots.cs` | ボットの番号の始まりと数の上限（`BotSeatStart`・`MaxBots`） |
 | `SpaceJunkSession.HostSettings.cs` | ホストが入れられる値の範囲（`MaxRoundsToWin`・`MinRoundSeconds`・`MaxRoundSeconds`） |
+| `SpaceJunkSession.VictoryShowcase.cs` | メンバー紹介の完了待ち（`victoryViewersFinished`・`victoryShowcaseId`） |
 
 逆に、**ロビーのカウントダウンの変数（`playersInTeamZones`・`lobbyCountdown…`）は入口のファイルにあるが、使うのは `SpaceJunkSession.LobbyZones.cs`**。
 
@@ -49,6 +51,7 @@
 - クラスの説明（`///` のコメント）は、入口のファイルの先頭にある。
 - **ボットの頭は、新しい体用の `SweeperBot` だけ**（`SpaceJunkSession.Bots.cs`）。古い体用のボットは 2026/11/7 に消したので、新しい体のプレハブが見つからず古い体で出たボットは、頭が付かず動かない（警告が出る）。
 - **試合を始める（`ServerStartMatch`）と、すぐにはマップへ移らない。** 状態を「試合中」にしてから `SceneTransition.PlayForEveryone(LoadNextMap)` で全員の画面を覆い、覆いきったら（約0.5秒後）`LoadNextMap` が呼ばれる（`SpaceJunkSession.Match.cs`）。演出の仕組みは `スクリプトの説明/Common/UI/SceneTransition.md`。
+- **試合の勝ちが決まると、ロビーへ戻る前に2つの演出を順に待つ**（`ReturnToLobbyAfterDelay`）。①結果画面（`PresentRoundResult`）②勝ったチームのメンバー紹介（`PresentMatchVictory`。25秒で打ち切り）。演出そのものは `スクリプトの説明/Game/UI/MatchVictoryShowcase.md`。
 
 ## 変更ログ
 
@@ -63,3 +66,4 @@
 結果演出の変数はResultPresentation.csのresultPlayback・resultViewersFinished・resultPresentationId・roundResultActive。Match.csが演出を待ち、色帯で画面を覆ってから次のStageまたはLobbyへ移る。
 
 | 2026/11/19 | Codex | 結果演出の担当ファイル、同期と完了待ちの変数を追記 |
+| 2026/11/25 | Claude Code | `SpaceJunkSession.VictoryShowcase.cs`（勝利演出のメンバー紹介）を足し、ファイルの分け方・変数の置き場所・気をつけることに書き足した |
