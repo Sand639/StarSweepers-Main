@@ -6,7 +6,7 @@ using UnityEngine;
 
 /// <summary>
 /// **プレイヤーの動きのアニメーション（狙い歩き・撃つ・引っ張る・投げる・落ちる）を、体の骨に合わせて取り込み、Animator に並べる道具。**（2026/11/25）
-/// 詳しい説明は Documents/スクリプトの説明/ と 機能ドキュメント/プレイヤーの動きのアニメーション.md。
+/// 詳しい説明は Documents/機能ドキュメント/プレイヤーの動きのアニメーション.md。
 /// </summary>
 public static class SweeperAnimationSetup
 {

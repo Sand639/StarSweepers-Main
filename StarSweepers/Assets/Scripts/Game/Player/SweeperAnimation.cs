@@ -15,7 +15,7 @@ using UnityEngine;
 ///
 /// 撃つ・巻き取る・やめるは <see cref="SweeperShooter"/> が呼ぶ。落ちる・両手で持つは、ここで毎フレーム調べる。
 /// Animator が無い・その名前の状態が無いときは、何もしない（エラーにもしない）。
-/// 詳しい説明は Documents/スクリプトの説明/ と 機能ドキュメント/プレイヤーの動きのアニメーション.md。
+/// 詳しい説明は Documents/機能ドキュメント/プレイヤーの動きのアニメーション.md。
 /// </summary>
 public class SweeperAnimation : MonoBehaviour
 {

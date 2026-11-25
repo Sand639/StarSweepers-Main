@@ -201,6 +201,18 @@
 
 > こういう手順でやったら失敗した、という記録。次に来たAIへの警告。
 
+### もらったアニメーションは、まず「骨が当たるか」を確かめる（2026/11/25）
+
+Hans さんの動きのアニメーション5つ（Shoot・Pull・Throw・Drop・DropLoot）は、**体 `SK_Character` と骨の名前が違い、Animator に入れても体が1本も動かなかった**（Idle・Move・Aimwalk は当たる）。エラーも警告も出ないので、見た目を確かめないと気づけない。
+
+- 確かめ方：画面なしの Unity で `AnimationUtility.GetCurveBindings(clip)` の `path` を、体のモデルの `transform.Find(path)` で引く。null が多ければ当たっていない。あわせて `clip.SampleAnimation(体, 時刻)` → `Camera.Render()` でポーズを画像にすると、腕がねじれていないかまで見られる（スクラッチに書く一時スクリプトで十分）。
+- 今回の違い：いちばん上（`GRP_ExportScale_DO_NOT_TOUCH/CTRL_Global/JNT_Tool` ↔ `SCL_Root/JNT_Root`）と、**右腕が `JNT_Shoulder_L2/JNT_Arm_L/JNT_Hand_L`（左の名前）**。
+- 対応：FBX と取り込みの設定は変えず（Hans さんの素材の決まり）、`SweeperAnimationSetup`（メニュー「プレイヤーの動きのアニメーションを取り込む」）で**骨の名前だけ置き換えた複製 `.anim`** を作った。新しい FBX が来たら、まずこの道具を通し、ログに「体に無い骨 〇本」が出たら置き換えの表 `PathRules` を足す。
+
+### 画面なしのテストでは、体の骨がアニメーションしない（2026/11/25）
+
+テストの場面にはカメラが無いので、体が「見えていない」扱いになり、Animator（Culling Mode が Cull Update Transforms）は**状態と時間だけ進めて、骨を動かさない**。`animator.GetCurrentAnimatorStateInfo` は正しく変わるのに、手の骨の位置がずっと同じだった。骨の位置を使うテストでは、テストの中で `animator.cullingMode = AnimatorCullingMode.AlwaysAnimate` にする（`SweeperAnimationTests` が実例）。
+
 ### スタンは通信で配られていなかった（2026/11/24 に直した）
 
 `PlayerStun.Stun` は、ぶつかられた人のPCで呼ばれるだけで、**他の人の画面では赤い点滅も頭の印も出なかった**（吹き飛ぶ動きは位置が届くので見える）。
@@ -651,3 +663,4 @@
 | 2026/11/24 | Claude Code（依頼：小野田 喬） | 大槻さんの伝言の5に、develop へマージしたことを書き足した |
 | 2026/11/24 | Claude Code（依頼：小野田 喬） | 「失敗したこと」に、スタンが通信で配られていないことと、調整項目の調査の場所を書いた |
 | 2026/11/24 | Claude Code（依頼：小野田 喬） | スタンの通信を直したことに書き換え、Time.deltaTime をテストで使わない・Netcode がプレハブを自動で一覧に入れる・このPCに Python が無い、の3つを足した |
+| 2026/11/25 | Claude Code（依頼：小野田 喬） | 「失敗したこと」に、もらったアニメーションの骨が体に当たらなかったこと（確かめ方と複製の道具）と、画面なしのテストで骨がアニメーションしないことを足した |
