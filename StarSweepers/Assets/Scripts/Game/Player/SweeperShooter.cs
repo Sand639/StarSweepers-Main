@@ -210,6 +210,19 @@ public class SweeperShooter : MonoBehaviour
     [Min(0.1f)]
     [SerializeField] private float retractSpeed = 40f;
 
+    [Header("リキャスト（次に撃てるまでの待ち。2026/11/24）")]
+    [Tooltip("空振りして光線が戻ってから、次に撃てるまでの秒数")]
+    [Min(0f)]
+    [SerializeField] private float recastAfterMiss = 0.25f;
+
+    [Tooltip("投げた（離した）あとから、次に撃てるまでの秒数")]
+    [Min(0f)]
+    [SerializeField] private float recastAfterThrow = 0.15f;
+
+    [Tooltip("待っている間の足元のリングの濃さ（1 でいつもどおり、0 で消える）")]
+    [Range(0f, 1f)]
+    [SerializeField] private float recastRingAlpha = 0.35f;
+
     [Header("当たり判定")]
     [Tooltip("光線の先の、当たりを見る球の半径（m）。大きいほど当てやすい")]
     [Min(0.05f)]
@@ -608,6 +621,24 @@ public class SweeperShooter : MonoBehaviour
 
     private Color IdleColor => Color.Lerp(teamColor, Color.white, idleWhiten);
 
+    /// <summary>この時刻より前は撃てない（リキャスト。2026/11/24）。</summary>
+    private float nextShotTime;
+
+    /// <summary>リキャスト中に押されたか（待ちが終わったら撃つ）。</summary>
+    private bool bufferedPress;
+
+    /// <summary>いま次を撃てるか（リキャストが終わっているか）。ボット・表示用。</summary>
+    public bool RecastReady => Time.time >= nextShotTime;
+
+    /// <summary>リキャスト中は足元のリングを薄くする。</summary>
+    private void UpdateRecastRing(bool ready)
+    {
+        if (ring != null)
+        {
+            ring.Dim = ready || phase != ShotPhase.Idle ? 1f : recastRingAlpha;
+        }
+    }
+
     private void Update()
     {
         bool blocked = GamePause.BlocksInput;
@@ -615,11 +646,29 @@ public class SweeperShooter : MonoBehaviour
         bool pressed = !blocked && input.AttackPressed(attackAction);
         bool released = !blocked && input.AttackReleased(attackAction);
 
+        // リキャスト中に押した分は覚えておき、待ちが終わったら撃つ（溜める撃ち方は離したかが分からないので覚えない）
+        if (phase == ShotPhase.Idle && pressed && Time.time < nextShotTime && !ChargesFirst(shotStyle))
+        {
+            bufferedPress = true;
+        }
+
+        bool ready = Time.time >= nextShotTime;
+        UpdateRecastRing(ready);
+        if (stunned)
+        {
+            bufferedPress = false;
+        }
+
         switch (phase)
         {
             case ShotPhase.Idle:
-                if (pressed && !stunned)
+                if (ready && bufferedPress && !stunned)
                 {
+                    pressed = true;
+                }
+                if (pressed && !stunned && ready)
+                {
+                    bufferedPress = false;
                     // ロビーコンソールで挙動が変えられていたら、ここで合わせる（撃っている途中では変えない）
                     if (followSettings)
                     {
@@ -1468,7 +1517,8 @@ public class SweeperShooter : MonoBehaviour
             // 重いデブリも引っ掛けられる。投げずに引きずるだけ（SweeperReel。2026/11/5。前は壁と同じ扱いで光線が戻っていた）
             HookableObject candidate = hit.collider.GetComponentInParent<HookableObject>();
 
-            bool usable = candidate != null && !candidate.IsHooked && !candidate.IsVanished && reel.CanHook(candidate);
+            // ほかの人がつかんでいる物は、引っ張り合いになれるときだけつかめる（CanHook が決める。2026/11/24）
+            bool usable = candidate != null && !candidate.IsVanished && reel.CanHook(candidate);
             if (!usable && (!walls || candidate != null || hit.distance <= 0f))
             {
                 // 引っ掛けられない物資（誰かが引いている。オンラインではほかの人が引いている物も）はすり抜ける。壁で止まらない設定のときも同じ
@@ -1489,6 +1539,13 @@ public class SweeperShooter : MonoBehaviour
     /// <summary>光線をしまい、歩けるように戻す。</summary>
     private void EndShot()
     {
+        // リキャスト：投げた（巻き取りから終わった）か、空振りかで待ちの長さを変える
+        if (phase != ShotPhase.Idle)
+        {
+            nextShotTime = Time.time + (phase == ShotPhase.Reeling ? recastAfterThrow : recastAfterMiss);
+            bufferedPress = false;
+        }
+
         phase = ShotPhase.Idle;
         traveled = 0f;
         charge = 0f;

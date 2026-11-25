@@ -30,12 +30,13 @@ public class SweeperDistanceModeTests
         yield return new ExitPlayMode();
     }
 
-    /// <summary>投げとクリティカルの間（今の値は 18〜33%）の引っ張りは、どこで押しても強さ 0.5。3m ÷ 12m＝25%。</summary>
+    /// <summary>投げとクリティカルの間（今の値は 18〜33%）の引っ張りは、どこで押しても強さ 0.5。2.3m ÷ 9m＝26%。</summary>
     [UnityTest]
     public IEnumerator MiddlePress_PullsAtHalfStrength()
     {
         yield return new EnterPlayMode();
-        yield return Run(3f, 1f, false, false);
+        // 投げとクリティカルの間（プレハブの Throw Zone End〜Critical Near。いまは光線の上限 9m の 18〜33% ＝ 1.6〜3m）。前は 3m だったが、調整でクリティカルの範囲に入ったので 2.3m にした（2026/11/24）
+        yield return Run(2.3f, 1f, false, false);
         yield return new ExitPlayMode();
     }
 

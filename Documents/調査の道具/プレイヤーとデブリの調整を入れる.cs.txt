@@ -1,0 +1,320 @@
+using System.Collections.Generic;
+using System.Text;
+using Unity.Netcode;
+using UnityEditor;
+using UnityEngine;
+
+/// <summary>
+/// 一時的な道具（2026/11/24・プレイヤーとデブリの調整）。画面なしの Unity で -executeMethod で動かし、終わったら消す。
+/// 写しは Documents/調査の道具/プレイヤーとデブリの調整を入れる.cs.txt。
+/// </summary>
+public static class TempAdjustSetup
+{
+    private const string ModelFolder = "Assets/Art/Models/";
+    private const string ItemFolder = "Assets/Prefabs/Item/";
+    private const string PlayerPrefab = "Assets/Prefabs/Player/SweeperPlayer.prefab";
+    private const string RingMaterial = "Assets/Art/Materials/SweeperRing.mat";
+
+    private static readonly string[] Models =
+    {
+        "SM_Bomb", "SM_Debris_Common_AK", "SM_Debris_Common_BrokenDisplay", "SM_Debris_Common_Components",
+        "SM_Debris_Common_DrumCont", "SM_Debris_Common_EnergyBattery", "SM_Debris_Common_Exhaust",
+        "SM_Debris_Common_MetalCap", "SM_Debris_Common_Products", "SM_Debris_Common_RobotArm",
+        "SM_Debris_Common_SteelPlate", "SM_Debris_Common_Transportbot", "SM_Debris_Rare_Engine", "SM_Debris_Rare_Parabola"
+    };
+
+    /// <summary>モデルの大きさと、今の物資のプレハブの大きさを書き出す（どう合わせるか決めるため）。</summary>
+    public static void Probe()
+    {
+        StringBuilder log = new StringBuilder("[TempAdjustSetup] PROBE\n");
+        foreach (string name in Models)
+        {
+            GameObject model = AssetDatabase.LoadAssetAtPath<GameObject>(ModelFolder + name + ".fbx");
+            if (model == null)
+            {
+                log.AppendLine($"  {name}: 読めない");
+                continue;
+            }
+
+            GameObject instance = Object.Instantiate(model);
+            Bounds bounds = RendererBounds(instance);
+            int renderers = instance.GetComponentsInChildren<Renderer>().Length;
+            int materials = 0;
+            foreach (Renderer r in instance.GetComponentsInChildren<Renderer>()) materials += r.sharedMaterials.Length;
+            log.AppendLine($"  {name}: size={bounds.size:F3} center={bounds.center:F3} renderers={renderers} materials={materials} rootScale={model.transform.localScale:F3}");
+            Object.DestroyImmediate(instance);
+        }
+
+        foreach (string path in AssetDatabase.FindAssets("t:Prefab", new[] { "Assets/Prefabs/Item" }))
+        {
+            string p = AssetDatabase.GUIDToAssetPath(path);
+            GameObject prefab = AssetDatabase.LoadAssetAtPath<GameObject>(p);
+            BoxCollider box = prefab.GetComponent<BoxCollider>();
+            Rigidbody body = prefab.GetComponent<Rigidbody>();
+            log.AppendLine($"  PREFAB {p}: scale={prefab.transform.localScale:F2} box={(box != null ? box.size.ToString("F2") : "-")} mass={(body != null ? body.mass : -1f)} children={prefab.transform.childCount}");
+            foreach (Component c in prefab.GetComponents<Component>())
+            {
+                log.AppendLine($"      {c.GetType().Name}");
+            }
+        }
+
+        Debug.Log(log.ToString());
+    }
+
+    /// <summary>今の物資のプレハブの見た目を、デザイナーさんのモデルに置き換える（名前から推測した割り当て）。</summary>
+    private static readonly string[,] Swaps =
+    {
+        { "SpaceJunkPlate", "SM_Debris_Common_SteelPlate" },
+        { "SpaceJunkCircuit", "SM_Debris_Common_Components" },
+        { "SpaceJunkFuel", "SM_Debris_Common_DrumCont" },
+        { "SpaceJunkAntenna", "SM_Debris_Rare_Parabola" },
+        { "SpaceJunkEngine", "SM_Debris_Rare_Engine" },
+        { "SpaceJunkBomb", "SM_Bomb" },
+        { "KnockBackBoom", "SM_Bomb" },
+    };
+
+    /// <summary>今の種類に無い8つ。装甲板のプレハブを写して作る（種類は仮に装甲板。あとで調整）。</summary>
+    private static readonly string[,] NewDebris =
+    {
+        { "SpaceJunkAK", "SM_Debris_Common_AK" },
+        { "SpaceJunkBrokenDisplay", "SM_Debris_Common_BrokenDisplay" },
+        { "SpaceJunkEnergyBattery", "SM_Debris_Common_EnergyBattery" },
+        { "SpaceJunkExhaust", "SM_Debris_Common_Exhaust" },
+        { "SpaceJunkMetalCap", "SM_Debris_Common_MetalCap" },
+        { "SpaceJunkProducts", "SM_Debris_Common_Products" },
+        { "SpaceJunkRobotArm", "SM_Debris_Common_RobotArm" },
+        { "SpaceJunkTransportbot", "SM_Debris_Common_Transportbot" },
+    };
+
+    public static void Apply()
+    {
+        StringBuilder log = new StringBuilder("[TempAdjustSetup] APPLY\n");
+        Material ring = AssetDatabase.LoadAssetAtPath<Material>(RingMaterial);
+        log.AppendLine($"  ring material: {(ring != null ? "ok" : "MISSING")}");
+
+        // ---- 1. 体のプレハブ：値と、部品（ぶつかった判定・吹き飛ばしのエフェクト）、星のマテリアル ----
+        using (PrefabUtility.EditPrefabContentsScope scope = new PrefabUtility.EditPrefabContentsScope(PlayerPrefab))
+        {
+            GameObject root = scope.prefabContentsRoot;
+            SerializedObject reel = new SerializedObject(root.GetComponent<SweeperReel>());
+            Set(reel, "reelSeconds", 2.3f, log);
+            Set(reel, "criticalStartShare", 0.5f, log);
+            Set(reel, "distanceReelSpeed", 5f, log);
+            reel.ApplyModifiedPropertiesWithoutUndo();
+
+            if (root.GetComponent<SweeperPulledHit>() == null)
+            {
+                root.AddComponent<SweeperPulledHit>();
+                log.AppendLine("  added SweeperPulledHit");
+            }
+
+            SweeperHitEffects effects = root.GetComponent<SweeperHitEffects>();
+            if (effects == null)
+            {
+                effects = root.AddComponent<SweeperHitEffects>();
+                log.AppendLine("  added SweeperHitEffects");
+            }
+            SerializedObject fx = new SerializedObject(effects);
+            fx.FindProperty("material").objectReferenceValue = ring;
+            fx.ApplyModifiedPropertiesWithoutUndo();
+
+            SerializedObject stun = new SerializedObject(root.GetComponent<PlayerStun>());
+            stun.FindProperty("starMaterial").objectReferenceValue = ring;
+            stun.ApplyModifiedPropertiesWithoutUndo();
+        }
+
+        // ---- 2. 物資の見た目の置き換え ----
+        for (int i = 0; i < Swaps.GetLength(0); i++)
+        {
+            ReplaceModel(Swaps[i, 0], Swaps[i, 1], log);
+        }
+
+        // ---- 3. 爆弾の導火線（引き寄せが長くなった分） ----
+        foreach (string bomb in new[] { "SpaceJunkBomb", "KnockBackBoom" })
+        {
+            using (PrefabUtility.EditPrefabContentsScope scope = new PrefabUtility.EditPrefabContentsScope(ItemFolder + bomb + ".prefab"))
+            {
+                SerializedObject explosive = new SerializedObject(scope.prefabContentsRoot.GetComponent<ExplosiveObject>());
+                Set(explosive, "fuseSeconds", 5.5f, log);
+                explosive.ApplyModifiedPropertiesWithoutUndo();
+            }
+        }
+
+        // ---- 4. 今の種類に無い8つを、出せる形のプレハブにする ----
+        NetworkPrefabsList list = AssetDatabase.LoadAssetAtPath<NetworkPrefabsList>("Assets/DefaultNetworkPrefabs.asset");
+        log.AppendLine($"  network list: {(list != null ? "ok" : "MISSING")}");
+        for (int i = 0; i < NewDebris.GetLength(0); i++)
+        {
+            string name = NewDebris[i, 0];
+            string path = ItemFolder + name + ".prefab";
+            if (AssetDatabase.LoadAssetAtPath<GameObject>(path) == null)
+            {
+                bool copied = AssetDatabase.CopyAsset(ItemFolder + "SpaceJunkPlate.prefab", path);
+                log.AppendLine($"  copy {name}: {copied}");
+            }
+
+            using (PrefabUtility.EditPrefabContentsScope scope = new PrefabUtility.EditPrefabContentsScope(path))
+            {
+                scope.prefabContentsRoot.name = name;
+            }
+            ReplaceModel(name, NewDebris[i, 1], log);
+
+            GameObject asset = AssetDatabase.LoadAssetAtPath<GameObject>(path);
+            NetworkObject networkObject = asset.GetComponent<NetworkObject>();
+            typeof(NetworkObject).GetMethod("OnValidate", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)
+                ?.Invoke(networkObject, null);
+            EditorUtility.SetDirty(asset);
+
+            if (list != null && !list.Contains(asset))
+            {
+                list.Add(new NetworkPrefab { Prefab = asset });
+                EditorUtility.SetDirty(list);
+                log.AppendLine($"  registered {name}");
+            }
+        }
+
+        AssetDatabase.SaveAssets();
+
+        // 確かめ：通信の番号が重なっていないか
+        HashSet<uint> hashes = new HashSet<uint>();
+        foreach (string guid in AssetDatabase.FindAssets("t:Prefab", new[] { "Assets/Prefabs/Item" }))
+        {
+            GameObject prefab = AssetDatabase.LoadAssetAtPath<GameObject>(AssetDatabase.GUIDToAssetPath(guid));
+            NetworkObject networkObject = prefab.GetComponent<NetworkObject>();
+            if (networkObject == null)
+            {
+                continue;
+            }
+            uint hash = networkObject.PrefabIdHash;
+            log.AppendLine($"  hash {prefab.name}: {hash}{(hashes.Add(hash) ? "" : "  ← 重なり!")}");
+        }
+
+        Debug.Log(log.ToString());
+    }
+
+    private static void Set(SerializedObject target, string property, float value, StringBuilder log)
+    {
+        SerializedProperty found = target.FindProperty(property);
+        if (found == null)
+        {
+            log.AppendLine($"  !! {target.targetObject.GetType().Name}.{property} が無い");
+            return;
+        }
+        log.AppendLine($"  {target.targetObject.GetType().Name}.{property}: {found.floatValue} → {value}");
+        found.floatValue = value;
+    }
+
+    /// <summary>
+    /// 物資のプレハブの、仮の箱の見た目（一番上の MeshFilter・MeshRenderer）を外し、モデルを子「Model」として置く。
+    /// モデルの真ん中を物資の中心に合わせ、BoxCollider をモデルの大きさにする。色を塗る先・爆弾の点滅先もモデルにする。
+    /// </summary>
+    private static void ReplaceModel(string prefabName, string modelName, StringBuilder log)
+    {
+        string path = ItemFolder + prefabName + ".prefab";
+        GameObject modelAsset = AssetDatabase.LoadAssetAtPath<GameObject>(ModelFolder + modelName + ".fbx");
+        if (modelAsset == null)
+        {
+            log.AppendLine($"  !! {modelName} が読めない");
+            return;
+        }
+
+        using (PrefabUtility.EditPrefabContentsScope scope = new PrefabUtility.EditPrefabContentsScope(path))
+        {
+            GameObject root = scope.prefabContentsRoot;
+
+            Transform old = root.transform.Find("Model");
+            if (old != null)
+            {
+                Object.DestroyImmediate(old.gameObject);
+            }
+
+            MeshRenderer rootRenderer = root.GetComponent<MeshRenderer>();
+            if (rootRenderer != null) Object.DestroyImmediate(rootRenderer);
+            MeshFilter rootFilter = root.GetComponent<MeshFilter>();
+            if (rootFilter != null) Object.DestroyImmediate(rootFilter);
+
+            // 爆弾の仮の導火線は、モデルに付いているので隠す
+            Transform fuse = root.transform.Find("Fuse");
+            if (fuse != null)
+            {
+                fuse.gameObject.SetActive(false);
+            }
+
+            GameObject model = (GameObject)PrefabUtility.InstantiatePrefab(modelAsset, root.transform);
+            model.name = "Model";
+            model.transform.localPosition = Vector3.zero;
+            model.transform.localRotation = Quaternion.identity;
+            model.transform.localScale = Vector3.one;
+            foreach (Collider extra in model.GetComponentsInChildren<Collider>())
+            {
+                Object.DestroyImmediate(extra);
+            }
+
+            Bounds world = RendererBounds(model);
+            Vector3 scale = root.transform.lossyScale;
+            Vector3 centerLocal = root.transform.InverseTransformPoint(world.center);
+            Vector3 sizeLocal = new Vector3(world.size.x / scale.x, world.size.y / scale.y, world.size.z / scale.z);
+            model.transform.localPosition = -centerLocal;
+
+            BoxCollider box = root.GetComponent<BoxCollider>();
+            if (box != null)
+            {
+                box.center = Vector3.zero;
+                box.size = sizeLocal;
+            }
+
+            Renderer[] renderers = model.GetComponentsInChildren<Renderer>();
+            SpaceJunkMaterial material = root.GetComponent<SpaceJunkMaterial>();
+            if (material != null)
+            {
+                SerializedObject so = new SerializedObject(material);
+                SetRenderers(so.FindProperty("tintRenderers"), renderers);
+                if (prefabName.StartsWith("SpaceJunk") && System.Array.IndexOf(new[] { "SpaceJunkPlate", "SpaceJunkCircuit", "SpaceJunkFuel", "SpaceJunkAntenna", "SpaceJunkEngine" }, prefabName) < 0)
+                {
+                    so.FindProperty("kind").enumValueIndex = (int)SpaceJunkMaterialKind.Plate;
+                }
+                so.ApplyModifiedPropertiesWithoutUndo();
+            }
+
+            ExplosiveObject explosive = root.GetComponent<ExplosiveObject>();
+            if (explosive != null)
+            {
+                SerializedObject so = new SerializedObject(explosive);
+                SetRenderers(so.FindProperty("blinkRenderers"), renderers);
+                so.ApplyModifiedPropertiesWithoutUndo();
+            }
+
+            log.AppendLine($"  {prefabName} ← {modelName}: box={sizeLocal:F2} offset={-centerLocal:F2} renderers={renderers.Length}");
+        }
+    }
+
+    private static void SetRenderers(SerializedProperty array, Renderer[] renderers)
+    {
+        if (array == null)
+        {
+            return;
+        }
+
+        array.arraySize = renderers.Length;
+        for (int i = 0; i < renderers.Length; i++)
+        {
+            array.GetArrayElementAtIndex(i).objectReferenceValue = renderers[i];
+        }
+    }
+
+    private static Bounds RendererBounds(GameObject root)
+    {
+        Renderer[] renderers = root.GetComponentsInChildren<Renderer>();
+        if (renderers.Length == 0)
+        {
+            return new Bounds(root.transform.position, Vector3.zero);
+        }
+
+        Bounds bounds = renderers[0].bounds;
+        for (int i = 1; i < renderers.Length; i++)
+        {
+            bounds.Encapsulate(renderers[i].bounds);
+        }
+        return bounds;
+    }
+}

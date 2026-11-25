@@ -27,6 +27,40 @@ public class PlayerStun : MonoBehaviour
     [Tooltip("頭の上の印を回す速さ（1秒あたりの度）")]
     [SerializeField] private float markerSpinSpeed = 240f;
 
+    [Header("頭のまわりを回る星（2026/11/24）")]
+    [Tooltip("ON：スタン中、頭のまわりに星（★）を回す。そのときは上の頭の上の印は出さない")]
+    [SerializeField] private bool useStars = true;
+
+    [Tooltip("星の数")]
+    [Min(1)]
+    [SerializeField] private int starCount = 3;
+
+    [Tooltip("星が回る高さ（足元から m）")]
+    [SerializeField] private float starHeight = 1.35f;
+
+    [Tooltip("星が回る円の半径（m）")]
+    [SerializeField] private float starOrbitRadius = 0.38f;
+
+    [Tooltip("星の大きさ（m）")]
+    [SerializeField] private float starSize = 0.24f;
+
+    [Tooltip("星が回る速さ（1秒あたりの度）")]
+    [SerializeField] private float starOrbitSpeed = 320f;
+
+    [Tooltip("星の色")]
+    [SerializeField] private Color starColor = new Color(1f, 0.86f, 0.25f, 1f);
+
+    [Tooltip("星に使うマテリアル（Art/Materials/SweeperRing.mat）。空なら再生したときに作るが、ビルドでは出ないことがある")]
+    [SerializeField] private Material starMaterial;
+
+    /// <summary>
+    /// スタンした瞬間に呼ばれる（渡ってくるのは秒数）。<see cref="SweeperNetSync"/> がほかの人の画面へ知らせるのに使う。
+    /// ほかの人の画面で見た目だけ出すとき（<see cref="Stun(float, bool)"/> の notify が false）は呼ばれない。
+    /// </summary>
+    public event System.Action<float> Stunned;
+
+    private SweeperStunStars stars;
+
     /// <summary>いま動けない状態か。</summary>
     public bool IsStunned => remaining > 0f;
 
@@ -194,6 +228,20 @@ public class PlayerStun : MonoBehaviour
     /// </summary>
     public void Stun(float seconds)
     {
+        Stun(seconds, true);
+    }
+
+    /// <summary>
+    /// この秒数だけ動けなくする。<paramref name="notify"/> が false のときは <see cref="Stunned"/> を呼ばない
+    /// （オンラインで、ほかの人の体に見た目だけ出すとき。ほかの人の体はこのPCでは動かしていないので、動けなくなる処理は関係ない）。
+    /// </summary>
+    public void Stun(float seconds, bool notify)
+    {
+        if (seconds <= 0f)
+        {
+            return;
+        }
+
         // スタン中に重ねて食らったときは控え直さない（点滅中の赤を控えてしまうため）
         if (!IsStunned)
         {
@@ -201,10 +249,40 @@ public class PlayerStun : MonoBehaviour
         }
 
         remaining = Mathf.Max(remaining, seconds);
+        ShowMarker(true);
+
+        if (notify)
+        {
+            Stunned?.Invoke(seconds);
+        }
+    }
+
+    /// <summary>頭の上の印（星を使うなら星）を出す／隠す。</summary>
+    private void ShowMarker(bool visible)
+    {
+        if (useStars)
+        {
+            if (visible && stars == null)
+            {
+                stars = SweeperStunStars.Create(transform, starCount, starHeight, starOrbitRadius, starSize,
+                    starOrbitSpeed, starColor, starMaterial);
+            }
+
+            if (stars != null)
+            {
+                stars.SetVisible(visible);
+            }
+
+            if (stunMarker != null)
+            {
+                stunMarker.SetActive(false);
+            }
+            return;
+        }
 
         if (stunMarker != null)
         {
-            stunMarker.SetActive(true);
+            stunMarker.SetActive(visible);
         }
     }
 
@@ -222,18 +300,14 @@ public class PlayerStun : MonoBehaviour
         {
             remaining = 0f;
             RestoreColors();
-
-            if (stunMarker != null)
-            {
-                stunMarker.SetActive(false);
-            }
+            ShowMarker(false);
             return;
         }
 
         // まだスタン中：体を点滅させ、頭の上の印を回す
         Blink();
 
-        if (stunMarker != null)
+        if (stunMarker != null && !useStars)
         {
             stunMarker.transform.Rotate(Vector3.up, markerSpinSpeed * Time.deltaTime, Space.World);
         }
