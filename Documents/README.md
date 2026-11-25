@@ -4,7 +4,7 @@
 | --- | --- |
 | 製作者 | 大槻 海斗 |
 | 作成日 | 2026年8月28日（金） |
-| 最終更新日 | 2026年11月24日（火）　変更者：Claude Code |
+| 最終更新日 | 2026年11月25日（水）　変更者：Claude Code |
 | リポジトリ | https://github.com/Sand639/StarSweepers-Main （本制作用）　旧：https://github.com/Sand639/StarSweepers （保管用） |
 
 > ⚠️ **2026/11/4 に、本制作（宇宙ごみ集め）に必要な物だけを集めた、このリポジトリに移りました。**
@@ -258,7 +258,7 @@ StarSweepers-Main/                     ← リポジトリのルート
     │       ├── MainLoop/             タイトルとロビー（TitleScene・Lobby。2026/11/11 から Lobby。前のロビー SpaceJunkLobby は使っていない）
     │       ├── Stage/            ステージ（`STAGE_Simple`・`STAGE_Train` など。名前の付け方と一覧は `宇宙ごみのマップの作り方.md`）
     │       ├── HansStages/       Hansさんのステージ
-    │       └── Test/             機能ごとの検証用シーン（ビルドには含めない）。いまは `SceneTransitionTest`・`TeamScoreBarUITest`・`DebrisSetUITest`・`StageBarrierTest`・`GoalScoreEffectTest`・`HighValueRouletteUITest`・`ProceduralStarrySkyTest`・`GoalEffectTest`・`SweeperWhipTest`・`ElectricDebrisTest`（ほかはメニューで作る）
+    │       └── Test/             機能ごとの検証用シーン（ビルドには含めない）。いまは `SceneTransitionTest`・`TeamScoreBarUITest`・`DebrisSetUITest`・`StageBarrierTest`・`GoalScoreEffectTest`・`HighValueRouletteUITest`・`ProceduralStarrySkyTest`・`GoalEffectTest`・`SweeperWhipTest`・`ElectricDebrisTest`・`MatchVictoryShowcaseTest`（ほかはメニューで作る）
     ├── Packages/
     ├── steam_appid.txt           Steam のテスト用の App ID（480）。Steam の外で起動するときに使う
     └── ProjectSettings/
@@ -762,3 +762,4 @@ Unityは `.meta` ファイルで各アセットの参照を管理しているた
 | 11/17（火） | Claude Code | リポジトリ構成の図の `Scenes/Test/` の検証シーン `GoalVortexTest` を `GoalEffectTest` にした（名前から SpaceJunk を外す整理で、検証シーンの名前も変えたため）。ルールは変えていない |
 | 11/21（土） | Claude Code | リポジトリ構成の図の `Scenes/Test/` の検証シーンに `ElectricDebrisTest` を足した（電気のデブリの検証シーンができたため）。ルールは変えていない |
 | 11/24（火） | Qoder（依頼：呉迪芝） | メンバー構成のプランナーに**呉迪芝**を追加した（本人の申告による。`（未記入）` の欄はサブリーダーのものかもしれないので残してある）。ルールの部分は変えていない |
+| 11/25（水） | Claude Code | リポジトリ構成の図の `Scenes/Test/` の検証シーンに `MatchVictoryShowcaseTest` を足した（勝利演出のメンバー紹介の検証シーンができたため）。ルールは変えていない |
