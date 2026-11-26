@@ -25,9 +25,9 @@
 EventBannerUI（Canvas：画面に重ねる・並び順 30、CanvasScaler：1920×1080 基準、EventBannerUI）
 └ Content（表示ごと隠す）
    ├ Banner（帯の画像。横は画面いっぱい＋左右 40 ずつはみ出す・高さ 216。画面の真ん中から 280 下）
-   ├ Label（「緊急連絡！」96・太字・白、薄い影。帯の真ん中）
-   ├ EventTitle（見出し 88・太字。帯の真ん中より 22 上。最初は隠しておく）
-   └ EventSubtitle（説明 30・太字。帯の真ん中より 58 下。最初は隠しておく）
+   ├ Label（「緊急連絡！」96・太字・白、薄い影。帯の真ん中より 26 上＝帯の赤い部分の真ん中に見える高さ）
+   ├ EventTitle（見出し 88・太字。帯の真ん中より 47 上。最初は隠しておく）
+   └ EventSubtitle（説明 30・太字。帯の真ん中より 33 下。最初は隠しておく）
 ```
 
 - 文字は `Banner` の子にしない（帯とは別に横へ動かすため）
@@ -50,3 +50,4 @@ EventBannerUI（Canvas：画面に重ねる・並び順 30、CanvasScaler：1920
 | 2026/11/26 | Claude Code（依頼：大槻 海斗） | 「緊急連絡！」のあとにイベントごとの文字へ切り替える（Message Seconds・Event Messages・`TryGetEventText`）ことを書いた |
 | 2026/11/26 | Claude Code（依頼：大槻 海斗） | デザイン案の演出（点滅2回 → 入れ替わり → 消える）に作り替えたのに合わせて、流れとプレハブの作りを書き直した（`EventTitle`・`EventSubtitle`・`IsBlinkOff`） |
 | 2026/11/26 | Claude Code（依頼：大槻 海斗） | 時間割りを5秒版にした（Lead Seconds 5、全部で 4.5 秒） |
+| 2026/11/26 | Claude Code（依頼：大槻 海斗） | 文字の高さを、帯の赤い部分の真ん中に見えるように上げた（帯の影とフォントの余白のぶん。`LabelOffsetY` など） |
