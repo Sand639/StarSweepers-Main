@@ -20,8 +20,11 @@ public static class EventBannerUISetup
     private const int FontSize = 96;            // 「緊急連絡！」
     private const int TitleFontSize = 88;       // イベントの見出し
     private const int SubtitleFontSize = 30;    // イベントの説明
-    private const float TitleOffsetY = 22f;     // 帯の真ん中から、見出しの真ん中までの高さ
-    private const float SubtitleOffsetY = -58f; // 帯の真ん中から、説明の真ん中までの高さ
+    // 帯の真ん中からの、文字の枠の真ん中の高さ。帯の画像は下 20 が影で赤い部分の真ん中が上にあり、
+    // 文字もフォントの余白で枠の真ん中より下に描かれるので、そのぶん上げて、赤い部分の真ん中に見えるようにしてある（Unity で測った値）
+    private const float LabelOffsetY = 26f;     // 「緊急連絡！」
+    private const float TitleOffsetY = 47f;     // 見出し
+    private const float SubtitleOffsetY = -33f; // 説明
 
     /// <summary>プレハブを作り直してから、それを置いただけの検証シーンを作って保存する。</summary>
     [MenuItem("Tools/StarSweepers/イベントの警告バナーの検証シーンを作る")]
@@ -101,7 +104,7 @@ public static class EventBannerUISetup
         banner.raycastTarget = false;
 
         // 文字は帯の子にしない（帯とは別に、横へ滑らせるため）
-        Text label = CreateText("Label", content, "緊急連絡！", FontSize, 0f, bannerSprite.rect.height);
+        Text label = CreateText("Label", content, "緊急連絡！", FontSize, LabelOffsetY, bannerSprite.rect.height);
         Text title = CreateText("EventTitle", content, "特別調達依頼", TitleFontSize, TitleOffsetY, 110f);
         Text subtitle = CreateText("EventSubtitle", content, "指定された資材を集めて、ボーナススコアを獲得しよう！", SubtitleFontSize, SubtitleOffsetY, 44f);
         title.gameObject.SetActive(false);
