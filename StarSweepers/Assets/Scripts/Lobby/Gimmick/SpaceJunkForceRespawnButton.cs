@@ -31,15 +31,14 @@ public class SpaceJunkForceRespawnButton : NetworkBehaviour
     [Tooltip("近づいているときの色")]
     [SerializeField] private Color nearColor = new Color(0.4f, 1f, 0.6f); // 緑系の安心色
 
-    private Color originalColor = Color.white;
+    [Tooltip("近づいたときの色とボタン画像の設定")]
+    [SerializeField] private InteractPromptVisual interactVisual = new InteractPromptVisual();
+
     private bool isPlayerNearby;
 
     private void Awake()
     {
-        if (highlightRenderer != null)
-        {
-            originalColor = highlightRenderer.sharedMaterial.color;
-        }
+        interactVisual.Initialize(transform, highlightRenderer);
     }
 
     private void Update()
@@ -47,6 +46,8 @@ public class SpaceJunkForceRespawnButton : NetworkBehaviour
         // ネットワークが動いていない時は何もしない
         if (NetworkManager.Singleton == null || !NetworkManager.Singleton.IsListening)
         {
+            isPlayerNearby = false;
+            interactVisual.SetNearby(false, nearColor);
             return;
         }
 
@@ -68,7 +69,17 @@ public class SpaceJunkForceRespawnButton : NetworkBehaviour
             RequestRespawnServerRpc();
         }
 
-        ApplyHighlight();
+        interactVisual.SetNearby(isPlayerNearby, nearColor);
+    }
+
+    private void LateUpdate() => interactVisual.LateUpdate();
+
+    private void OnDisable() => interactVisual.SetNearby(false, nearColor);
+
+    public override void OnDestroy()
+    {
+        interactVisual.Cleanup();
+        base.OnDestroy();
     }
 
     /// <summary>
@@ -101,12 +112,6 @@ public class SpaceJunkForceRespawnButton : NetworkBehaviour
             }
         }
         return null;
-    }
-
-    private void ApplyHighlight()
-    {
-        if (highlightRenderer == null) return;
-        highlightRenderer.material.color = isPlayerNearby ? nearColor : originalColor;
     }
 
     private void OnDrawGizmosSelected()

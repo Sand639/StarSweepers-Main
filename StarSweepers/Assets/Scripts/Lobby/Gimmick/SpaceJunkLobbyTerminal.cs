@@ -46,6 +46,9 @@ public class SpaceJunkLobbyTerminal : MonoBehaviour
     [Tooltip("ホストが近づいているときの色")]
     [SerializeField] private Color nearColor = new Color(0.4f, 1f, 0.6f);
 
+    [Tooltip("近づいたときの色とボタン画像の設定")]
+    [SerializeField] private InteractPromptVisual interactVisual = new InteractPromptVisual();
+
     /// <summary>詳細設定が開いているか。</summary>
     public bool IsOpen { get; private set; }
 
@@ -55,22 +58,15 @@ public class SpaceJunkLobbyTerminal : MonoBehaviour
     /// <summary>押すキーとボタンの名前（案内の文言に使う。例：「E／A」）。</summary>
     public string InteractKeyName => $"{interactKey}／{GamepadInput.Label(interactButton)}";
 
-    /// <summary>近づいていないときに戻す、見た目の元の色。</summary>
-    private Color originalColor = Color.white;
-
     private void Awake()
     {
         Current = this;
-
-        // 色を変える前に元の色を控えておく（AIの申し送り参照）
-        if (highlightRenderer != null)
-        {
-            originalColor = highlightRenderer.sharedMaterial.color;
-        }
+        interactVisual.Initialize(transform, highlightRenderer);
     }
 
     private void OnDestroy()
     {
+        interactVisual.Cleanup();
         if (Current == this)
         {
             Current = null;
@@ -124,8 +120,16 @@ public class SpaceJunkLobbyTerminal : MonoBehaviour
         // 閉じ方は「もう一度 E」か、画面の「閉じる」ボタン。
 
         // 色と操作は、開く・閉じるが切り替わったときだけでなく毎フレーム合わせ直している
-        ApplyHighlight();
+        interactVisual.SetNearby(IsHostNearby, nearColor);
         SetLocalPlayerControlEnabled(!IsOpen && LobbyTestDeparture.Current?.IsBoarding != true);
+    }
+
+    private void LateUpdate() => interactVisual.LateUpdate();
+
+    private void OnDisable()
+    {
+        IsHostNearby = false;
+        interactVisual.SetNearby(false, nearColor);
     }
 
     /// <summary>詳細設定を閉じる。画面の「閉じる」ボタンから呼ばれる。</summary>
@@ -159,18 +163,6 @@ public class SpaceJunkLobbyTerminal : MonoBehaviour
         }
 
         return null;
-    }
-
-    /// <summary>ホストが近いときだけ、見た目を <see cref="nearColor"/> にする。</summary>
-    private void ApplyHighlight()
-    {
-        if (highlightRenderer == null)
-        {
-            return;
-        }
-
-        // material（この見た目専用の複製）の色を変える。sharedMaterial を変えると、同じ素材を使うほかの物の色まで変わってしまう
-        highlightRenderer.material.color = IsHostNearby ? nearColor : originalColor;
     }
 
     /// <summary>
