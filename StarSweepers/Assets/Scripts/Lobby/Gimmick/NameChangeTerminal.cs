@@ -24,6 +24,9 @@ public class NameChangeTerminal : MonoBehaviour
     [Tooltip("自分のプレイヤーが近づいているときの色")]
     [SerializeField] private Color nearColor = new Color(0.4f, 1f, 0.6f);
 
+    [Tooltip("近づいたときの色とボタン画像の設定")]
+    [SerializeField] private InteractPromptVisual interactVisual = new InteractPromptVisual();
+
 
     /// <summary>このPCで操作しているプレイヤーが近くにいるか。</summary>
     public bool IsPlayerNearby { get; private set; }
@@ -34,21 +37,15 @@ public class NameChangeTerminal : MonoBehaviour
     /// <summary>押すキーとボタンの名前（案内の文言に使う。例：「E／A」）。</summary>
     public string InteractKeyName => $"{interactKey}／{GamepadInput.Label(interactButton)}";
 
-    /// <summary>近づいていないときに戻す、見た目の元の色。</summary>
-    private Color originalColor = Color.white;
-
     private void Awake()
     {
         Current = this;
-
-        if (highlightRenderer != null && highlightRenderer.sharedMaterial != null)
-        {
-            originalColor = highlightRenderer.sharedMaterial.color;
-        }
+        interactVisual.Initialize(transform, highlightRenderer);
     }
 
     private void OnDestroy()
     {
+        interactVisual.Cleanup();
         if (Current == this)
         {
             Current = null;
@@ -75,11 +72,10 @@ public class NameChangeTerminal : MonoBehaviour
             }
         }
 
-        if (highlightRenderer != null && highlightRenderer.sharedMaterial != null)
-        {
-            highlightRenderer.material.color = IsPlayerNearby ? nearColor : originalColor;
-        }
+        interactVisual.SetNearby(IsPlayerNearby, nearColor);
     }
+
+    private void LateUpdate() => interactVisual.LateUpdate();
 
     /// <summary>近くにいる本人だけの名前を抽選し、既存のPlayer経由で全員へ同期する。</summary>
     public bool TryRandomName(SweeperNetPlayer player)
@@ -108,10 +104,7 @@ public class NameChangeTerminal : MonoBehaviour
     private void OnDisable()
     {
         IsPlayerNearby = false;
-        if (highlightRenderer != null && highlightRenderer.sharedMaterial != null)
-        {
-            highlightRenderer.material.color = originalColor;
-        }
+        interactVisual.SetNearby(false, nearColor);
     }
 
     private void OnDrawGizmosSelected()
