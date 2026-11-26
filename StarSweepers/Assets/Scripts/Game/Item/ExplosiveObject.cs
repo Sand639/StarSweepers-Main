@@ -106,6 +106,7 @@ public class ExplosiveObject : MonoBehaviour
 
         FuseLit = true;
         FuseRemaining = fuseSeconds;
+        GameAudio.PlaySe(GameSe.BombFuse);
 
         if (!LitBombs.Contains(this))
         {
@@ -183,6 +184,7 @@ public class ExplosiveObject : MonoBehaviour
     /// </summary>
     private void Explode()
     {
+        GameAudio.PlaySe(GameSe.Explosion);
         SpawnEffect();
         ApplyDamage();
 

@@ -237,8 +237,27 @@ public class TitleMenuButton : MonoBehaviour,
 
     public void OnPointerEnter(PointerEventData eventData)
     {
+        PlayHoverSoundIfNew();
         pointerOver = true;
         Refresh();
+    }
+
+    /// <summary>
+    /// 指されていなかったボタンが、いま指されたときだけ、重なったときの効果音を鳴らす（2026/11/26）。
+    /// 押せないボタン（Button が無い・押せない状態）では鳴らさない。
+    /// </summary>
+    private void PlayHoverSoundIfNew()
+    {
+        if (!Application.isPlaying || IsHighlighted)
+        {
+            return;
+        }
+
+        Button button = GetComponent<Button>();
+        if (button != null && button.IsInteractable())
+        {
+            GameAudio.PlayUi(UiSound.Hover);
+        }
     }
 
     public void OnPointerExit(PointerEventData eventData)
@@ -249,6 +268,7 @@ public class TitleMenuButton : MonoBehaviour,
 
     public void OnSelect(BaseEventData eventData)
     {
+        PlayHoverSoundIfNew();
         selectedByNavigation = true;
         Refresh();
     }

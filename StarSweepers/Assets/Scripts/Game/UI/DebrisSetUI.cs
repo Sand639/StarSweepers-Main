@@ -363,6 +363,13 @@ public sealed class DebrisSetUI : MonoBehaviour
         }
 
         SetVisible(true);
+
+        // 出てきた瞬間（前のフレームまで出ていなかった）に、腕が入ってくる機械の音を鳴らす
+        if (!hasState)
+        {
+            GameAudio.PlaySe(GameSe.UiDebrisSet);
+        }
+
         hasState = true;
         shownTeams = teamCount;
         UpdateSides(SpaceJunkRound.Current != null);

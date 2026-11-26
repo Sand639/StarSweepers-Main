@@ -71,6 +71,9 @@ public class MeteorStrikeEvent : NetworkBehaviour
     /// <summary>このPCで着弾の処理を済ませたか（1回しか起こさないため）。</summary>
     private bool impactApplied;
 
+    /// <summary>落ちてくる音を鳴らしたか。</summary>
+    private bool fallSoundPlayed;
+
     /// <summary>攻撃を終わりにしてよい時刻（着弾 + 爆発の見た目の秒数）。</summary>
     private double finishTime;
 
@@ -161,6 +164,7 @@ public class MeteorStrikeEvent : NetworkBehaviour
         if (!impactApplied && remaining <= 0d)
         {
             impactApplied = true;
+            GameAudio.PlaySe(GameSe.Explosion);
             HideWarningAndMeteor();
             SpawnImpactVfx();
             ApplyImpact();
@@ -221,6 +225,13 @@ public class MeteorStrikeEvent : NetworkBehaviour
         if (meteorInstance.activeSelf != falling)
         {
             meteorInstance.SetActive(falling);
+
+            // 落ち始めたら、着弾までヒューと鳴らす（1回だけ）
+            if (falling && !fallSoundPlayed)
+            {
+                fallSoundPlayed = true;
+                GameAudio.PlaySe(GameSe.MeteorFall, remainingSeconds + 0.1f);
+            }
         }
 
         if (!falling)

@@ -195,6 +195,9 @@ public class SceneTransition : MonoBehaviour
         effect.Apply(0f, false);
         canvasObject.SetActive(true);
 
+        // 覆い始めから、少しのあいだ切り替えの音を鳴らす（元の音は長いので途中で切る）
+        GameAudio.PlaySe(GameSe.SceneTransition, coverSeconds + 1f);
+
         yield return Animate(effect, coverSeconds, false);
 
         if (onCovered != null)

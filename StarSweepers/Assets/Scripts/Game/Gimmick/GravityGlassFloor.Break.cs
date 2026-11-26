@@ -16,6 +16,8 @@ public partial class GravityGlassFloor
             return;
         }
 
+        GameAudio.PlaySe(GameSe.GlassBreak);
+
         if (fractureExtensionSeconds <= 0f)
         {
             FinishBreak();
