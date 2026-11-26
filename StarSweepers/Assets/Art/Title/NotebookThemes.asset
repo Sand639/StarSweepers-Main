@@ -21,6 +21,27 @@ MonoBehaviour:
   buttonOutlineColor: {r: 0, g: 0, b: 0, a: 0}
   buttonTextColor: {r: 0.9529412, g: 0.9019608, b: 0.8509804, a: 1}
   buttonHoverTextColor: {r: 0.9529412, g: 0.9019608, b: 0.8509804, a: 1}
+--- !u!114 &-5684436013774537791
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f66bec690b03425baf784f154965b951, type: 3}
+  m_Name: OnlineMenu
+  m_EditorClassIdentifier: Assembly-CSharp::TitleScreenTheme
+  button: {fileID: 0}
+  buttonHover: {fileID: 21300000, guid: 31b5870636f6de0bba9d6598c20269aa, type: 3}
+  useHoverSpriteWhenSelected: 0
+  pointerHighlightOnly: 1
+  buttonColor: {r: 0, g: 0, b: 0, a: 0}
+  buttonHoverColor: {r: 1, g: 1, b: 1, a: 1}
+  buttonOutlineColor: {r: 0, g: 0, b: 0, a: 0}
+  buttonTextColor: {r: 0.9529412, g: 0.9019608, b: 0.8509804, a: 1}
+  buttonHoverTextColor: {r: 0.9529412, g: 0.9019608, b: 0.8509804, a: 1}
 --- !u!114 &-326861803472705902
 MonoBehaviour:
   m_ObjectHideFlags: 0

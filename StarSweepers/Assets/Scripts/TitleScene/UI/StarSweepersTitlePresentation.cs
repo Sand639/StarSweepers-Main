@@ -40,13 +40,9 @@ public sealed class StarSweepersTitlePresentation : MonoBehaviour
         }
     }
 
-    internal void ShowPage(bool notebookOpen, bool opening)
+    internal void PlayEntranceSwing()
     {
-        robotGroup.gameObject.SetActive(!notebookOpen);
-        if (opening)
-        {
-            Swing(-29f);
-        }
+        Swing(-29f);
     }
 
     internal void PlayRetractionSwing()

@@ -53,13 +53,9 @@ public class TitleTablet
         FinishSlide();
         bool opening = tabletPage && !IsOpen;
         currentPanel = tabletPage && page != null ? PanelOf(page) : null;
-        if (presentation != null)
-        {
-            presentation.ShowPage(tabletPage, opening);
-        }
-
         if (opening && currentPanel != null)
         {
+            presentation?.PlayEntranceSwing();
             StartSlide(0f);
         }
 

@@ -10024,7 +10024,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::TitleMenuButton
   action: 51
   useTheme: 1
-  theme: {fileID: 11400000, guid: 6db6f42e1bd42a549ba6bea6cdca51c0, type: 2}
+  theme: {fileID: -5684436013774537791, guid: 6db6f42e1bd42a549ba6bea6cdca51c0, type: 2}
   background: {fileID: 2881669678841862423}
   label: {fileID: 5228119963074461161}
   highlightScale: 1
