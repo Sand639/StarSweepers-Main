@@ -109,6 +109,12 @@ public class TitleScreen : MonoBehaviour
         // つないでいる途中の表示が出ている間は戻らない（表示のボタンで閉じる）
         if (WasBackPressed() && !busy.IsShown)
         {
+            // 戻れるとき（メインの画面でないか、参加の確認の窓が開いている）だけ、キャンセルの音を鳴らす
+            if (joinDialog.IsOpen || current != Page.Main)
+            {
+                GameAudio.PlayUi(UiSound.Cancel);
+            }
+
             GoBack();
         }
     }
@@ -193,7 +199,22 @@ public class TitleScreen : MonoBehaviour
             }
 
             TitleButtonAction action = look.Action;
+            button.onClick.AddListener(() => GameAudio.PlayUi(SoundOf(action)));
             button.onClick.AddListener(() => Do(action));
+        }
+    }
+
+    /// <summary>ボタンを押したときの効果音。戻る・閉じるはキャンセルの音、ほかは決定の音（2026/11/26）。</summary>
+    private static UiSound SoundOf(TitleButtonAction action)
+    {
+        switch (action)
+        {
+            case TitleButtonAction.Back:
+            case TitleButtonAction.CloseWindow:
+            case TitleButtonAction.CloseJoinDialog:
+                return UiSound.Cancel;
+            default:
+                return UiSound.Confirm;
         }
     }
 
