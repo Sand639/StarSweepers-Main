@@ -3,7 +3,7 @@ using UnityEngine;
 using UnityEngine.UI;
 
 /// <summary>
-/// ラウンドイベント「期間限定高価値デブリ（高単価デブリ）」の種類を、時間の丸の下から出るルーレットで決めて見せる。
+/// ラウンドイベント「期間限定高価値デブリ（高単価デブリ）」の種類を、得点バーの下から出る半円のルーレットで決めて見せる。
 /// 説明：Documents/スクリプトの説明/Game/UI/HighValueRouletteUI.md
 /// </summary>
 public sealed class HighValueRouletteUI : MonoBehaviour
@@ -31,7 +31,7 @@ public sealed class HighValueRouletteUI : MonoBehaviour
     [Tooltip("物資の画像（デブリセットのUIと同じ画像）。上から 物資1＝装甲板、物資2＝回路基板、物資3＝燃料タンク、物資4＝アンテナ、物資5＝エンジン")]
     [SerializeField] private Sprite[] itemSprites = new Sprite[ItemKinds];
 
-    [Tooltip("ルーレットのフレームの画像。空ならプレハブの画像のまま")]
+    [Tooltip("ルーレットのフレームの画像（Assets/Art/Sprites/EventUI/HighValueDebris/UI_roulette）。空ならプレハブの画像のまま")]
     [SerializeField] private Sprite frameSprite;
 
     [Header("部品（プレハブで割り当て済み）")]
@@ -54,11 +54,11 @@ public sealed class HighValueRouletteUI : MonoBehaviour
     [Tooltip("回り始めの速さ（1秒に何個の物資が真下を通るか）。決まる時刻に向けて、だんだん遅くなる")]
     [SerializeField, Min(1f)] private float spinStartSpeed = 14f;
 
-    [Tooltip("フレームの中心から物資の中心までの距離（レールの半径）")]
-    [SerializeField, Min(0f)] private float railRadius = 200f;
+    [Tooltip("回る中心（半円の上の辺の真ん中）から物資の中心までの距離（レールの半径）。真下の物資が真ん中の三角に収まる長さ")]
+    [SerializeField, Min(0f)] private float railRadius = 92f;
 
-    [Tooltip("レールの上の、となりの物資との角度（度）")]
-    [SerializeField, Range(30f, 90f)] private float itemAngle = 45f;
+    [Tooltip("レールの上の、となりの物資との角度（度）。となりの物資が、三角の左右の扇の真ん中に来る角度")]
+    [SerializeField, Range(30f, 90f)] private float itemAngle = 64f;
 
     [Tooltip("出てくるとき・しまわれるときに動く秒数")]
     [SerializeField, Min(0f)] private float slideSeconds = 0.25f;
@@ -75,13 +75,6 @@ public sealed class HighValueRouletteUI : MonoBehaviour
 
     /// <summary>いま画面にルーレットを出しているか（しまう途中も含む）。</summary>
     public static bool IsShowing => Instance != null && Instance.content != null && Instance.content.activeSelf;
-
-    /// <summary>ルーレットが回っている（種類がまだ決まっていない）か。SpaceJunkMatchUI が、合図の文字で種類を先に出さないために見る。</summary>
-    public static bool IsSpinning => Instance != null && Instance.shown && Instance.wasRunning &&
-                                     Instance.lastTime - Instance.spinStart < Instance.spinSeconds;
-
-    /// <summary>画面の上から、下りきったルーレットの下の端までのピクセル数。出していなければ 0（SpaceJunkMatchUI が見る）。</summary>
-    public static float OccupiedScreenHeight { get; private set; }
 
     // レールに並ぶ物資（左右の Pad 個を含む。reel[reelCount + Pad] が決まる物資）
     private int[] reel;
@@ -100,7 +93,6 @@ public sealed class HighValueRouletteUI : MonoBehaviour
     // 出ているときの位置と、しまうときに上へ動かす量
     private Vector2 shownPosition;
     private float hideOffset;
-    private static readonly Vector3[] Corners = new Vector3[4];
 
     // テスト用
     private bool testStarted;
@@ -161,7 +153,6 @@ public sealed class HighValueRouletteUI : MonoBehaviour
         if (Instance == this)
         {
             Instance = null;
-            OccupiedScreenHeight = 0f;
         }
     }
 
@@ -206,10 +197,6 @@ public sealed class HighValueRouletteUI : MonoBehaviour
         if (shown)
         {
             Draw(now);
-        }
-        else
-        {
-            OccupiedScreenHeight = 0f;
         }
     }
 
@@ -287,7 +274,6 @@ public sealed class HighValueRouletteUI : MonoBehaviour
             float eased = 1f - (1f - reveal) * (1f - reveal);
             float slide = hideOffset * (1f - eased);
             wheel.anchoredPosition = shownPosition + new Vector2(0f, slide);
-            OccupiedScreenHeight = MeasureOccupiedHeight(slide);
         }
 
         float elapsed = now - spinStart;
@@ -325,16 +311,6 @@ public sealed class HighValueRouletteUI : MonoBehaviour
             float scale = index == reelCount ? 1f + (PopScale - 1f) * pop : 1f;
             image.rectTransform.localScale = new Vector3(scale, scale, 1f);
         }
-    }
-
-    /// <summary>画面の上から、下りきったときのルーレットの下の端までのピクセル数（下りてくる途中でも同じ値にする）。</summary>
-    private float MeasureOccupiedHeight(float slide)
-    {
-        wheel.GetWorldCorners(Corners);
-
-        // 画面に重ねる UI なので、角の位置はそのまま画面のピクセル（下が 0）。いま上へずらしているぶんを戻して測る
-        float slideOnScreen = wheel.parent != null ? wheel.parent.TransformVector(new Vector3(0f, slide, 0f)).y : slide;
-        return Mathf.Max(0f, Screen.height - (Corners[0].y - slideOnScreen));
     }
 
     /// <summary>決まるまでに真下を通る物資の数（減速の曲線の出だしの速さが spinStartSpeed になる数）。</summary>

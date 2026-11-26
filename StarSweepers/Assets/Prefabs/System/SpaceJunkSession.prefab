@@ -83,17 +83,12 @@ MonoBehaviour:
     - kind: 2
       displayName: "\u671F\u9593\u9650\u5B9A\u9AD8\u4FA1\u5024\u30C7\u30D6\u30EA"
       description: 
-      durationSeconds: 40
+      durationSeconds: 70
       weight: 1
     - kind: 1
       displayName: "\u30BB\u30C3\u30C8\u30C7\u30D6\u30EA"
       description: 
-      durationSeconds: 40
-      weight: 1
-    - kind: 3
-      displayName: "\u7279\u6B8A\u30C7\u30D6\u30EA"
-      description: 
-      durationSeconds: 40
+      durationSeconds: 70
       weight: 1
     debugForceEvent: 0
     debrisSetOrdered: 0

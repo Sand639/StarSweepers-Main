@@ -1,4 +1,3 @@
-using System.IO;
 using UnityEditor;
 using UnityEditor.SceneManagement;
 using UnityEngine;
@@ -6,32 +5,30 @@ using UnityEngine.UI;
 using Object = UnityEngine.Object;
 
 /// <summary>
-/// 高単価デブリのルーレットUIの仮の画像・プレハブ・検証シーンを作るメニュー（エディタ専用）。
+/// 高単価デブリのルーレットUIのプレハブ・検証シーンを作るメニュー（エディタ専用）。
 /// 説明：Documents/スクリプトの説明/Game/UI/HighValueRouletteUI.md
 /// </summary>
 public static class HighValueRouletteUISetup
 {
     private const string PrefabPath = "Assets/Resources/HighValueRouletteUI.prefab";
     private const string ScenePath = "Assets/Scenes/Test/HighValueRouletteUITest.unity";
-    private const string ScoreBarPrefabPath = "Assets/Prefabs/UI/TeamScoreBarUI.prefab";
+    private const string ScoreBarPrefabPath = "Assets/Prefabs/UI/TeamScoreBarFrameUI.prefab"; // ステージで使っている得点バー
 
-    // 仮のフレームの画像。**同じ名前の本素材で上書きすれば、そのまま差し替わる**（無いときだけ描いて作る）
-    private const string FramePath = "Assets/Art/Sprites/HighValueRouletteFrame.png";
+    // フレームの画像（デザイナーさんの素材。半円の上の辺の真ん中が、物資が回る中心）
+    private const string FramePath = "Assets/Art/Sprites/EventUI/HighValueDebris/UI_roulette.png";
 
     // 物資の画像は、デブリセットのUIと同じ画像を使う（1回差し替えれば両方に効く）
     private static string ItemPath(int kind) => $"Assets/Art/Sprites/DebrisSetItem{kind + 1}.png";
 
-    // 大きさ（1920×1080 の画面での値）。得点バーは画面の上から 48〜92、時間の丸は 34〜130
-    private const float ClipTop = 48f;                                   // ここより上は切り抜く（得点バーの上の端）
+    // 大きさ（1920×1080 の画面での値）。得点バー（フレーム版）は、横長の枠が画面の上から 110〜217、
+    // 時間の板は 176〜230 にある（Assets/Prefabs/UI/TeamScoreBarFrameUI.prefab）
+    private const float ClipTop = 110f;                                  // ここより上は切り抜く（得点バーの横長の枠の上の端）
     private static readonly Vector2 ClipSize = new Vector2(800f, 420f);
-    private const float WheelRadius = 260f;
-    private const float WheelCenterAboveClip = 88f;                      // フレームの中心は画面の上の端より 40 上
-    private const float RailRadius = 200f;
+    private const float WheelTop = 90f;                                  // 半円の上の端を、切り抜きの上の端からどれだけ下に置くか（上の端は時間の板の裏に隠れ、左右の物資は得点バーの下に出る）
+    private const float HubFromTop = 8f;                                 // 画像の上の端から、半円の上の辺（回る中心）までの距離
+    private const float RailRadius = 92f;                                // 真下の物資が、真ん中の三角の中に収まる
     private const float ItemSize = 64f;
-    private const float ItemAngle = 45f;
-
-    // 仮のフレームの画像の大きさ
-    private const int FrameTextureSize = 512;
+    private const float ItemAngle = 64f;                                 // となりの物資が、三角の左右の扇の真ん中に来る
 
     /// <summary>プレハブを作り直してから、得点バーと一緒に置いた検証シーンを作って保存する。</summary>
     [MenuItem("Tools/StarSweepers/高単価デブリのルーレットUIの検証シーンを作る")]
@@ -48,7 +45,7 @@ public static class HighValueRouletteUISetup
         camera.backgroundColor = new Color(0.12f, 0.12f, 0.16f);
         cameraObject.tag = "MainCamera";
 
-        // ルーレットは時間の丸の下から出るので、得点バーも置いて並びを見られるようにする
+        // ルーレットは得点バーの時間の板の下から出るので、得点バーも置いて並びを見られるようにする
         var scoreBarPrefab = AssetDatabase.LoadAssetAtPath<GameObject>(ScoreBarPrefabPath);
         if (scoreBarPrefab != null)
         {
@@ -104,7 +101,12 @@ public static class HighValueRouletteUISetup
             }
         }
 
-        Sprite frameSprite = EnsureFrameSprite();
+        var frameSprite = AssetDatabase.LoadAssetAtPath<Sprite>(FramePath);
+        if (frameSprite == null)
+        {
+            Debug.LogError($"ルーレットのフレームの画像が読めません（無いか、Texture Type が Sprite でない）: {FramePath}");
+            return null;
+        }
 
         // ---- 一番上：画面全体を覆う Canvas ----
         var root = new GameObject("HighValueRouletteUI", typeof(RectTransform));
@@ -134,12 +136,13 @@ public static class HighValueRouletteUISetup
         clip.anchoredPosition = new Vector2(0f, -ClipTop);
         clip.gameObject.AddComponent<RectMask2D>();
 
+        // フレームの画像の大きさのまま、上の端を時間の板の裏に置く
         RectTransform wheel = CreateRect("Wheel", clip);
         wheel.anchorMin = new Vector2(0.5f, 1f);
         wheel.anchorMax = new Vector2(0.5f, 1f);
-        wheel.pivot = new Vector2(0.5f, 0.5f);
-        wheel.sizeDelta = new Vector2(WheelRadius * 2f, WheelRadius * 2f);
-        wheel.anchoredPosition = new Vector2(0f, WheelCenterAboveClip);
+        wheel.pivot = new Vector2(0.5f, 1f);
+        wheel.sizeDelta = new Vector2(frameSprite.rect.width, frameSprite.rect.height);
+        wheel.anchoredPosition = new Vector2(0f, -WheelTop);
 
         RectTransform frameRect = CreateRect("Frame", wheel);
         frameRect.anchorMin = Vector2.zero;
@@ -149,17 +152,26 @@ public static class HighValueRouletteUISetup
         Image frame = AddImage(frameRect, frameSprite);
         frame.preserveAspect = true;
 
+        // 物資は半円の中だけに見せる（上の辺より上へ回った物資は切り抜く）
+        RectTransform window = CreateRect("Window", wheel);
+        window.anchorMin = Vector2.zero;
+        window.anchorMax = Vector2.one;
+        window.offsetMin = Vector2.zero;
+        window.offsetMax = new Vector2(0f, -HubFromTop);
+        window.gameObject.AddComponent<RectMask2D>();
+
+        // 物資の位置は、Window の上の辺の真ん中（回る中心）から測る
         var items = new Image[HighValueRouletteUI.RailItems];
         int pad = items.Length / 2;
         for (int s = 0; s < items.Length; s++)
         {
-            RectTransform item = CreateRect($"Item{s}", wheel);
-            item.anchorMin = new Vector2(0.5f, 0.5f);
-            item.anchorMax = new Vector2(0.5f, 0.5f);
+            RectTransform item = CreateRect($"Item{s}", window);
+            item.anchorMin = new Vector2(0.5f, 1f);
+            item.anchorMax = new Vector2(0.5f, 1f);
             item.pivot = new Vector2(0.5f, 0.5f);
             item.sizeDelta = new Vector2(ItemSize, ItemSize);
 
-            // プレハブを開いたときの見本：真ん中が真下、左右に 45 度ずつ（ゲーム中はスクリプトが動かす）
+            // プレハブを開いたときの見本：真ん中が真下、左右に ItemAngle 度ずつ（ゲーム中はスクリプトが動かす）
             item.anchoredPosition = HighValueRouletteUI.RailPoint((pad - s) * ItemAngle, RailRadius);
             items[s] = AddImage(item, itemSprites[s % itemSprites.Length]);
             items[s].preserveAspect = true;
@@ -206,57 +218,5 @@ public static class HighValueRouletteUISetup
         {
             property.GetArrayElementAtIndex(i).objectReferenceValue = values[i];
         }
-    }
-
-    // ---------------------------------------------------------------- 仮の画像
-
-    /// <summary>
-    /// 仮のフレーム：薄い灰色の円盤に、濃い灰色の縁と、物資が乗るレールの線。
-    /// **画像がもうあれば（本素材も）そのまま使う。**
-    /// </summary>
-    private static Sprite EnsureFrameSprite()
-    {
-        var existing = AssetDatabase.LoadAssetAtPath<Sprite>(FramePath);
-        if (existing != null) return existing;
-
-        const int size = FrameTextureSize;
-        float scale = size * 0.5f / WheelRadius;
-        float outer = size * 0.5f - 1f;
-        float rail = RailRadius * scale;
-        var center = new Vector2(size * 0.5f, size * 0.5f);
-        var fill = new Color(0.85f, 0.85f, 0.86f, 0.92f);
-        var edge = new Color(0.45f, 0.45f, 0.48f, 1f);
-        var railColor = new Color(0.66f, 0.66f, 0.69f, 0.92f);
-
-        var texture = new Texture2D(size, size, TextureFormat.RGBA32, false);
-        for (int y = 0; y < size; y++)
-        {
-            for (int x = 0; x < size; x++)
-            {
-                float distance = Vector2.Distance(new Vector2(x + 0.5f, y + 0.5f), center);
-
-                // レールの線（太さ 4 ピクセル。縁は1ピクセルぶんぼかす）
-                float onRail = Mathf.Clamp01(2.5f - Mathf.Abs(distance - rail));
-                Color color = Color.Lerp(fill, railColor, onRail);
-
-                // 外側の縁（太さ 6 ピクセル）と、円の外の透明
-                color = Color.Lerp(edge, color, Mathf.Clamp01(outer - 6f - distance + 0.5f));
-                color.a *= Mathf.Clamp01(outer - distance + 0.5f);
-                texture.SetPixel(x, y, color);
-            }
-        }
-
-        File.WriteAllBytes(Path.Combine(Directory.GetCurrentDirectory(), FramePath), texture.EncodeToPNG());
-        Object.DestroyImmediate(texture);
-        AssetDatabase.ImportAsset(FramePath);
-
-        var importer = (TextureImporter)AssetImporter.GetAtPath(FramePath);
-        importer.textureType = TextureImporterType.Sprite;
-        importer.spriteImportMode = SpriteImportMode.Single;
-        importer.alphaIsTransparency = true;
-        importer.mipmapEnabled = false;
-        importer.SaveAndReimport();
-
-        return AssetDatabase.LoadAssetAtPath<Sprite>(FramePath);
     }
 }
