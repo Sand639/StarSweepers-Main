@@ -70,31 +70,31 @@ public sealed class EventBannerUI : MonoBehaviour
 
     [Header("演出（秒。出始めを 0 として数える。イベントの始まる時刻から決まるので、全員の画面で同じ時に出る）")]
     [Tooltip("イベントが始まる何秒前に出し始めるか")]
-    [SerializeField, Min(0f)] private float leadSeconds = 3f;
+    [SerializeField, Min(0f)] private float leadSeconds = 5f;
 
     [Tooltip("1回目の点滅（帯と文字が消える）が始まる時刻")]
-    [SerializeField, Min(0f)] private float firstBlinkAt = 0.2f;
+    [SerializeField, Min(0f)] private float firstBlinkAt = 0.3f;
 
     [Tooltip("点滅で消えている秒数")]
-    [SerializeField, Min(0f)] private float blinkOffSeconds = 0.2f;
+    [SerializeField, Min(0f)] private float blinkOffSeconds = 0.3f;
 
     [Tooltip("点滅の間隔（1回目の点滅の始まりから、2回目の点滅の始まりまで）")]
-    [SerializeField, Min(0.01f)] private float blinkInterval = 0.4f;
+    [SerializeField, Min(0.01f)] private float blinkInterval = 0.6f;
 
     [Tooltip("点滅の回数")]
     [SerializeField, Min(0)] private int blinkCount = 2;
 
     [Tooltip("「緊急連絡！」が右へ出ていき、イベントの文字が左から入ってくる時刻")]
-    [SerializeField, Min(0f)] private float switchAt = 1f;
+    [SerializeField, Min(0f)] private float switchAt = 1.5f;
 
     [Tooltip("入れ替わりにかかる秒数")]
-    [SerializeField, Min(0f)] private float switchSeconds = 0.5f;
+    [SerializeField, Min(0f)] private float switchSeconds = 1f;
 
     [Tooltip("入れ替わりで文字が動く距離")]
     [SerializeField] private float switchDistance = 1200f;
 
     [Tooltip("帯と文字が消え始める時刻")]
-    [SerializeField, Min(0f)] private float fadeAt = 2f;
+    [SerializeField, Min(0f)] private float fadeAt = 4f;
 
     [Tooltip("消えるまでの秒数")]
     [SerializeField, Min(0f)] private float fadeSeconds = 0.5f;
@@ -104,7 +104,7 @@ public sealed class EventBannerUI : MonoBehaviour
     [SerializeField] private bool testMode;
 
     [Tooltip("テストで出す間隔（秒）。回ごとに、イベントごとの文字を順に出す")]
-    [SerializeField, Min(1f)] private float testInterval = 4f;
+    [SerializeField, Min(1f)] private float testInterval = 6f;
 
     /// <summary>いま動いている係（ゲーム中は1つだけ）。</summary>
     public static EventBannerUI Instance { get; private set; }

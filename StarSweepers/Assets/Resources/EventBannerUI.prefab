@@ -228,18 +228,18 @@ MonoBehaviour:
     title: "\u9AD8\u91CD\u91CF\u30C7\u30D6\u30EA\u767A\u751F\uFF01"
     subtitle: 
   font: {fileID: 0}
-  leadSeconds: 3
-  firstBlinkAt: 0.2
-  blinkOffSeconds: 0.2
-  blinkInterval: 0.4
+  leadSeconds: 5
+  firstBlinkAt: 0.3
+  blinkOffSeconds: 0.3
+  blinkInterval: 0.6
   blinkCount: 2
-  switchAt: 1
-  switchSeconds: 0.5
+  switchAt: 1.5
+  switchSeconds: 1
   switchDistance: 1200
-  fadeAt: 2
+  fadeAt: 4
   fadeSeconds: 0.5
   testMode: 0
-  testInterval: 4
+  testInterval: 6
 --- !u!1 &4430513017132832563
 GameObject:
   m_ObjectHideFlags: 0

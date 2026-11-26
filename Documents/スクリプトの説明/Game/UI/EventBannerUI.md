@@ -8,7 +8,7 @@
 
 ## 何をするスクリプトか
 
-ラウンドイベントが始まる Lead Seconds（3）秒前に、赤い半透明の帯（`UI_EventBanner_base`）と「緊急連絡！」を出して2回点滅させ、「緊急連絡！」を右へ送り出してイベントの見出しと説明（Event Messages）を左から入れ、帯ごと消す（全部で 2.5 秒）。**表示するだけで、何も送らない。**
+ラウンドイベントが始まる Lead Seconds（5）秒前に、赤い半透明の帯（`UI_EventBanner_base`）と「緊急連絡！」を出して2回点滅させ、「緊急連絡！」を右へ送り出してイベントの見出しと説明（Event Messages）を左から入れ、帯ごと消す（全部で 4.5 秒）。**表示するだけで、何も送らない。**
 
 ## 流れ
 
@@ -49,3 +49,4 @@ EventBannerUI（Canvas：画面に重ねる・並び順 30、CanvasScaler：1920
 | 2026/11/26 | Claude Code（依頼：大槻 海斗） | イベントの5秒前から出して始まったら閉じる形（`ReadSecondsShown`・Lead Seconds）に書き直した |
 | 2026/11/26 | Claude Code（依頼：大槻 海斗） | 「緊急連絡！」のあとにイベントごとの文字へ切り替える（Message Seconds・Event Messages・`TryGetEventText`）ことを書いた |
 | 2026/11/26 | Claude Code（依頼：大槻 海斗） | デザイン案の演出（点滅2回 → 入れ替わり → 消える）に作り替えたのに合わせて、流れとプレハブの作りを書き直した（`EventTitle`・`EventSubtitle`・`IsBlinkOff`） |
+| 2026/11/26 | Claude Code（依頼：大槻 海斗） | 時間割りを5秒版にした（Lead Seconds 5、全部で 4.5 秒） |
