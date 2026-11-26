@@ -66,6 +66,7 @@ public class SpaceJunkLobbyTerminal : MonoBehaviour
 
     private void OnDestroy()
     {
+        interactVisual.Cleanup();
         if (Current == this)
         {
             Current = null;
@@ -130,8 +131,6 @@ public class SpaceJunkLobbyTerminal : MonoBehaviour
         IsHostNearby = false;
         interactVisual.SetNearby(false, nearColor);
     }
-
-    private void OnDestroy() => interactVisual.Cleanup();
 
     /// <summary>詳細設定を閉じる。画面の「閉じる」ボタンから呼ばれる。</summary>
     public void Close()

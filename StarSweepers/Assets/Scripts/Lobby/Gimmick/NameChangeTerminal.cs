@@ -45,6 +45,7 @@ public class NameChangeTerminal : MonoBehaviour
 
     private void OnDestroy()
     {
+        interactVisual.Cleanup();
         if (Current == this)
         {
             Current = null;
@@ -105,8 +106,6 @@ public class NameChangeTerminal : MonoBehaviour
         IsPlayerNearby = false;
         interactVisual.SetNearby(false, nearColor);
     }
-
-    private void OnDestroy() => interactVisual.Cleanup();
 
     private void OnDrawGizmosSelected()
     {

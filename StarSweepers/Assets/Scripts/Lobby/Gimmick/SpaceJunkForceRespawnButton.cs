@@ -76,7 +76,11 @@ public class SpaceJunkForceRespawnButton : NetworkBehaviour
 
     private void OnDisable() => interactVisual.SetNearby(false, nearColor);
 
-    private void OnDestroy() => interactVisual.Cleanup();
+    public override void OnDestroy()
+    {
+        interactVisual.Cleanup();
+        base.OnDestroy();
+    }
 
     /// <summary>
     /// クライアントからサーバー（ホスト）へ「リスポーンして」と頼む通信。
