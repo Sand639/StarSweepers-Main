@@ -6,7 +6,7 @@ using UnityEngine;
 /// 出しているもの：
 ///
 ///   ・**残り時間**（残り10秒を切ると赤くなる。チームの得点バー <see cref="TeamScoreBarUI"/> を置いたステージでは、バーの丸に任せて出さない）
-///   ・**イベントの始まる前のカウントダウンと、始まった合図**
+///   ・**イベントの始まる前のカウントダウンと、続いている間の一行**（始まった合図は EventBannerUI）
 ///   ・**復活までの秒数**
 ///   ・決着後 … **このラウンドを取ったチーム**（引き分けならその旨）
 ///   ・試合が終わったら … **試合に勝ったチーム**
@@ -44,7 +44,7 @@ public class SpaceJunkMatchUI : MonoBehaviour
     /// <summary>残り時間の大きな数字。</summary>
     private GUIStyle timerStyle;
 
-    /// <summary>真ん中に出す大きな文字（決着・復活まで・イベント発生）。</summary>
+    /// <summary>真ん中に出す大きな文字（決着・復活まで）。</summary>
     private GUIStyle resultStyle;
 
     // イベントの一行の高さ。チームの得点バーが出ているときはその下へずらす
@@ -89,7 +89,7 @@ public class SpaceJunkMatchUI : MonoBehaviour
 
         if (round.Phase == SpaceJunkRoundPhase.Playing)
         {
-            DrawEventNotice(round, viewWidth, Screen.height / scale);
+            DrawEventNotice(round, viewWidth);
         }
 
         if (round.Phase == SpaceJunkRoundPhase.Result)
@@ -163,9 +163,9 @@ public class SpaceJunkMatchUI : MonoBehaviour
     }
 
     /// <summary>
-    /// イベントの**始まる前のカウントダウン**（残り5秒から）と、**始まった合図**（4秒間）を出す。
+    /// イベントの**始まる前のカウントダウン**（残り5秒から）と、続いている間・終わったあとの一行を出す。
     /// </summary>
-    private void DrawEventNotice(SpaceJunkRound round, float viewWidth, float viewHeight)
+    private void DrawEventNotice(SpaceJunkRound round, float viewWidth)
     {
         // 一行の表示は、どれも残り時間のすぐ下（y = 70）に出す。上から順に、当てはまった1つだけを出して抜ける
 
@@ -186,21 +186,7 @@ public class SpaceJunkMatchUI : MonoBehaviour
             return;
         }
 
-        // 始まって 4 秒間は、画面の上から 3 割の高さに大きく合図を出す（高さ 110 の枠の真ん中をそこに合わせる）
-        if (since < 4f)
-        {
-            // 高単価デブリの種類は、ルーレット（HighValueRouletteUI）が止まってから出す（回っている間に答えが見えないように）
-            string highValue = HighValueRouletteUI.IsSpinning ? string.Empty : HighValueText(round, "\n");
-
-            Color saved = GUI.color;
-            GUI.color = new Color(1f, 0.9f, 0.4f);
-            GUI.Label(new Rect(0f, viewHeight * 0.3f - 55f, viewWidth, 110f),
-                      $"イベント発生！　{round.EventName}\n" +
-                      $"<size=16>{round.EventDescription}{highValue}</size>",
-                      resultStyle);
-            GUI.color = saved;
-            return;
-        }
+        // 始まった合図は、赤い帯の「緊急連絡！」（EventBannerUI）が出す
 
         if (!round.IsEventRunning)
         {
@@ -217,7 +203,8 @@ public class SpaceJunkMatchUI : MonoBehaviour
             line += $"　残り {Mathf.CeilToInt(remaining)} 秒";
         }
 
-        if (round.ActiveEvent == SpaceJunkEventKind.HighValueDebris)
+        // 高単価デブリの種類は、ルーレット（HighValueRouletteUI）が止まってから出す（回っている間に答えが見えないように）
+        if (round.ActiveEvent == SpaceJunkEventKind.HighValueDebris && !HighValueRouletteUI.IsSpinning)
         {
             line += HighValueText(round, "　");
         }
