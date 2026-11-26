@@ -12,6 +12,7 @@ public class TitleTablet
     /// <summary>出てくる前に右へずらしておく距離（1920×1080 のときのピクセル）。</summary>
     private const float SlideDistance = 900f;
 
+    private readonly StarSweepersTitlePresentation presentation;
     private RectTransform sliding;
     private float slideTime;
 
@@ -30,6 +31,7 @@ public class TitleTablet
     /// <summary>root の下の操作の案内を全部集める。</summary>
     public TitleTablet(GameObject root)
     {
+        presentation = root.GetComponent<StarSweepersTitlePresentation>();
         foreach (TitlePart part in root.GetComponentsInChildren<TitlePart>(true))
         {
             Text text = part.GetComponent<Text>();
@@ -44,8 +46,13 @@ public class TitleTablet
     public void Show(GameObject page, bool tabletPage)
     {
         FinishSlide();
+        bool opening = tabletPage && !IsOpen;
+        if (presentation != null)
+        {
+            presentation.ShowPage(tabletPage, opening);
+        }
 
-        if (tabletPage && !IsOpen)
+        if (opening)
         {
             StartSlide(page);
         }
@@ -56,6 +63,7 @@ public class TitleTablet
     /// <summary>タブレットを閉じた扱いにする（画面が消えるとき）。</summary>
     public void Close()
     {
+        FinishSlide();
         IsOpen = false;
     }
 
@@ -82,7 +90,7 @@ public class TitleTablet
 
         sliding = panel;
         slideTime = 0f;
-        panel.anchoredPosition = home[panel] + new Vector2(SlideDistance, 0f);
+        PlaceSlide(0f);
     }
 
     /// <summary>出てくる途中の枠を、少しずつ元の位置へ動かす。</summary>
@@ -94,14 +102,31 @@ public class TitleTablet
         }
 
         slideTime += Time.unscaledDeltaTime;
-        float t = Mathf.Clamp01(slideTime / SlideSeconds);
-        float eased = 1f - (1f - t) * (1f - t) * (1f - t);
-        sliding.anchoredPosition = home[sliding] + new Vector2(SlideDistance * (1f - eased), 0f);
-
+        float seconds = presentation != null ? StarSweepersTitlePresentation.NotebookSlideSeconds : SlideSeconds;
+        float t = Mathf.Clamp01(slideTime / seconds);
         if (t >= 1f)
         {
-            sliding = null;
+            FinishSlide();
+            return;
         }
+
+        PlaceSlide(t);
+    }
+
+    private void PlaceSlide(float t)
+    {
+        float remaining = (1f - t) * (1f - t) * (1f - t);
+        Vector2 restingPosition = home[sliding];
+        if (presentation == null)
+        {
+            sliding.anchoredPosition = restingPosition + Vector2.right * (SlideDistance * remaining);
+            return;
+        }
+
+        float height = -160f * remaining + 36f * Mathf.Sin(t * Mathf.PI);
+        sliding.anchoredPosition = restingPosition + new Vector2(1480f * remaining, height);
+        sliding.localRotation = Quaternion.Euler(0f, 0f,
+            StarSweepersTitlePresentation.NotebookAngle - 19f * remaining);
     }
 
     /// <summary>出てくる途中の枠を、すぐ元の位置に置く。</summary>
@@ -109,7 +134,7 @@ public class TitleTablet
     {
         if (sliding != null)
         {
-            sliding.anchoredPosition = home[sliding];
+            PlaceSlide(1f);
             sliding = null;
         }
     }

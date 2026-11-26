@@ -24,6 +24,7 @@
 | `TitleParts.cs` | 部品（印の付いた物）を探して、文字・出し入れ・選ばれた見た目を変える補助。コントローラーで項目を選ぶ補助 | `Object`・`SetText`・`SetActive`・`SetSelectedLook`・`SelectForGamepad` |
 | `TitleInputFields.cs` | 入力欄（サーバーの名前・パスワード・部屋番号）の値を持ち、欄とつなぐ。文字数の表示 | `Refresh` |
 | `TitleTablet.cs` | 右から出てくるタブレットの枠と、右下の操作の案内 | `Show`・`Update` |
+| `StarSweepersTitlePresentation.cs` | `StarSweepersTitle` シーンの画像を組み立て、キーホルダーと3体のロボットを動かす | `Build`・`ShowPage` |
 | `TitleCreateRoom.cs` | 部屋を作る（人数・□パブリック □プライベート □LAN・作成） | `Refresh`・`Create` |
 | `TitleRoomList.cs` | 部屋を探す（LAN・公開・フレンドの部屋の一覧、部屋番号の検索、■のチェック） | `Open`・`Update` |
 | `TitleJoinDialog.cs` | 参加の確認の窓（参加しますか？／パスワード） | `Open`・`Confirm`・`TryShowFailure` |
@@ -66,7 +67,7 @@ TitleScreen ─┬→ TitleCreateRoom ──┐
 ## 流れ
 
 1. **出たとき**（`Awake` / `OnEnable`）
-   - 1回だけ `Initialize`：日本語フォントに差し替え → 係を作る（このとき各係が自分の部品をつなぎ、最初は隠す物を隠す）→ ボタンを `Do` につなぐ
+   - 1回だけ `Initialize` で画面を準備する。`StarSweepersTitlePresentation` が付いていれば、先にノートとロボットの画像を置く。続いて日本語フォントに差し替え、各係を作り、ボタンを `Do` につなぐ
    - メインの画面を出す。ホストに切られて戻ってきたなら、その理由を取っておく
 2. **毎フレーム**（`Update`）
    - Steam から頼まれた参加を受ける → つないでいる途中の表示を出し入れ → 部屋を探す画面なら一覧を取り直す → タブレットを動かす → 戻るが押されたら `GoBack`
@@ -128,3 +129,4 @@ TitleScreen ─┬→ TitleCreateRoom ──┐
 | 2026/11/6 | Claude Code | 新規作成（大槻さんの依頼）。`TitleScreen.cs` の古い仕様の処理を消し、コードのコメントを1行にしたので、詳しい説明をここに移した |
 | 2026/11/6 | Claude Code | スクリプトのフォルダ分け直し（TitleScene・Lobby・Game・Common）に合わせて、スクリプトの場所の書き込みを新しい場所に直した（対応は `実装計画/スクリプトのシーン別フォルダの対応表.md`） |
 | 2026/11/6 | Claude Code | `TitleScreen.cs` を機能ごとの係（10本）に分けたので、「ファイルの分け方」を足し、全体を今の形に書き直した（大槻さんの依頼。動きは変えていない） |
+| 2026/11/26 | Codex（依頼：ソウホイチョン） | StarSweepersTitle の画像と動きの担当、初期化の順番を追記 |

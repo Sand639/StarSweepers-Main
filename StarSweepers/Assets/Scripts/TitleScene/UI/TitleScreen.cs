@@ -123,6 +123,11 @@ public class TitleScreen : MonoBehaviour
 
         initialized = true;
 
+        if (TryGetComponent(out StarSweepersTitlePresentation presentation))
+        {
+            presentation.Build();
+        }
+
         if (useOsJapaneseFont)
         {
             ApplyJapaneseFont();
