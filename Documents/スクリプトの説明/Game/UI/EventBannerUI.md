@@ -8,15 +8,15 @@
 
 ## 何をするスクリプトか
 
-ラウンドイベントが始まった瞬間に、赤い半透明の帯（`UI_EventBanner_base`）と「緊急連絡！」の文字を、約 2.25 秒だけ出す。**表示するだけで、何も送らない。**
+ラウンドイベントが始まる Lead Seconds（5）秒前から、赤い半透明の帯（`UI_EventBanner_base`）と「緊急連絡！」の文字を出し、イベントが始まったら閉じる。**表示するだけで、何も送らない。**
 
 ## 流れ
 
 1. `CreateOnStart`（`RuntimeInitializeOnLoadMethod`。ゲームの開始時に1回）… シーンにまだ無ければ、`Resources/EventBannerUI.prefab` から作って `DontDestroyOnLoad` にする
 2. `Awake` … 2つ目なら消える。帯の元の濃さと、文字の元の位置を覚える。文字に Message とフォント（Font が空ならパソコンの日本語フォント `UiFont.Find`）を入れる。最初は隠す
 3. `Update` … 毎フレーム
-   1. `ReadSecondsSinceStart` … ラウンドがあれば `SpaceJunkRound.SecondsSinceEventStarted`（イベントが起きていなければ -1）。ラウンドが無く Test Mode がオンなら、Test Interval 秒ごとにくり返す秒数
-   2. 0 以上で Open + Hold + Close 秒より前なら出し、`Draw` で見た目を決める。それ以外は隠す
+   1. `ReadSecondsShown` … 出始めてからの秒数（始まる Lead Seconds 秒前が 0）。ラウンドがあれば、試合中で `SecondsUntilEvent` が 0〜Lead Seconds なら「Lead Seconds − 残り」、始まったあとは「Lead Seconds ＋ `SecondsSinceEventStarted`」。どちらでもなければ -1。ラウンドが無く Test Mode がオンなら、Test Interval 秒ごとにくり返す秒数
+   2. 0 以上で Lead + Close 秒より前なら出し、`Draw` で見た目を決める。それ以外は隠す
 4. `Draw(秒数)` … 帯の縦の大きさ（開く：3乗の減速、閉じる：3乗の加速）、帯の濃さ（開ききったあと cos で点滅）、文字の横の位置（右から滑り込む）と濃さ（閉じるのに合わせて消える）を、秒数だけから決める
 
 ## プレハブの作り（`EventBannerUISetup`）
@@ -44,3 +44,4 @@ EventBannerUI（Canvas：画面に重ねる・並び順 30、CanvasScaler：1920
 | 日付 | 変更者 | 内容 |
 | --- | --- | --- |
 | 2026/11/26 | Claude Code（依頼：大槻 海斗） | 新規作成 |
+| 2026/11/26 | Claude Code（依頼：大槻 海斗） | イベントの5秒前から出して始まったら閉じる形（`ReadSecondsShown`・Lead Seconds）に書き直した |

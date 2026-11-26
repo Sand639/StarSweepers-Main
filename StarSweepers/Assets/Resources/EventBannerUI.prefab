@@ -214,15 +214,15 @@ MonoBehaviour:
   label: {fileID: 5466936820911629705}
   message: "\u7DCA\u6025\u9023\u7D61\uFF01"
   font: {fileID: 0}
+  leadSeconds: 5
   openSeconds: 0.2
-  holdSeconds: 1.8
   closeSeconds: 0.25
   textSlideSeconds: 0.3
   textSlideDistance: 320
   blinkPerSecond: 2.5
   blinkMinAlpha: 0.6
   testMode: 0
-  testInterval: 4
+  testInterval: 8
 --- !u!1 &4430513017132832563
 GameObject:
   m_ObjectHideFlags: 0

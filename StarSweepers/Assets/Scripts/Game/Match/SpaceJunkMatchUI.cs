@@ -6,7 +6,7 @@ using UnityEngine;
 /// 出しているもの：
 ///
 ///   ・**残り時間**（残り10秒を切ると赤くなる。チームの得点バー <see cref="TeamScoreBarUI"/> を置いたステージでは、バーの丸に任せて出さない）
-///   ・**イベントの始まる前のカウントダウンと、続いている間の一行**（始まった合図は EventBannerUI）
+///   ・**イベントが続いている間の一行**（始まる前の知らせと始まった合図は EventBannerUI）
 ///   ・**復活までの秒数**
 ///   ・決着後 … **このラウンドを取ったチーム**（引き分けならその旨）
 ///   ・試合が終わったら … **試合に勝ったチーム**
@@ -163,20 +163,12 @@ public class SpaceJunkMatchUI : MonoBehaviour
     }
 
     /// <summary>
-    /// イベントの**始まる前のカウントダウン**（残り5秒から）と、続いている間・終わったあとの一行を出す。
+    /// イベントが続いている間・終わったあとの一行を出す。
     /// </summary>
     private void DrawEventNotice(SpaceJunkRound round, float viewWidth)
     {
         // 一行の表示は、どれも残り時間のすぐ下（y = 70）に出す。上から順に、当てはまった1つだけを出して抜ける
-
-        // 始まる前の 5 秒間だけ、カウントダウン
-        float until = round.SecondsUntilEvent;
-
-        if (until > 0f && until <= 5f)
-        {
-            GUI.Label(new Rect(0f, eventY, viewWidth, 24f), $"イベントまで {Mathf.CeilToInt(until)}", titleStyle);
-            return;
-        }
+        // 始まる前の知らせと始まった合図は、赤い帯の「緊急連絡！」（EventBannerUI）が出す
 
         // 始まってからの秒数（マイナスなら、まだ始まっていない）
         float since = round.SecondsSinceEventStarted;
@@ -185,8 +177,6 @@ public class SpaceJunkMatchUI : MonoBehaviour
         {
             return;
         }
-
-        // 始まった合図は、赤い帯の「緊急連絡！」（EventBannerUI）が出す
 
         if (!round.IsEventRunning)
         {

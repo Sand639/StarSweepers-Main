@@ -2,8 +2,8 @@ using UnityEngine;
 using UnityEngine.UI;
 
 /// <summary>
-/// ラウンドイベントが始まった瞬間に、画面を横切る赤い帯と「緊急連絡！」の文字を出して知らせる
-/// （帯が上下に開く → 文字が右から滑り込む → 帯が点滅しながら少し残る → 帯が閉じて消える）。
+/// ラウンドイベントが始まる少し前から、画面を横切る赤い帯と「緊急連絡！」の文字を出して知らせる
+/// （帯が上下に開く → 文字が右から滑り込む → 帯が点滅しながらイベントの始まりまで残る → 始まったら帯が閉じて消える）。
 /// 説明：Documents/スクリプトの説明/Game/UI/EventBannerUI.md
 /// </summary>
 public sealed class EventBannerUI : MonoBehaviour
@@ -28,14 +28,14 @@ public sealed class EventBannerUI : MonoBehaviour
     [Tooltip("文字のフォント。空ならパソコンに入っている日本語のフォントを使う（デザイナーさんの指定のフォントが来たら入れる）")]
     [SerializeField] private Font font;
 
-    [Header("演出（イベントが始まってからの秒数で決まるので、全員の画面で同じ時に出る）")]
+    [Header("演出（イベントの始まる時刻からの秒数で決まるので、全員の画面で同じ時に出る）")]
+    [Tooltip("イベントが始まる何秒前から出すか。イベントが始まると閉じる")]
+    [SerializeField, Min(0.5f)] private float leadSeconds = 5f;
+
     [Tooltip("帯が上下に開く秒数")]
     [SerializeField, Min(0f)] private float openSeconds = 0.2f;
 
-    [Tooltip("開ききってから閉じ始めるまでの秒数")]
-    [SerializeField, Min(0f)] private float holdSeconds = 1.8f;
-
-    [Tooltip("帯が閉じる秒数")]
+    [Tooltip("イベントが始まってから、帯が閉じきるまでの秒数")]
     [SerializeField, Min(0f)] private float closeSeconds = 0.25f;
 
     [Tooltip("文字が滑り込んでくる秒数（帯が開き始めると同時に始まる）")]
@@ -54,8 +54,8 @@ public sealed class EventBannerUI : MonoBehaviour
     [Tooltip("オンなら、ラウンドが無くても一定の間隔でくり返し出す。検証シーン用。本番（Resources のプレハブ）ではオフ")]
     [SerializeField] private bool testMode;
 
-    [Tooltip("テストで出す間隔（秒）")]
-    [SerializeField, Min(1f)] private float testInterval = 4f;
+    [Tooltip("テストで出す間隔（秒）。出ている時間（Lead Seconds＋Close Seconds）より長くする")]
+    [SerializeField, Min(1f)] private float testInterval = 8f;
 
     /// <summary>いま動いている係（ゲーム中は1つだけ）。</summary>
     public static EventBannerUI Instance { get; private set; }
@@ -66,7 +66,7 @@ public sealed class EventBannerUI : MonoBehaviour
     private float testStart = float.NaN;
 
     /// <summary>出てから消えるまでの秒数。</summary>
-    private float TotalSeconds => openSeconds + holdSeconds + closeSeconds;
+    private float TotalSeconds => leadSeconds + closeSeconds;
 
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
     private static void CreateOnStart()
@@ -127,23 +127,32 @@ public sealed class EventBannerUI : MonoBehaviour
 
     private void Update()
     {
-        float since = ReadSecondsSinceStart(Time.unscaledTime);
-        bool visible = since >= 0f && since < TotalSeconds;
+        float shown = ReadSecondsShown(Time.unscaledTime);
+        bool visible = shown >= 0f && shown < TotalSeconds;
         SetVisible(visible);
 
         if (visible)
         {
-            Draw(since);
+            Draw(shown);
         }
     }
 
-    /// <summary>イベントが始まってからの秒数。イベントが起きていなければ -1。</summary>
-    private float ReadSecondsSinceStart(float now)
+    /// <summary>出始めてからの秒数（イベントの始まる Lead Seconds 秒前が 0）。出す時でなければ -1。</summary>
+    private float ReadSecondsShown(float now)
     {
         SpaceJunkRound round = SpaceJunkRound.Current;
         if (round != null)
         {
-            return round.SecondsSinceEventStarted;
+            // 始まる前（0 は「時刻になったが、ホストがまだ始めていない」一瞬）
+            float until = round.SecondsUntilEvent;
+            if (round.Phase == SpaceJunkRoundPhase.Playing && until >= 0f && until <= leadSeconds)
+            {
+                return leadSeconds - until;
+            }
+
+            // 始まったあと（閉じる間だけ）
+            float since = round.SecondsSinceEventStarted;
+            return since >= 0f ? leadSeconds + since : -1f;
         }
 
         if (!testMode)
@@ -159,19 +168,19 @@ public sealed class EventBannerUI : MonoBehaviour
         return (now - testStart) % testInterval;
     }
 
-    /// <summary>始まってから since 秒の見た目にする。</summary>
-    private void Draw(float since)
+    /// <summary>出始めてから shown 秒の見た目にする。</summary>
+    private void Draw(float shown)
     {
-        float closing = Clamp01Div(since - openSeconds - holdSeconds, closeSeconds);
-        float open = EaseOutCubic(Clamp01Div(since, openSeconds)) * (1f - EaseInCubic(closing));
+        float closing = Clamp01Div(shown - leadSeconds, closeSeconds);
+        float open = EaseOutCubic(Clamp01Div(shown, openSeconds)) * (1f - EaseInCubic(closing));
 
         if (bannerRect != null)
         {
             bannerRect.localScale = new Vector3(1f, open, 1f);
 
             // 開ききっている間だけ、警報のように点滅させる（開いた瞬間がいちばん濃い）
-            float blink = blinkPerSecond > 0f && since > openSeconds
-                ? Mathf.Lerp(blinkMinAlpha, 1f, 0.5f + 0.5f * Mathf.Cos((since - openSeconds) * blinkPerSecond * Mathf.PI * 2f))
+            float blink = blinkPerSecond > 0f && shown > openSeconds
+                ? Mathf.Lerp(blinkMinAlpha, 1f, 0.5f + 0.5f * Mathf.Cos((shown - openSeconds) * blinkPerSecond * Mathf.PI * 2f))
                 : 1f;
             Color color = banner.color;
             color.a = bannerAlpha * blink;
@@ -180,7 +189,7 @@ public sealed class EventBannerUI : MonoBehaviour
 
         if (label != null)
         {
-            float slide = EaseOutCubic(Clamp01Div(since, textSlideSeconds));
+            float slide = EaseOutCubic(Clamp01Div(shown, textSlideSeconds));
             label.rectTransform.anchoredPosition = labelPosition + new Vector2((1f - slide) * textSlideDistance, 0f);
 
             Color color = label.color;
