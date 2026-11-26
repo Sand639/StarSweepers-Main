@@ -144,11 +144,42 @@ public class SweeperAnimationTests
             yield return Wait(0.3f);
             Assert.That(State(animator), Is.EqualTo("Idle"));
 
-            // スタンすると倒れる（Fall）。解けたら起き上がり（Rise）を流し切って、Idle に戻る
-            player.GetComponent<PlayerStun>().Stun(1f, false);
-            yield return WaitState(animator, "Fall", 0.5f);
-            yield return WaitState(animator, "Rise", 2f);
-            yield return WaitState(animator, "Idle", 2f);
+            // 短いスタン（1 秒）と長いスタン（3 秒）。どちらも、倒れる（Fall。頭の構えの部分は飛ばす）→ 起き上がる（Rise）で、
+            // スタンが終わる瞬間には起き上がり終わっている。撃つ動き（Shoot）は出ない
+            foreach (float seconds in new[] { 1f, 3f })
+            {
+                PlayerStun stun = player.GetComponent<PlayerStun>();
+                stun.Stun(seconds, false);
+                yield return WaitState(animator, "Fall", 0.3f);
+                yield return null;
+                AnimatorStateInfo fall = Info(animator);
+                // AN_Fall（2.1 秒）の 0.9 秒目から流すので、正規化時間はすぐ 0.4 を超えている
+                Assert.That(fall.normalizedTime, Is.GreaterThan(0.4f), "倒れるアニメーションの頭（撃つように見える構え）を飛ばしていない");
+
+                bool sawShoot = false;
+                float until = Time.realtimeSinceStartup + seconds + 1f;
+                while (State(animator) != "Rise" && Time.realtimeSinceStartup < until)
+                {
+                    sawShoot |= State(animator) == "Shoot";
+                    yield return null;
+                }
+                Assert.That(State(animator), Is.EqualTo("Rise"), "起き上がらない");
+                Assert.That(stun.IsStunned, Is.True, "スタンが終わってから起き上がり始めている");
+                float riseStartRemaining = stun.Remaining;
+
+                while (stun.IsStunned && Time.realtimeSinceStartup < until)
+                {
+                    sawShoot |= State(animator) == "Shoot";
+                    yield return null;
+                }
+                AnimatorStateInfo end = Info(animator);
+                string endState = State(animator);
+                Debug.Log($"[SweeperAnimationTests] スタン {seconds} 秒：起き上がり始め＝残り {riseStartRemaining:F2} 秒、スタンが終わった瞬間＝{endState} {end.normalizedTime:F2}");
+                Assert.That(sawShoot, Is.False, "スタン中に撃つ動きが出た");
+                Assert.That(endState == "Idle" || (endState == "Rise" && end.normalizedTime > 0.85f), Is.True,
+                    $"スタンが終わった瞬間に起き上がり終わっていない（{endState} {end.normalizedTime:F2}）");
+                yield return WaitState(animator, "Idle", 1f);
+            }
         }
         finally
         {
@@ -198,6 +229,12 @@ public class SweeperAnimationTests
     }
 
     private static readonly string[] Names = { "Idle", "Walk", "AimWalk", "Shoot", "Pull", "Throw", "Drop", "DropLoot", "Fall", "Rise" };
+
+    /// <summary>Animator がいまいる状態（移り変わり中なら行き先）。</summary>
+    private static AnimatorStateInfo Info(Animator animator)
+    {
+        return animator.IsInTransition(0) ? animator.GetNextAnimatorStateInfo(0) : animator.GetCurrentAnimatorStateInfo(0);
+    }
 
     /// <summary>Animator がいまいる状態の名前（移り変わり中なら行き先）。</summary>
     private static string State(Animator animator)

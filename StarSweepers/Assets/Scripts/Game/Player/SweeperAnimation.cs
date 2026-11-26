@@ -7,7 +7,7 @@ using UnityEngine;
 /// | いまの様子 | 流す状態 |
 /// | --- | --- |
 /// | 足場から落ちている | Drop（落ちる瞬間）→ DropLoot（落ちている間のくり返し。Animator の中でつながる） |
-/// | スタンしている | Fall（倒れる。終わったら倒れたポーズのまま）。スタンが解けたら Rise（起き上がる。流し切る）。2026/11/26 |
+/// | スタンしている | Fall（倒れる。頭の構えの部分は飛ばす）→ 倒れたまま → Rise（起き上がる）。**スタンが終わる瞬間に起き上がり終わる**よう、スタンの長さから逆算する。短いスタンでは速める。2026/11/26 |
 /// | 物資を両手で持っている | Throw（持ち上げて前へ投げる。投げ終わるまで流し切る） |
 /// | 物資を巻き取っている | Pull（くり返し） |
 /// | 光線を撃った | Shoot（終わったら AimWalk へ戻る） |
@@ -57,8 +57,28 @@ public class SweeperAnimation : MonoBehaviour
     [Tooltip("スタンしたときの状態（倒れる。2026/11/26）")]
     [SerializeField] private string stunState = "Fall";
 
-    [Tooltip("スタンが解けたときの状態（起き上がる。流し切る）")]
+    [Tooltip("スタンが解ける直前に流す状態（起き上がる。スタンが終わる瞬間に流し終わる）")]
     [SerializeField] private string riseState = "Rise";
+
+    [Tooltip("倒れる・起き上がるの再生の速さを渡す float のパラメーター名（スタンが短いと速くする）。空・無ければ渡さない")]
+    [SerializeField] private string stunSpeedParameter = "StunSpeed";
+
+    [Header("スタン（Fall → Rise。2026/11/26）")]
+    [Tooltip("倒れるアニメーション（AN_Fall）をこの秒から流す。頭の約 0.9 秒は銃を構えて腕を上げる動きで、撃つ動きに見えるため飛ばす")]
+    [Min(0f)]
+    [SerializeField] private float stunFallStart = 0.9f;
+
+    [Tooltip("上の秒から倒れきるまでの秒数（AN_Fall は 1.7 秒で倒れきる）。スタンの長さを、倒れる・起き上がるに分けるのに使う")]
+    [Min(0.01f)]
+    [SerializeField] private float stunFallSeconds = 0.8f;
+
+    [Tooltip("起き上がるアニメーション（AN_Rise）の長さ（秒）。スタンが終わる瞬間に流し終わるよう、この秒数だけ前から流す")]
+    [Min(0.01f)]
+    [SerializeField] private float stunRiseSeconds = 1f;
+
+    [Tooltip("スタンが短いときに速める上限（倍）")]
+    [Min(1f)]
+    [SerializeField] private float stunMaxSpeed = 4f;
 
     [Tooltip("歩く速さを渡す float のパラメーター名。空・無ければ渡さない")]
     [SerializeField] private string speedParameter = "Speed";
@@ -127,11 +147,21 @@ public class SweeperAnimation : MonoBehaviour
 
     private int shootHash;
     private int throwHash;
-    private int riseHash;
     private int speedHash;
     private int aimSpeedHash;
     private bool hasSpeed;
     private bool hasAimSpeed;
+    private int stunSpeedHash;
+    private bool hasStunSpeed;
+
+    /// <summary>このスタンの、倒れる・起き上がるの再生の速さ（倍）。スタンが「倒れる＋起き上がる」より短いと 1 より大きい。</summary>
+    private float stunPlaySpeed = 1f;
+
+    /// <summary>スタンの残りがこの秒数を切ったら起き上がり始める（起き上がりの長さ ÷ 速さ）。</summary>
+    private float stunRiseAt;
+
+    /// <summary>前のフレームのスタンの残り（重ねてスタンして伸びたのに気づくため）。</summary>
+    private float lastStunRemaining;
 
     private void Awake()
     {
@@ -150,12 +180,12 @@ public class SweeperAnimation : MonoBehaviour
         groundY = lastY = transform.position.y;
         shootHash = Animator.StringToHash(shootState);
         throwHash = Animator.StringToHash(throwState);
-        riseHash = Animator.StringToHash(riseState);
 
         if (animator != null)
         {
             hasSpeed = HasFloat(speedParameter, out speedHash);
             hasAimSpeed = HasFloat(aimSpeedParameter, out aimSpeedHash);
+            hasStunSpeed = HasFloat(stunSpeedParameter, out stunSpeedHash);
             leftHand = FindChild(animator.transform, leftHandBone);
             rightHand = FindChild(animator.transform, rightHandBone);
         }
@@ -232,17 +262,18 @@ public class SweeperAnimation : MonoBehaviour
         UpdateFalling();
 
         bool stunned = stun != null && stun.IsStunned;
-        Mode want = falling ? Mode.Drop : stunned ? Mode.Stun : ReadCarrying() ? Mode.Throw : shotMode;
+        if (stunned)
+        {
+            PlanStun(stun.Remaining);
+        }
+        else
+        {
+            lastStunRemaining = 0f;
+        }
 
-        // スタンが解けたら起き上がる。起き上がりは流し切る（落ちた・スタンし直した・撃ち始めたときは切り替える）
-        if (current == Mode.Stun && want == Mode.Move)
-        {
-            want = Mode.Rise;
-        }
-        if (current == Mode.Rise && want == Mode.Move && IsPlaying(riseHash))
-        {
-            want = Mode.Rise;
-        }
+        // スタン中：残りが「起き上がりの長さ」を切るまでは倒れる、切ったら起き上がる（スタンが終わる瞬間に立ち上がり終わる）
+        Mode stunMode = stunned && stun.Remaining > stunRiseAt ? Mode.Stun : Mode.Rise;
+        Mode want = falling ? Mode.Drop : stunned ? stunMode : ReadCarrying() ? Mode.Throw : shotMode;
 
         // 投げる動きは、持ち終わっても振り切るまで流す（落ちた・次を撃ったときは切り替える）
         if (current == Mode.Throw && want == Mode.Move && IsPlaying(throwHash))
@@ -271,7 +302,7 @@ public class SweeperAnimation : MonoBehaviour
         switch (mode)
         {
             case Mode.Drop: Play(dropState); break;
-            case Mode.Stun: Play(stunState); break;
+            case Mode.Stun: Play(stunState, stunFallStart); break;
             case Mode.Rise: Play(riseState); break;
             case Mode.Throw: Play(throwState); break;
             case Mode.Pull: Play(pullState); break;
@@ -369,8 +400,30 @@ public class SweeperAnimation : MonoBehaviour
         return state.shortNameHash == hash && state.normalizedTime >= 1f;
     }
 
+    /// <summary>
+    /// スタンの長さから、倒れる・起き上がるの速さと、起き上がり始める時刻を決める。スタンし始めた・重ねて伸びたときだけ決め直す。
+    /// 「倒れる（Stun Fall Seconds）＋起き上がる（Stun Rise Seconds）」よりスタンが短ければ、その割合で速める。
+    /// </summary>
+    private void PlanStun(float remaining)
+    {
+        bool started = remaining > lastStunRemaining + 0.01f;
+        lastStunRemaining = remaining;
+        if (!started)
+        {
+            return;
+        }
+
+        float need = stunFallSeconds + stunRiseSeconds;
+        stunPlaySpeed = Mathf.Clamp(need / Mathf.Max(0.01f, remaining), 1f, stunMaxSpeed);
+        stunRiseAt = stunRiseSeconds / stunPlaySpeed;
+        if (hasStunSpeed)
+        {
+            animator.SetFloat(stunSpeedHash, stunPlaySpeed);
+        }
+    }
+
     /// <summary>その名前の状態があれば切り替える。切り替えたら true。</summary>
-    private bool Play(string stateName)
+    private bool Play(string stateName, float startSeconds = 0f)
     {
         if (animator == null || !animator.isActiveAndEnabled || string.IsNullOrEmpty(stateName))
         {
@@ -383,7 +436,7 @@ public class SweeperAnimation : MonoBehaviour
             return false;
         }
 
-        animator.CrossFadeInFixedTime(hash, crossFade, 0, 0f);
+        animator.CrossFadeInFixedTime(hash, crossFade, 0, startSeconds);
         return true;
     }
 

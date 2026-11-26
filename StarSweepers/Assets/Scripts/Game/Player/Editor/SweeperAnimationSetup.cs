@@ -42,6 +42,7 @@ public static class SweeperAnimationSetup
 
         EnsureFloat(controller, "Speed");
         EnsureFloat(controller, "AimSpeed");
+        EnsureFloat(controller, "StunSpeed", 1f);
 
         AnimatorStateMachine machine = controller.layers[0].stateMachine;
         foreach (ChildAnimatorState child in machine.states.ToArray())
@@ -85,6 +86,13 @@ public static class SweeperAnimationSetup
         made["AimWalk"].speedParameterActive = true;
         made["AimWalk"].speedParameter = "AimSpeed";
 
+        // 倒れる・起き上がる：スタンが短いと速める（SweeperAnimation が StunSpeed を渡す）
+        foreach (string name in new[] { "Fall", "Rise" })
+        {
+            made[name].speedParameterActive = true;
+            made[name].speedParameter = "StunSpeed";
+        }
+
         // 落ちる瞬間（Drop）が終わったら、落ちている間のくり返し（DropLoot）へ
         AnimatorStateTransition next = made["Drop"].AddTransition(made["DropLoot"]);
         next.hasExitTime = true;
@@ -97,11 +105,11 @@ public static class SweeperAnimationSetup
         Debug.Log($"[Animation] {ControllerPath} に {made.Count} 個の状態を並べ直しました。");
     }
 
-    private static void EnsureFloat(AnimatorController controller, string name)
+    private static void EnsureFloat(AnimatorController controller, string name, float defaultValue = 0f)
     {
         if (controller.parameters.All(p => p.name != name))
         {
-            controller.AddParameter(name, AnimatorControllerParameterType.Float);
+            controller.AddParameter(new AnimatorControllerParameter { name = name, type = AnimatorControllerParameterType.Float, defaultFloat = defaultValue });
         }
     }
 
