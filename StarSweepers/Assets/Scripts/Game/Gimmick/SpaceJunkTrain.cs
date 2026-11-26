@@ -152,6 +152,8 @@ public class SpaceJunkTrain : MonoBehaviour
             body.gameObject.SetActive(running);
         }
 
+        PlayWarningSound(index, interval, sinceStart, running);
+
         if (!running)
         {
             return;
@@ -161,6 +163,13 @@ public class SpaceJunkTrain : MonoBehaviour
         {
             runIndex = index;
             hitThisRun.Clear();
+
+            // 走り始めた音（走り終わるまでの秒数で切る）。シーンを開いたときにもう走っていたら鳴らさない
+            float runSeconds = halfLength * 2f / Mathf.Max(0.1f, Mathf.Abs(moveSpeed));
+            if (sinceStart < 0.5f)
+            {
+                GameAudio.PlaySe(GameSe.TrainPass, runSeconds);
+            }
         }
 
         // 北（＋Z）から南へ走るなら +1 → -1 へ、南から北なら -1 → +1 へ
@@ -172,6 +181,26 @@ public class SpaceJunkTrain : MonoBehaviour
         body.rotation = Quaternion.LookRotation(runDirection, Vector3.up);
 
         HitAround(runDirection);
+    }
+
+    /// <summary>列車が来る何秒前から警告音を鳴らすか。</summary>
+    private const float WarningSoundSeconds = 3f;
+
+    /// <summary>警告音を鳴らした回（同じ回で二度鳴らさない）。</summary>
+    private long warnedIndex = long.MinValue;
+
+    /// <summary>次の回の列車が来る <see cref="WarningSoundSeconds"/> 秒前に、来るまでの間だけ警告音を鳴らす。</summary>
+    private void PlayWarningSound(long index, float interval, float sinceStart, bool running)
+    {
+        long next = index + 1;
+        float untilNext = interval - sinceStart;
+        if (running || warnedIndex == next || !RunsInCycle(next) || untilNext > WarningSoundSeconds)
+        {
+            return;
+        }
+
+        warnedIndex = next;
+        GameAudio.PlaySe(GameSe.TrainWarning, untilNext);
     }
 
     /// <summary>この回の列車が、北から南へ走るか。</summary>

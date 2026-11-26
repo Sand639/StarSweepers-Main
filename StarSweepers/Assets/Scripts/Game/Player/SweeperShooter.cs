@@ -914,11 +914,13 @@ public class SweeperShooter : MonoBehaviour
 
             case ShotPhase.Charging:
                 animationPlayer?.PlayAim();
+                GameAudio.PlaySe(GameSe.PlayerAim);
                 break;
 
             case ShotPhase.Extending:
                 beam?.SetColor(IdleColor);
                 animationPlayer?.PlayShoot();
+                GameAudio.PlaySe(GameSe.PlayerShoot);
                 break;
 
             case ShotPhase.Reeling:
@@ -972,6 +974,7 @@ public class SweeperShooter : MonoBehaviour
             }
         }
         animationPlayer?.PlayAim();
+        GameAudio.PlaySe(GameSe.PlayerAim);
     }
 
     private void UpdateCharge(bool released, bool stunned)
@@ -1039,6 +1042,7 @@ public class SweeperShooter : MonoBehaviour
         }
 
         animationPlayer?.PlayShoot();
+        GameAudio.PlaySe(GameSe.PlayerShoot);
     }
 
     private void UpdateExtend()
@@ -1132,6 +1136,7 @@ public class SweeperShooter : MonoBehaviour
 
         beam?.SetColor(IdleColor);
         animationPlayer?.PlayShoot();
+        GameAudio.PlaySe(GameSe.PlayerShoot);
     }
 
     /// <summary>出している間：先を伸ばし、しならせ、光線のどこかが物資に触れたらつかむ。時間が来たら（離したら）戻り始める。</summary>

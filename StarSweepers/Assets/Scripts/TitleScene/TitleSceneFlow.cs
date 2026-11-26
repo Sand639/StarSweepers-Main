@@ -94,7 +94,7 @@ public class TitleSceneFlow : MonoBehaviour
     /// </summary>
     private void MoveEveryoneToLobbyIfHosting(string activeScene, NetworkManager manager)
     {
-        if (activeScene != TitleScreen.TitleSceneName)
+        if (activeScene != TitleScreen.TitleSceneName && activeScene != StarSweepersTitlePresentation.SceneName)
         {
             // タイトルを離れたら印を戻す。次にタイトルへ戻ってきたとき、また指示を出せるように
             lobbyLoadRequested = false;

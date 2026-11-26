@@ -18,6 +18,7 @@ public partial class GravityGlassFloor
         CrackPattern pattern = BuildCracks(box.ClosestPoint(blastCenter), append: true, startAtEdge: true);
         pattern.Progress = 1f;
         RevealPattern(pattern);
+        GameAudio.PlaySe(GameSe.GlassCrack);
 
         blastHits++;
         if (blastHits >= blastHitsToBreak)
@@ -39,6 +40,7 @@ public partial class GravityGlassFloor
 
         State = FloorState.Cracked;
         BreakRemaining = secondsUntilBreak;
+        GameAudio.PlaySe(GameSe.GlassCrack);
 
         BuildCracks(from);
 
