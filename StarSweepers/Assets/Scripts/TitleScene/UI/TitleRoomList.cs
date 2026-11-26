@@ -216,6 +216,7 @@ public class TitleRoomList
         parts.SetSelectedLook(TitleButtonAction.ToggleSearchPublic, searchPublic);
         parts.SetSelectedLook(TitleButtonAction.ToggleSearchFriends, searchFriends);
         parts.SetSelectedLook(TitleButtonAction.ToggleSearchNoPassword, searchNoPassword);
+        parts.SetActive(TitlePartRole.SearchNoPasswordCheckIcon, searchNoPassword);
     }
 
     /// <summary>検索欄の文字（前後の空白と「#」を除き、大文字にそろえる）。</summary>

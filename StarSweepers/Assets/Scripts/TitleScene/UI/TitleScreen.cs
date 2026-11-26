@@ -266,6 +266,11 @@ public class TitleScreen : MonoBehaviour
             case TitleButtonAction.SetPublic: createRoom.SetPrivate(false); break;
             case TitleButtonAction.SetPrivate: createRoom.SetPrivate(true); break;
             case TitleButtonAction.SetLan: createRoom.SetLan(); break;
+            case TitleButtonAction.UseInternet: createRoom.SetInternet(); break;
+            case TitleButtonAction.SetPlayerLimit2: createRoom.SetMaxPlayers(2); break;
+            case TitleButtonAction.SetPlayerLimit4: createRoom.SetMaxPlayers(4); break;
+            case TitleButtonAction.SetPlayerLimit6: createRoom.SetMaxPlayers(6); break;
+            case TitleButtonAction.SetPlayerLimit8: createRoom.SetMaxPlayers(8); break;
 
             case TitleButtonAction.TabSound: settings.ShowTab(TitleSettingsPage.Tab.Sound); break;
             case TitleButtonAction.TabGraphics: settings.ShowTab(TitleSettingsPage.Tab.Graphics); break;

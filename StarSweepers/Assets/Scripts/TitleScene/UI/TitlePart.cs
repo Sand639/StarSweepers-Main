@@ -108,6 +108,7 @@ public enum TitlePartRole
     // タブレット（2026/10/27）：マルチプレイ・部屋を探す・部屋を作るの枠（開くときに右から出てくる）と、右下の操作の案内
     TabletPanel = 93,
     TabletHint = 94,
+    SearchNoPasswordCheckIcon = 95,
 }
 
 /// <summary>

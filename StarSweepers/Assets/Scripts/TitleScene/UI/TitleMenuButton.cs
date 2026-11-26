@@ -77,6 +77,10 @@ public enum TitleButtonAction
     // 部屋を探す（2026/10/22）：「募集中の部屋」の ⟳（すぐ取り直す）と、■パスワード不要
     RefreshRoomList = 57,
     ToggleSearchNoPassword = 58,
+    SetPlayerLimit2 = 59,
+    SetPlayerLimit4 = 60,
+    SetPlayerLimit6 = 61,
+    SetPlayerLimit8 = 62,
 }
 
 /// <summary>
