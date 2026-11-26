@@ -22,6 +22,12 @@ public class TitleScreenTheme : ScriptableObject
     [Tooltip("ボタンの画像（マウスが重なった・コントローラーで選んだとき）。空ならふだんの画像を色だけ変える")]
     public Sprite buttonHover;
 
+    [Tooltip("選択中も重なったときの画像を使う")]
+    public bool useHoverSpriteWhenSelected;
+
+    [Tooltip("マウスが重なったときだけ見た目を変える")]
+    public bool pointerHighlightOnly;
+
     [Header("ボタンの色")]
     [Tooltip("ボタンの色（画像があれば、画像にこの色を掛ける）")]
     public Color buttonColor = new Color(0.10f, 0.12f, 0.12f, 0.92f);

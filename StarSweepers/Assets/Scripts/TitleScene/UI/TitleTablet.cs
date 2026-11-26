@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.InputSystem;
@@ -8,16 +9,19 @@ using UnityEngine.UI;
 public class TitleTablet
 {
     private const float SlideSeconds = 0.25f;
+    private const float NotebookOpenSeconds = 0.55f;
+    private const float NotebookCloseSeconds = 0.42f;
 
     /// <summary>出てくる前に右へずらしておく距離（1920×1080 のときのピクセル）。</summary>
     private const float SlideDistance = 900f;
 
     private readonly StarSweepersTitlePresentation presentation;
+    private RectTransform currentPanel;
     private RectTransform sliding;
-    private float slideTime;
-
-    /// <summary>タブレットの枠の、ずらす前の位置。</summary>
-    private readonly Dictionary<RectTransform, Vector2> home = new Dictionary<RectTransform, Vector2>();
+    private float progress;
+    private Vector2 restingPosition;
+    private Quaternion restingRotation;
+    private Action afterRetraction;
 
     /// <summary>右下の操作の案内（タブレットの画面ごとにある）。</summary>
     private readonly List<Text> hints = new List<Text>();
@@ -27,6 +31,7 @@ public class TitleTablet
 
     /// <summary>タブレットが開いているか。</summary>
     public bool IsOpen { get; private set; }
+    public bool IsClosing => afterRetraction != null;
 
     /// <summary>root の下の操作の案内を全部集める。</summary>
     public TitleTablet(GameObject root)
@@ -47,23 +52,43 @@ public class TitleTablet
     {
         FinishSlide();
         bool opening = tabletPage && !IsOpen;
+        currentPanel = tabletPage && page != null ? PanelOf(page) : null;
         if (presentation != null)
         {
             presentation.ShowPage(tabletPage, opening);
         }
 
-        if (opening)
+        if (opening && currentPanel != null)
         {
-            StartSlide(page);
+            StartSlide(0f);
         }
 
         IsOpen = tabletPage;
+    }
+
+    public bool TryRetract(Action onClosed)
+    {
+        if (presentation == null || currentPanel == null || IsClosing)
+        {
+            return false;
+        }
+
+        if (sliding == null)
+        {
+            StartSlide(1f);
+        }
+
+        afterRetraction = onClosed;
+        presentation.PlayRetractionSwing();
+        return true;
     }
 
     /// <summary>タブレットを閉じた扱いにする（画面が消えるとき）。</summary>
     public void Close()
     {
         FinishSlide();
+        afterRetraction = null;
+        currentPanel = null;
         IsOpen = false;
     }
 
@@ -75,22 +100,13 @@ public class TitleTablet
     }
 
     /// <summary>その画面のタブレットの枠を右へずらし、元の位置へ動かし始める。</summary>
-    private void StartSlide(GameObject page)
+    private void StartSlide(float startingProgress)
     {
-        RectTransform panel = page != null ? PanelOf(page) : null;
-        if (panel == null)
-        {
-            return;
-        }
-
-        if (!home.ContainsKey(panel))
-        {
-            home[panel] = panel.anchoredPosition;
-        }
-
-        sliding = panel;
-        slideTime = 0f;
-        PlaceSlide(0f);
+        sliding = currentPanel;
+        restingPosition = sliding.anchoredPosition;
+        restingRotation = sliding.localRotation;
+        progress = startingProgress;
+        PlaceSlide();
     }
 
     /// <summary>出てくる途中の枠を、少しずつ元の位置へ動かす。</summary>
@@ -101,32 +117,33 @@ public class TitleTablet
             return;
         }
 
-        slideTime += Time.unscaledDeltaTime;
-        float seconds = presentation != null ? StarSweepersTitlePresentation.NotebookSlideSeconds : SlideSeconds;
-        float t = Mathf.Clamp01(slideTime / seconds);
-        if (t >= 1f)
+        float target = IsClosing ? 0f : 1f;
+        float seconds = IsClosing ? NotebookCloseSeconds : presentation != null ? NotebookOpenSeconds : SlideSeconds;
+        progress = Mathf.MoveTowards(progress, target, Time.unscaledDeltaTime / seconds);
+        if (progress == target)
         {
+            Action callback = afterRetraction;
+            afterRetraction = null;
             FinishSlide();
+            callback?.Invoke();
             return;
         }
 
-        PlaceSlide(t);
+        PlaceSlide();
     }
 
-    private void PlaceSlide(float t)
+    private void PlaceSlide()
     {
-        float remaining = (1f - t) * (1f - t) * (1f - t);
-        Vector2 restingPosition = home[sliding];
+        float remaining = (1f - progress) * (1f - progress) * (1f - progress);
         if (presentation == null)
         {
             sliding.anchoredPosition = restingPosition + Vector2.right * (SlideDistance * remaining);
             return;
         }
 
-        float height = -160f * remaining + 36f * Mathf.Sin(t * Mathf.PI);
+        float height = -160f * remaining + 36f * Mathf.Sin(progress * Mathf.PI);
         sliding.anchoredPosition = restingPosition + new Vector2(1480f * remaining, height);
-        sliding.localRotation = Quaternion.Euler(0f, 0f,
-            StarSweepersTitlePresentation.NotebookAngle - 19f * remaining);
+        sliding.localRotation = restingRotation * Quaternion.AngleAxis(-19f * remaining, Vector3.forward);
     }
 
     /// <summary>出てくる途中の枠を、すぐ元の位置に置く。</summary>
@@ -134,7 +151,8 @@ public class TitleTablet
     {
         if (sliding != null)
         {
-            PlaceSlide(1f);
+            sliding.anchoredPosition = restingPosition;
+            sliding.localRotation = restingRotation;
             sliding = null;
         }
     }

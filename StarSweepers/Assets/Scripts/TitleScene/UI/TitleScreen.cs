@@ -123,11 +123,6 @@ public class TitleScreen : MonoBehaviour
 
         initialized = true;
 
-        if (TryGetComponent(out StarSweepersTitlePresentation presentation))
-        {
-            presentation.Build();
-        }
-
         if (useOsJapaneseFont)
         {
             ApplyJapaneseFont();
@@ -208,7 +203,9 @@ public class TitleScreen : MonoBehaviour
         Text version = parts.Text(TitlePartRole.VersionText);
         if (version != null)
         {
-            version.text = version.text.Replace("{version}", Application.version);
+            version.text = GetComponent<StarSweepersTitlePresentation>() != null
+                ? $"version - {Application.version}"
+                : version.text.Replace("{version}", Application.version);
         }
     }
 
@@ -219,6 +216,11 @@ public class TitleScreen : MonoBehaviour
     /// <summary>ボタンを押したときの入口。Action ごとに係へ振り分ける。</summary>
     private void Do(TitleButtonAction action)
     {
+        if (tablet.IsClosing)
+        {
+            return;
+        }
+
         switch (action)
         {
             case TitleButtonAction.QuickPlay: quickPlay.Begin(); break;
@@ -314,6 +316,11 @@ public class TitleScreen : MonoBehaviour
     /// <summary>1つ前の画面へ戻る（参加の確認の窓が開いていれば、窓を閉じるだけ）。</summary>
     private void GoBack()
     {
+        if (tablet.IsClosing)
+        {
+            return;
+        }
+
         if (joinDialog.IsOpen)
         {
             joinDialog.Close();
@@ -323,6 +330,12 @@ public class TitleScreen : MonoBehaviour
         switch (current)
         {
             case Page.MultiMenu:
+                if (!tablet.TryRetract(() => ShowPage(Page.Main)))
+                {
+                    ShowPage(Page.Main);
+                }
+
+                break;
             case Page.Settings:
                 ShowPage(Page.Main);
                 break;

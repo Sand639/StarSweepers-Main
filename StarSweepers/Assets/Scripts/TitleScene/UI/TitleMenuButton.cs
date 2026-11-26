@@ -129,7 +129,6 @@ public class TitleMenuButton : MonoBehaviour,
 
     /// <summary>「選ばれている」見た目にしているか（タブ・切り替えボタン用。<see cref="SetSelectedLook"/>）。</summary>
     private bool selectedLook;
-    private bool usePresentationTheme;
 
     /// <summary>Resources から読んだ共通のテーマ。全部のボタンで1つを使い回す。</summary>
     private static TitleScreenTheme defaultTheme;
@@ -139,14 +138,6 @@ public class TitleMenuButton : MonoBehaviour,
 
     /// <summary>ボタンの文字（「満員」などに書き換えるとき用）。</summary>
     public Text Label => label;
-
-    public void ApplyPresentationTheme(TitleScreenTheme presentationTheme, float scale = 1f)
-    {
-        theme = presentationTheme;
-        usePresentationTheme = true;
-        highlightScale = scale;
-        Refresh();
-    }
 
     private TitleScreenTheme Theme
     {
@@ -281,10 +272,11 @@ public class TitleMenuButton : MonoBehaviour,
 
         // highlighted … マウスか十字キーで指されている（重なり用の画像に変わる）
         // emphasized  … それに加えて「選ばれている」見た目も含む（色・文字・ふちが変わる）
-        bool highlighted = pointerOver || selectedByNavigation;
-        bool emphasized = highlighted || selectedLook;
+        bool highlighted = pointerOver || (!look.pointerHighlightOnly && selectedByNavigation);
+        bool selected = !look.pointerHighlightOnly && selectedLook;
+        bool emphasized = highlighted || selected;
 
-        bool useHoverSprite = highlighted || (usePresentationTheme && selectedLook);
+        bool useHoverSprite = highlighted || (look.useHoverSpriteWhenSelected && selected);
         Sprite sprite = useHoverSprite && look.buttonHover != null ? look.buttonHover : look.button;
         background.sprite = sprite;
 
