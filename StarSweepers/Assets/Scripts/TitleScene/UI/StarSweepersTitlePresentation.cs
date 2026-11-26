@@ -243,10 +243,13 @@ public sealed class StarSweepersTitlePresentation : MonoBehaviour
             Place(Picture("Hand", panel, hand).rectTransform, TopLeft,
                 new Vector2(801f, -562f), new Vector2(409f, 431f), TopLeft);
 
-            RawImage charm = Picture("Keychain", panel, keychain);
+            Image charm = new GameObject("Keychain", typeof(RectTransform), typeof(Image)).GetComponent<Image>();
+            charm.rectTransform.SetParent(panel, false);
+            charm.sprite = MakeSprite(keychain);
+            // 透明な余白では、奥にある部屋のボタンを押せるようにする。
+            charm.alphaHitTestMinimumThreshold = 0.15f;
             Vector2 anchor = new Vector2(0.61f, 0.91f);
             Place(charm.rectTransform, TopLeft, new Vector2(51f, -266f), new Vector2(223f, 325f), anchor);
-            charm.raycastTarget = true;
             Button swing = charm.gameObject.AddComponent<Button>();
             swing.navigation = new Navigation { mode = Navigation.Mode.None };
             swing.transition = Selectable.Transition.None;
@@ -272,7 +275,7 @@ public sealed class StarSweepersTitlePresentation : MonoBehaviour
 
         if (role == TitlePartRole.PageMulti)
         {
-            ImagePart("RoomListWell", board, roomWell, new Vector2(37f, -164f), new Vector2(854f, 589f)).SetAsFirstSibling();
+            StyleRoomList(board, roomTheme.button);
         }
 
         foreach (Transform child in board)
@@ -302,9 +305,19 @@ public sealed class StarSweepersTitlePresentation : MonoBehaviour
                     PlaceMenuButton(item, roomTheme, -541f, new Vector2(594f, 126f), 44);
                     break;
                 case TitleButtonAction.JoinListedServer:
-                case TitleButtonAction.RefreshRoomList:
                 case TitleButtonAction.CreateServer:
+                case TitleButtonAction.SetPublic:
+                case TitleButtonAction.SetPrivate:
+                case TitleButtonAction.SetLan:
+                case TitleButtonAction.ToggleSearchPublic:
+                case TitleButtonAction.ToggleSearchFriends:
+                case TitleButtonAction.ToggleSearchNoPassword:
                     item.ApplyPresentationTheme(roomTheme);
+                    break;
+                case TitleButtonAction.RefreshRoomList:
+                    Place((RectTransform)item.transform, new Vector2(1f, 1f), new Vector2(-58f, -107f),
+                        new Vector2(84f, 50f), new Vector2(1f, 1f));
+                    item.ApplyPresentationTheme(quickTheme);
                     break;
                 case TitleButtonAction.Back:
                     item.Label.text = string.Empty;
@@ -324,6 +337,27 @@ public sealed class StarSweepersTitlePresentation : MonoBehaviour
                     new Vector2(425f, 40f), new Vector2(1f, 0f));
             }
         }
+    }
+
+    private void StyleRoomList(RectTransform board, Sprite searchBackground)
+    {
+        ImagePart("SearchHeader", board, matchWell, new Vector2(37f, -91f), new Vector2(854f, 80f)).SetAsFirstSibling();
+        ImagePart("RoomListWell", board, roomWell, new Vector2(37f, -177f), new Vector2(854f, 576f)).SetAsFirstSibling();
+        foreach (TitleInput input in board.GetComponentsInChildren<TitleInput>(true))
+        {
+            if (input.Kind == TitleInputKind.PrivateCode)
+            {
+                Image field = input.GetComponent<Image>();
+                field.sprite = searchBackground;
+                field.color = new Color32(153, 149, 146, 255);
+            }
+        }
+
+        // ノートと一緒に傾く一覧は、画面の縦横に沿って切る RectMask2D では切れ方がずれる。
+        RectTransform viewport = board.GetComponentInChildren<ScrollRect>(true).viewport;
+        viewport.GetComponent<RectMask2D>().enabled = false;
+        viewport.gameObject.AddComponent<Image>();
+        viewport.gameObject.AddComponent<Mask>().showMaskGraphic = false;
     }
 
     private static void PlaceMenuButton(TitleMenuButton item, TitleScreenTheme theme, float top, Vector2 size, int fontSize)
