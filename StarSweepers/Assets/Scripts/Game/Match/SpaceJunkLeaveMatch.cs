@@ -18,20 +18,20 @@ using UnityEngine.SceneManagement;
 /// </summary>
 public static class SpaceJunkLeaveMatch
 {
-    /// <summary>自分だけ抜けたときに戻るタイトルのシーン（2026/10/6）。</summary>
-    private const string TitleSceneName = "TitleScene";
-
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
     private static void Register()
     {
         PauseMenu.CanReturnToLobby = () => SpaceJunkRound.Current != null;
         PauseMenu.ReturnToLobby = ReturnToLobby;
 
-        // つながっていて、タイトル以外（ロビー・試合）にいる間は「タイトルにもどる」を出す（2026/10/6）
+        // ロビーや試合からタイトルへ戻れる。ステージをエディターで直接開いた場合も出す。
         PauseMenu.CanReturnToTitle = () =>
         {
             NetworkManager manager = NetworkManager.Singleton;
-            return manager != null && manager.IsListening && SceneManager.GetActiveScene().name != TitleSceneName;
+            string activeScene = SceneManager.GetActiveScene().name;
+            return activeScene != TitleScreen.TitleSceneName &&
+                   ((manager != null && manager.IsListening) || activeScene == TitleScreen.LobbySceneName ||
+                    Object.FindFirstObjectByType<SpaceJunkRound>() != null);
         };
         PauseMenu.ReturnToTitle = ReturnToTitle;
     }
@@ -57,7 +57,7 @@ public static class SpaceJunkLeaveMatch
             await Disconnect(manager);
         }
 
-        SceneManager.LoadScene(TitleSceneName, LoadSceneMode.Single);
+        SceneManager.LoadScene(TitleScreen.TitleSceneName, LoadSceneMode.Single);
     }
 
     /// <summary>試合から抜けて、ロビーへ戻る。</summary>
@@ -70,7 +70,7 @@ public static class SpaceJunkLeaveMatch
         {
             if (manager.IsServer)
             {
-                // ホスト：全員でロビーへ戻る（試合が終わったときと同じ戻り方）
+                // ホスト：モニターの演出を出し、全員でロビーへ戻る。
                 if (session != null && session.ServerReturnToLobby())
                 {
                     Debug.Log("[JUNK] ホストがポーズ画面から試合を打ち切りました。全員でロビーへ戻ります。");
@@ -86,8 +86,8 @@ public static class SpaceJunkLeaveMatch
         }
 
         // 自分だけ抜けたので、タイトルへ戻る（2026/10/6 まではロビーへ戻っていた。サーバーを作る・探すはタイトルで行うため）
-        Debug.Log($"[JUNK] 試合から抜けて、タイトル（{TitleSceneName}）へ戻ります。");
-        SceneManager.LoadScene(TitleSceneName, LoadSceneMode.Single);
+        Debug.Log($"[JUNK] 試合から抜けて、タイトル（{TitleScreen.TitleSceneName}）へ戻ります。");
+        SceneManager.LoadScene(TitleScreen.TitleSceneName, LoadSceneMode.Single);
     }
 
     /// <summary>

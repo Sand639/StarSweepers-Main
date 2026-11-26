@@ -19,8 +19,8 @@ public partial class SpaceJunkSession
     public void ServerStartMatch()
     {
         LobbyTestDeparture departure = LobbyTestDeparture.Current;
-        if (!IsServer ||
-            (departure != null && (State != SpaceJunkMatchState.Lobby || TestBoardingTime <= 0 ||
+        if (!IsServer || State != SpaceJunkMatchState.Lobby ||
+            (departure != null && (TestBoardingTime <= 0 ||
                                    NetworkManager.ServerTime.Time < TestBoardingTime + departure.Duration)))
         {
             return;
@@ -36,6 +36,12 @@ public partial class SpaceJunkSession
             return;
         }
 
+        // 全員の画面をモニターに引いてから、マップへ移る。
+        if (!SceneTransition.PlayForEveryone(LoadNextMap, SceneTransitionType.Monitor))
+        {
+            return;
+        }
+
         for (int i = 0; i < roundWins.Count; i++)
         {
             roundWins[i] = 0;
@@ -45,9 +51,6 @@ public partial class SpaceJunkSession
         lastRoundWinner.Value = -1;
         matchWinner.Value = -1;
         state.Value = SpaceJunkMatchState.Playing;
-
-        // 全員の画面をトランジションで覆ってから、マップへ移る
-        SceneTransition.PlayForEveryone(LoadNextMap);
     }
 
     /// <summary>
@@ -160,7 +163,7 @@ public partial class SpaceJunkSession
                 state.Value = SpaceJunkMatchState.Lobby;
                 currentRound.Value = 0;
                 LoadScene(lobbySceneName);
-            }, SceneTransitionType.RoundedStripes))
+            }, SceneTransitionType.Monitor))
             {
                 yield break;
             }
@@ -221,19 +224,40 @@ public partial class SpaceJunkSession
     public string LobbySceneName => lobbySceneName;
 
     /// <summary>
-    /// **ポーズ画面の「ロビーに戻る」をホストが押したとき。** 試合を打ち切って、全員をロビーへ戻す。
+    /// **ポーズ画面の「ロビーに戻る」をホストが押したとき。** モニターを通って全員をロビーへ戻す。
     /// ホストでなければ何もせず false（<see cref="SpaceJunkLeaveMatch"/> から呼ばれる）。
     /// </summary>
     public bool ServerReturnToLobby()
     {
-        if (!IsServer)
+        if (!IsSpawned || !IsServer)
         {
             return false;
         }
 
+        if (state.Value == SpaceJunkMatchState.Lobby)
+        {
+            return true;
+        }
+
         StopAllCoroutines();
-        AbortToLobby();
+        // 戻る途中にラウンドが終わっても、次のラウンドや結果表示を始めない。
+        roundResultActive = true;
+        StartCoroutine(ReturnToLobbyWithMonitor());
         return true;
+    }
+
+    private IEnumerator ReturnToLobbyWithMonitor()
+    {
+        // すでにシーンが切り替わり始めていれば、覆いが消えるのを待つ。
+        while (IsSpawned && IsServer && state.Value != SpaceJunkMatchState.Lobby)
+        {
+            if (!SceneTransition.IsPlaying && SceneTransition.PlayForEveryone(AbortToLobby, SceneTransitionType.Monitor))
+            {
+                yield break;
+            }
+
+            yield return null;
+        }
     }
 
     /// <summary>試合を打ち切って、全員をロビーへ戻す。</summary>

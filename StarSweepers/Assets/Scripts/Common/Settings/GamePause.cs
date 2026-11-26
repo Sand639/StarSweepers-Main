@@ -38,7 +38,7 @@ public static class GamePause
     /// 実際に、**ポーズ画面を閉じた瞬間に複製の下書きが消える／物が置かれる**という形で出る
     /// （`リスクリスト.md` 2026/9/14 登録）。1フレームだけ入力を捨てれば、この取り合いは起きない。
     /// </summary>
-    public static bool BlocksInput => IsPaused || ChangedThisFrame;
+    public static bool BlocksInput => IsPaused || ChangedThisFrame || SceneTransition.BlocksGameplayInput;
 
     /// <summary>
     /// 止める・動かすを切り替える。

@@ -9,7 +9,7 @@ using UnityEngine.UI;
 /// **タイトル画面のプレハブ（`Assets/Resources/TitleScreen.prefab`）を作るツール。**（2026/10/6・大槻さん
 /// 「プレハブで組み直して、エディタで配置もいじれるようにしてほしい」）
 ///
-/// ・プレハブが無いときは、Unity が読み込んだときに**自動で1回だけ作り**、TitleScene に置く
+/// ・プレハブが無いときは、Unity が読み込んだときに**自動で1回だけ作る**
 /// ・`Tools > StarSweepers > タイトル画面のプレハブを作り直す` で、最初の状態に作り直せる（**手で直した配置・画像・色は消える**）
 ///
 /// 部品は**決まった位置に置くだけ**（自動で並べる仕組みは、パブリックサーバーの一覧の中だけ）。
@@ -21,10 +21,10 @@ using UnityEngine.UI;
 /// ## 流れ
 ///
 /// 1. Unity がスクリプトを読み込むと <see cref="AutoBuildIfMissing"/> が動き、**エディタが落ち着いてから**（`EditorApplication.delayCall`）次のどれかをする
-///    ・プレハブが無い → <see cref="Build"/>（作って TitleScene に置く）
+///    ・プレハブが無い → <see cref="Build"/>（プレハブを作る）
 ///    ・版が 3 より古い → <see cref="Build"/>（作り直す。手で直した配置は消える）
 ///    ・版が 3 以上で <see cref="PrefabVersion"/> より古い → <see cref="Upgrade"/>（足りない部品だけを足す。手で直した配置は残る）
-/// 2. <see cref="Build"/> … 見えない作業用のシーンで <see cref="BuildRoot"/> が画面を丸ごと組み立て、プレハブに保存して、TitleScene に置く
+/// 2. <see cref="Build"/> … 見えない作業用のシーンで <see cref="BuildRoot"/> が画面を丸ごと組み立て、プレハブに保存する
 /// 3. <see cref="Upgrade"/> … 保存してあるプレハブを開き、古い版から1つずつ順に部品を足す・消す・組み替えて、版を書き換えて保存する
 ///
 /// ## 版を上げるとき
@@ -46,8 +46,6 @@ public static class TitleScreenPrefabBuilder
 
     /// <summary>背景の画像（Assets/Art/Sprites/title.png）。場所が変わっても見つかるように番号で探す。</summary>
     private const string BackgroundGuid = "0051ed586d64b7a409d1a5f3f40e6713";
-
-    private const string TitleSceneName = "TitleScene";
 
     // 見た目の初期値（作ったあとは、プレハブの中で直接変える）
     // 大きさ・位置の数字は、画面を 1920×1080 としたときのピクセル（<see cref="BuildRoot"/> の CanvasScaler）
@@ -1228,7 +1226,7 @@ public static class TitleScreenPrefabBuilder
         Build();
     }
 
-    /// <summary>プレハブを最初の状態で丸ごと作り（今あるものは上書き）、TitleScene に無ければ置く。</summary>
+    /// <summary>プレハブを最初の状態で丸ごと作り（今あるものは上書き）。</summary>
     private static void Build()
     {
         defaultFont = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
@@ -1255,74 +1253,6 @@ public static class TitleScreenPrefabBuilder
 
         Debug.Log($"[UI] タイトル画面のプレハブを作りました：{PrefabPath}\n" +
                   "ダブルクリックで開くと、ボタンや文字を自由に動かせます。");
-
-        PlaceInTitleScene(saved);
-    }
-
-    /// <summary>
-    /// TitleScene にタイトル画面が無ければ置く。
-    /// 開いていなければ開いて置いて保存し、閉じる。開いていて**まだ保存していない変更があれば、保存はしない**（メンバーの作業を勝手に保存しないため）。
-    /// </summary>
-    private static void PlaceInTitleScene(GameObject prefab)
-    {
-        string path = FindTitleScenePath();
-        if (path == null)
-        {
-            Debug.LogWarning("[UI] TitleScene が見つからないので、タイトル画面をシーンに置けませんでした。");
-            return;
-        }
-
-        Scene scene = SceneManager.GetSceneByPath(path);
-        bool openedHere = !scene.isLoaded;
-        if (openedHere)
-        {
-            scene = EditorSceneManager.OpenScene(path, OpenSceneMode.Additive);
-        }
-
-        foreach (GameObject rootObject in scene.GetRootGameObjects())
-        {
-            if (rootObject.GetComponentInChildren<TitleScreen>(true) != null)
-            {
-                if (openedHere)
-                {
-                    EditorSceneManager.CloseScene(scene, true);
-                }
-                return;
-            }
-        }
-
-        bool wasDirty = scene.isDirty;
-        PrefabUtility.InstantiatePrefab(prefab, scene);
-        EditorSceneManager.MarkSceneDirty(scene);
-
-        if (!wasDirty)
-        {
-            EditorSceneManager.SaveScene(scene);
-            Debug.Log($"[UI] TitleScene にタイトル画面を置いて保存しました：{path}");
-        }
-        else
-        {
-            Debug.LogWarning("[UI] TitleScene にタイトル画面を置きました。**シーンを保存してください**（ほかの変更があったので、自動では保存していません）。");
-        }
-
-        if (openedHere)
-        {
-            EditorSceneManager.CloseScene(scene, true);
-        }
-    }
-
-    private static string FindTitleScenePath()
-    {
-        foreach (string guid in AssetDatabase.FindAssets(TitleSceneName + " t:Scene"))
-        {
-            string path = AssetDatabase.GUIDToAssetPath(guid);
-            if (Path.GetFileNameWithoutExtension(path) == TitleSceneName)
-            {
-                return path;
-            }
-        }
-
-        return null;
     }
 
     // ------------------------------------------------------------

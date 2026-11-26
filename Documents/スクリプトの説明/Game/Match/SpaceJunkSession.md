@@ -67,3 +67,5 @@
 
 | 2026/11/19 | Codex | 結果演出の担当ファイル、同期と完了待ちの変数を追記 |
 | 2026/11/25 | Claude Code | `SpaceJunkSession.VictoryShowcase.cs`（勝利演出のメンバー紹介）を足し、ファイルの分け方・変数の置き場所・気をつけることに書き足した |
+| 2026/11/27 | Codex（依頼：ソウホイチョン） | `ServerStartMatch` と `ReturnToLobbyAfterDelay` でモニターを使う。`ShowVictoryAfterSavingResult` は勝利紹介の直前に結果の画を記録する |
+| 2026/11/27 | Codex（依頼：ソウホイチョン） | ホストの中断時は `ReturnToLobbyWithMonitor` で既存の演出が終わるのを待ってからモニターを開始する。画面を引き終えたら `AbortToLobby` でロビーを読む |

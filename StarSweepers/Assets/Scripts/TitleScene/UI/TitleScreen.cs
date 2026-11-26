@@ -13,7 +13,7 @@ using UnityEngine.UI;
 [DisallowMultipleComponent]
 public class TitleScreen : MonoBehaviour
 {
-    public const string TitleSceneName = "TitleScene";
+    public const string TitleSceneName = "StarSweepersTitle";
     public const string LobbySceneName = "Lobby";
 
     /// <summary>Resources の中の画面のプレハブの名前。</summary>
@@ -105,6 +105,7 @@ public class TitleScreen : MonoBehaviour
         }
 
         tablet.Update();
+        createRoom.Update();
 
         // つないでいる途中の表示が出ている間は戻らない（表示のボタンで閉じる）
         if (WasBackPressed() && !busy.IsShown)

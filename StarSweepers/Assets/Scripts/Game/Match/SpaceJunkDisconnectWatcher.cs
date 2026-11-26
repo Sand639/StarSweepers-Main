@@ -19,9 +19,6 @@ using UnityEngine.SceneManagement;
 /// </summary>
 public class SpaceJunkDisconnectWatcher : MonoBehaviour
 {
-    /// <summary>自分だけ抜けたときに戻るタイトルのシーン（2026/10/6）。</summary>
-    private const string TitleSceneName = "TitleScene";
-
     /// <summary>知らせを出しておく秒数。</summary>
     private const float MessageSeconds = 6f;
 
@@ -55,7 +52,7 @@ public class SpaceJunkDisconnectWatcher : MonoBehaviour
         // 試合中だけでなく、**ロビーにいる間も見張る**（2026/10/6。ホストが「タイトルにもどる」を選ぶと、
         // 参加者はホストとの通信が切れるので、ここで全員をタイトルへ戻す）
         bool clientInMatch = manager != null && manager.IsConnectedClient && !manager.IsServer &&
-                             SceneManager.GetActiveScene().name != TitleSceneName;
+                             SceneManager.GetActiveScene().name != TitleScreen.TitleSceneName;
 
         if (clientInMatch)
         {
@@ -95,7 +92,7 @@ public class SpaceJunkDisconnectWatcher : MonoBehaviour
             manager.Shutdown();
         }
 
-        SceneManager.LoadScene(TitleSceneName, LoadSceneMode.Single);
+        SceneManager.LoadScene(TitleScreen.TitleSceneName, LoadSceneMode.Single);
     }
 
     private void OnGUI()

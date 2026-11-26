@@ -52,6 +52,17 @@ public partial class SpaceJunkSession
     [ClientRpc]
     private void ShowVictoryShowcaseClientRpc(int id, int winner)
     {
+        StartCoroutine(ShowVictoryAfterSavingResult(id, winner));
+    }
+
+    private IEnumerator ShowVictoryAfterSavingResult(int id, int winner)
+    {
+        if (RoundResultPlayback.IsPresenting && !Application.isBatchMode)
+        {
+            yield return new WaitForEndOfFrame();
+            SceneTransition.SaveResultFrame();
+        }
+
         // 演出はいまのマップのシーンに作るので、ロビーへ切り替わると一緒に消える
         localVictoryShowcase = MatchVictoryShowcase.PlayNew(winner, MatchVictoryShowcase.CollectTeam(winner), () =>
         {

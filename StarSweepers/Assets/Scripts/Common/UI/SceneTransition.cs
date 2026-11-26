@@ -20,6 +20,9 @@ public class SceneTransition : MonoBehaviour
 
     /// <summary>ホストから参加者へ「画面を覆え」と知らせる通信のメッセージの名前。</summary>
     private const string CoverMessageName = "StarSweepers.SceneTransition.Cover";
+    private const string MonitorReadyMessageName = "StarSweepers.SceneTransition.MonitorReady";
+    private const float MonitorPullBackSeconds = 0.8f;
+    private const float MonitorPushInSeconds = 0.95f;
 
     /// <summary>読み込みで1フレームが長くなっても、演出が一気に進まないように抑える1フレームの長さ。</summary>
     private const float MaxStepSeconds = 1f / 30f;
@@ -57,6 +60,59 @@ public class SceneTransition : MonoBehaviour
     private bool playing;
     private bool sceneLoadedSinceCover;
     private CustomMessagingManager registeredMessaging;
+    private readonly HashSet<ulong> monitorWaitingClients = new HashSet<ulong>();
+    private int monitorTicket;
+    private int nextMonitorTicket;
+    private float monitorDeadline;
+    private bool monitorPlaying;
+    private Texture2D savedResultFrame;
+
+    /// <summary>勝利演出に入る直前の結果を、戻りのモニターに残す。フレームの描画後に呼ぶ。</summary>
+    public static void SaveResultFrame()
+    {
+        SceneTransition transition = GetOrCreate();
+        transition.DiscardResultFrame();
+        try
+        {
+            transition.savedResultFrame = MonitorTransitionEffect.CaptureScreen("MonitorResultFrame");
+        }
+        catch (Exception exception)
+        {
+            Debug.LogException(exception);
+        }
+    }
+
+    private void DiscardResultFrame()
+    {
+        if (savedResultFrame != null) Destroy(savedResultFrame);
+        savedResultFrame = null;
+    }
+
+    public static bool BlocksGameplayInput => Current != null && Current.monitorPlaying;
+    internal static bool IsPlaying => Current != null && Current.playing;
+
+    /// <summary>最初のラウンドの時計は、参加者全員の画面が開いてから始める。</summary>
+    public static bool MonitorHandoffPending
+    {
+        get
+        {
+            SceneTransition transition = Current;
+            NetworkManager manager = NetworkManager.Singleton;
+            if (transition == null || transition.monitorTicket == 0 || manager == null || !manager.IsServer)
+            {
+                return false;
+            }
+
+            if (transition.monitorPlaying) return true;
+            if (Time.unscaledTime >= transition.monitorDeadline) return false;
+            foreach (ulong clientId in manager.ConnectedClientsIds)
+            {
+                if (transition.monitorWaitingClients.Contains(clientId)) return true;
+            }
+
+            return false;
+        }
+    }
 
     // ------------------------------------------------------------
     // 呼び出す関数
@@ -75,12 +131,13 @@ public class SceneTransition : MonoBehaviour
         SceneTransition transition = GetOrCreate();
         SceneTransitionType chosen = type ?? transition.transitionType;
 
-        if (!transition.Begin(chosen, onCovered))
+        int ticket = chosen == SceneTransitionType.Monitor ? ++transition.nextMonitorTicket : 0;
+        if (!transition.Begin(chosen, onCovered, ticket))
         {
             return false;
         }
 
-        transition.SendCoverToClients(chosen);
+        transition.SendCoverToClients(chosen, ticket);
         return true;
     }
 
@@ -143,6 +200,7 @@ public class SceneTransition : MonoBehaviour
 
     private void OnDestroy()
     {
+        DiscardResultFrame();
         if (Current == this)
         {
             Current = null;
@@ -173,7 +231,7 @@ public class SceneTransition : MonoBehaviour
     // ------------------------------------------------------------
 
     /// <summary>演出を始める。演出中なら何もせず false。</summary>
-    private bool Begin(SceneTransitionType type, Action onCovered)
+    private bool Begin(SceneTransitionType type, Action onCovered, int ticket = 0)
     {
         if (playing)
         {
@@ -182,6 +240,10 @@ public class SceneTransition : MonoBehaviour
         }
 
         playing = true;
+        monitorPlaying = type == SceneTransitionType.Monitor;
+        monitorTicket = ticket;
+        monitorWaitingClients.Clear();
+        monitorDeadline = Time.unscaledTime + maxWaitSeconds + 8f;
         StartCoroutine(Run(SceneTransitionEffect.Create(type), onCovered));
         return true;
     }
@@ -192,13 +254,31 @@ public class SceneTransition : MonoBehaviour
         sceneLoadedSinceCover = false;
         ClearEffect();
         effect.Build(effectRoot, color);
+        var monitor = effect as MonitorTransitionEffect;
+        float coverDuration = monitor != null ? MonitorPullBackSeconds : coverSeconds;
+        float revealDuration = monitor != null ? MonitorPushInSeconds : revealSeconds;
+        if (monitor != null && !Application.isBatchMode)
+        {
+            // 古い画面をUIごと記録してから、モニターを手前に出す。
+            yield return new WaitForEndOfFrame();
+            try
+            {
+                monitor.CaptureSource(savedResultFrame);
+                savedResultFrame = null;
+            }
+            catch (Exception exception)
+            {
+                Debug.LogException(exception);
+            }
+        }
+
         effect.Apply(0f, false);
         canvasObject.SetActive(true);
 
         // 覆い始めから、少しのあいだ切り替えの音を鳴らす（元の音は長いので途中で切る）
-        GameAudio.PlaySe(GameSe.SceneTransition, coverSeconds + 1f);
+        GameAudio.PlaySe(GameSe.SceneTransition, coverDuration + 1f);
 
-        yield return Animate(effect, coverSeconds, false);
+        yield return Animate(effect, coverDuration, false);
 
         if (onCovered != null)
         {
@@ -225,11 +305,25 @@ public class SceneTransition : MonoBehaviour
         }
 
         yield return new WaitForSecondsRealtime(holdSeconds);
-        yield return Animate(effect, revealSeconds, true);
+        if (monitor != null && !Application.isBatchMode)
+        {
+            try
+            {
+                monitor.CaptureDestination(sceneLoadedSinceCover);
+            }
+            catch (Exception exception)
+            {
+                Debug.LogException(exception);
+            }
+        }
+        yield return Animate(effect, revealDuration, true);
 
         canvasObject.SetActive(false);
         ClearEffect();
+        monitor?.Release();
         playing = false;
+        monitorPlaying = false;
+        if (monitor != null && sceneLoadedSinceCover) SendMonitorReady(monitorTicket);
     }
 
     /// <summary>覆い具合を、時間に合わせて 0→1（開くときは 1→0）に動かす。</summary>
@@ -261,6 +355,7 @@ public class SceneTransition : MonoBehaviour
         if (mode == LoadSceneMode.Single)
         {
             sceneLoadedSinceCover = true;
+            DiscardResultFrame();
         }
     }
 
@@ -281,6 +376,7 @@ public class SceneTransition : MonoBehaviour
             if (messaging != null)
             {
                 messaging.RegisterNamedMessageHandler(CoverMessageName, OnCoverReceived);
+                messaging.RegisterNamedMessageHandler(MonitorReadyMessageName, OnMonitorReadyReceived);
                 registeredMessaging = messaging;
             }
         }
@@ -297,6 +393,7 @@ public class SceneTransition : MonoBehaviour
         try
         {
             registeredMessaging.UnregisterNamedMessageHandler(CoverMessageName);
+            registeredMessaging.UnregisterNamedMessageHandler(MonitorReadyMessageName);
         }
         catch (Exception)
         {
@@ -306,7 +403,7 @@ public class SceneTransition : MonoBehaviour
     }
 
     /// <summary>（ホスト）ほかの参加者全員に「この種類で画面を覆え」と送る。</summary>
-    private void SendCoverToClients(SceneTransitionType type)
+    private void SendCoverToClients(SceneTransitionType type, int ticket)
     {
         NetworkManager manager = NetworkManager.Singleton;
         if (manager == null || !manager.IsListening || !manager.IsServer || manager.CustomMessagingManager == null)
@@ -329,9 +426,14 @@ public class SceneTransition : MonoBehaviour
             return;
         }
 
-        using (FastBufferWriter writer = new FastBufferWriter(sizeof(int), Allocator.Temp))
+        using (FastBufferWriter writer = new FastBufferWriter(sizeof(int) * 2, Allocator.Temp))
         {
             writer.WriteValueSafe((int)type);
+            if (type == SceneTransitionType.Monitor)
+            {
+                monitorWaitingClients.UnionWith(targets);
+                writer.WriteValueSafe(ticket);
+            }
             manager.CustomMessagingManager.SendNamedMessage(CoverMessageName, targets, writer);
         }
     }
@@ -345,6 +447,28 @@ public class SceneTransition : MonoBehaviour
         }
 
         reader.ReadValueSafe(out int type);
-        Begin((SceneTransitionType)type, null);
+        int ticket = 0;
+        if ((SceneTransitionType)type == SceneTransitionType.Monitor) reader.ReadValueSafe(out ticket);
+        Begin((SceneTransitionType)type, null, ticket);
+    }
+
+    private void SendMonitorReady(int ticket)
+    {
+        NetworkManager manager = NetworkManager.Singleton;
+        if (ticket == 0 || manager == null || !manager.IsConnectedClient || manager.IsServer || registeredMessaging == null)
+            return;
+
+        using (var writer = new FastBufferWriter(sizeof(int), Allocator.Temp))
+        {
+            writer.WriteValueSafe(ticket);
+            registeredMessaging.SendNamedMessage(MonitorReadyMessageName, NetworkManager.ServerClientId, writer);
+        }
+    }
+
+    private void OnMonitorReadyReceived(ulong sender, FastBufferReader reader)
+    {
+        if (NetworkManager.Singleton == null || !NetworkManager.Singleton.IsServer || monitorTicket == 0) return;
+        reader.ReadValueSafe(out int ticket);
+        if (ticket == monitorTicket) monitorWaitingClients.Remove(sender);
     }
 }

@@ -141,7 +141,7 @@ STAGES = [n for n in roots if n.startswith("STAGE_")]
 def where(f):
     names = reached_by.get(f, set())
     out = []
-    if "TitleScene" in names: out.append("タイトル")
+    if "StarSweepersTitle" in names: out.append("タイトル")
     if "SpaceJunkLobby" in names: out.append("ロビー")
     st = [n for n in STAGES if n in names]
     if st and len(st) == len(STAGES): out.append("全ステージ")
@@ -223,3 +223,5 @@ for folder in sorted(rows):
     for n, l, s, note in rs:
         print(f"| `{n}` | {l} | {s} | {note} |")
     print()
+
+# 2026/11/27 Codex: 現行のタイトルシーン名に更新。

@@ -7,6 +7,7 @@ public class SceneTransitionTester : MonoBehaviour
 {
     [Tooltip("背景の色を変えるカメラ")]
     [SerializeField] private Camera targetCamera;
+    [SerializeField] private bool useMonitor;
 
     [Tooltip("読み直すたびに順に変える背景の色（シーンが切り替わったのが分かるように）")]
     [SerializeField] private Color[] backgroundColors =
@@ -39,7 +40,7 @@ public class SceneTransitionTester : MonoBehaviour
 
         if (pressed)
         {
-            SceneTransition.Play(ReloadScene);
+            SceneTransition.Play(ReloadScene, useMonitor ? SceneTransitionType.Monitor : (SceneTransitionType?)null);
         }
     }
 

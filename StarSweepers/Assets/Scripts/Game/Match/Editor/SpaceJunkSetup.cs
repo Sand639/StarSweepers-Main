@@ -38,9 +38,9 @@ public static class SpaceJunkSetup
     public static string LobbyScenePath => FindScenePathByName(LobbySceneName) ?? DefaultLobbyScenePath;
 
     /// <summary>タイトルのシーンの名前（ゲームはここから始まる）。</summary>
-    public const string TitleSceneName = "TitleScene";
+    public const string TitleSceneName = TitleScreen.TitleSceneName;
 
-    /// <summary>**タイトルのシーンの置き場所。名前（TitleScene）で探す。** 見つからなければ null。</summary>
+    /// <summary>タイトルのシーンの置き場所。見つからなければ null。</summary>
     public static string TitleScenePath => FindScenePathByName(TitleSceneName);
 
     /// <summary>
