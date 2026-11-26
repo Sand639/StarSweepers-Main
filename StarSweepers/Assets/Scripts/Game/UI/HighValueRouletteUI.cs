@@ -182,6 +182,13 @@ public sealed class HighValueRouletteUI : MonoBehaviour
             {
                 // イベントの始まりの時刻にそろえる（途中から見え始めたなら、もう止まっている）
                 Begin(kind, now - Mathf.Max(0f, sinceStart));
+
+                // まだ回っている間なら、止まるまでルーレットの音を鳴らす
+                float spinLeft = spinSeconds - Mathf.Max(0f, sinceStart);
+                if (spinLeft > 0.05f)
+                {
+                    GameAudio.PlaySe(GameSe.UiRoulette, spinLeft);
+                }
             }
 
             wasRunning = true;

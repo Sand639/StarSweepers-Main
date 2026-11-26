@@ -24,6 +24,12 @@ public static class SpaceJunkSkybox
     /// <summary>読み込んだ星空の素材（1回だけ読む）。</summary>
     private static Material material;
 
+    /// <summary>
+    /// 空に貼る写し。素材そのものを貼ると、空を回す部品（Hans さんの RotateSkybox）が素材のファイルを書き換え、
+    /// 古い版のまま保存・マージされて星空が消えた（2026/11/18）ので、再生中は写しを使う。
+    /// </summary>
+    private static Material runtimeCopy;
+
     /// <summary>再生を始めたら、シーンの読み込みと切り替えを見張る。最初のシーンがマップのときのために、1回目もここで見る。</summary>
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
     private static void Init()
@@ -79,6 +85,11 @@ public static class SpaceJunkSkybox
             }
         }
 
-        RenderSettings.skybox = material;
+        if (runtimeCopy == null)
+        {
+            runtimeCopy = new Material(material) { name = MaterialName + " (Runtime)" };
+        }
+
+        RenderSettings.skybox = runtimeCopy;
     }
 }

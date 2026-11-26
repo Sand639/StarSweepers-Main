@@ -237,8 +237,27 @@ public class TitleMenuButton : MonoBehaviour,
 
     public void OnPointerEnter(PointerEventData eventData)
     {
+        PlayHoverSoundIfNew();
         pointerOver = true;
         Refresh();
+    }
+
+    /// <summary>
+    /// 指されていなかったボタンが、いま指されたときだけ、重なったときの効果音を鳴らす（2026/11/26）。
+    /// 押せないボタン（Button が無い・押せない状態）では鳴らさない。
+    /// </summary>
+    private void PlayHoverSoundIfNew()
+    {
+        if (!Application.isPlaying || IsHighlighted)
+        {
+            return;
+        }
+
+        Button button = GetComponent<Button>();
+        if (button != null && button.IsInteractable())
+        {
+            GameAudio.PlayUi(UiSound.Hover);
+        }
     }
 
     public void OnPointerExit(PointerEventData eventData)
@@ -249,6 +268,7 @@ public class TitleMenuButton : MonoBehaviour,
 
     public void OnSelect(BaseEventData eventData)
     {
+        PlayHoverSoundIfNew();
         selectedByNavigation = true;
         Refresh();
     }
@@ -272,10 +292,12 @@ public class TitleMenuButton : MonoBehaviour,
 
         // highlighted … マウスか十字キーで指されている（重なり用の画像に変わる）
         // emphasized  … それに加えて「選ばれている」見た目も含む（色・文字・ふちが変わる）
-        bool highlighted = pointerOver || selectedByNavigation;
-        bool emphasized = highlighted || selectedLook;
+        bool highlighted = pointerOver || (!look.pointerHighlightOnly && selectedByNavigation);
+        bool selected = !look.pointerHighlightOnly && selectedLook;
+        bool emphasized = highlighted || selected;
 
-        Sprite sprite = highlighted && look.buttonHover != null ? look.buttonHover : look.button;
+        bool useHoverSprite = highlighted || (look.useHoverSpriteWhenSelected && selected);
+        Sprite sprite = useHoverSprite && look.buttonHover != null ? look.buttonHover : look.button;
         background.sprite = sprite;
 
         // Sprite Editor で9スライス（Border）を付けた画像は、角をつぶさずに引き伸ばす

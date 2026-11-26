@@ -67,6 +67,8 @@ public class SweeperHitEffects : MonoBehaviour
     /// <summary>エフェクトをこのPCにだけ出す（オンラインのほかの人の体では、知らせが届いたときに呼ばれる）。</summary>
     public void ShowKnockback(Vector3 point, float strength)
     {
+        GameAudio.PlaySe(GameSe.PlayerHit);
+
         float size = Mathf.Lerp(0.6f, 1.2f, strength);
         SweeperShards.Spawn(point, size * 0.5f, burstColor, material);
         Vector3 ground = new Vector3(point.x, transform.position.y + 0.03f, point.z);

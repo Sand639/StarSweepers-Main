@@ -55,6 +55,7 @@ public class TitleSettingsPage
             {
                 row.Previous.onClick.AddListener(() =>
                 {
+                    GameAudio.PlayUi(UiSound.Confirm);
                     Step(target.Kind, -1);
                     RefreshRow(target);
                 });
@@ -64,6 +65,7 @@ public class TitleSettingsPage
             {
                 row.Next.onClick.AddListener(() =>
                 {
+                    GameAudio.PlayUi(UiSound.Confirm);
                     Step(target.Kind, 1);
                     RefreshRow(target);
                 });

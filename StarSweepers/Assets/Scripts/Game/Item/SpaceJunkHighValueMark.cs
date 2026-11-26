@@ -37,6 +37,7 @@ public class SpaceJunkHighValueMark : MonoBehaviour
 
         shown = true;
         enabled = true;
+        GameAudio.PlaySe(GameSe.SpecialDebris);
 
         renderers = GetComponentsInChildren<MeshRenderer>();
         block ??= new MaterialPropertyBlock();

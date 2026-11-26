@@ -34,7 +34,7 @@
 | t が 1 になった（ホスト） | 印を外し、大きさを元に戻してから、ゴールの `Collect`（`Absorbed` も出す）。`Collect` → `SpaceJunkRound.ServerCollect` → 数えたら `FlashClientRpc`（得点の光る演出）→ `HookableObject.Vanish`（全員の画面から消える）。戻した大きさは、同じフレームで見えなくなる |
 | t が 1 になった（参加者） | 小さいまま、ホストが消すのを待つ。消されたら（`Vanish` で印が外れる）大きさを戻して係を外す。3秒たっても消されなければ、元に戻す |
 | 吸い込み中に、ほかの理由で `Vanish` された（爆発など） | `Vanish` が印を外すので、係はそれに気づいて大きさを戻して外れる。**得点にはしない** |
-| 渦の係の `Update` → `DrawAt(Time.time)` | ゴールごとに「出ている量」（0〜1）を Appear Seconds で増減し、円の板（`_Part`＝0。**Show Floor Vortex がオンのときだけ**。2026/11/17 からオフ）と、すり鉢（`_Part`＝1。高さは Funnel Height×出ている量）・らせんの帯（`_Part`＝2。すり鉢と同じ大きさ）・かけら（`_Part`＝3。大きさはそのまま m で、位置はシェーダーが決める）を `Graphics.RenderMesh` で描く。すり鉢から先は `_Funnel`（底の割合・曲がり具合・渦の半径・高さ）も渡す。閉ざされたゴールには描かない。試合のゴールは、見た目（`IntroVisual`）の MeshRenderer が全部切られている間（始まりの演出でゴールが飛んでいる間）は出ている量を 0 へ |
+| 渦の係の `Update` → `DrawAt(Time.time)` | ゴールごとに「出ている量」（0〜1）を Appear Seconds で増減し、円の板（`_Part`＝0。**Show Floor Vortex がオンのときだけ**。2026/11/17 からオフ）と、すり鉢（`_Part`＝1。高さは Funnel Height×出ている量）・らせんの帯（`_Part`＝2。すり鉢と同じ大きさ）・かけら（`_Part`＝3。大きさはそのまま m で、位置はシェーダーが決める）を `Graphics.RenderMesh` で描く。すり鉢から先は `_Funnel`（底の割合・曲がり具合・渦の半径・高さ）も渡す。閉ざされたゴールには描かない。試合のゴールは、**始まりの演出の間（`SpaceJunkRound.Current.IsIntro`。START! より前）**と、見た目（`IntroVisual`）の MeshRenderer が全部切られている間（始まりの演出でゴールが飛んでいる間）は出ている量を 0 へ（START! で出し始める。2026/11/25） |
 
 ### 時計（`GoalAbsorb.ClockOf`）
 
@@ -122,3 +122,4 @@
 | 2026/11/17 | Claude Code（依頼：大槻 海斗） | 光の柱のときの物資の動き（真ん中の上へ運ぶ → ゆっくり上げる → 光って消える）と、消える光（`DrawFlashes`・`PlayFlash`）を書いた |
 | 2026/11/17 | Claude Code（依頼：大槻 海斗） | 物資の動きのプルダウン（`absorbMotion`）と、ホストが決めた動きを参加者へ送るようにしたことを書いた |
 | 2026/11/24 | Claude Code（依頼：小野田 喬） | 名前を変えたスクリプト（`FishingNetSupply` → `NetSupply` など）に合わせて書き換えた |
+| 2026/11/25 | Claude Code（依頼：大槻 海斗） | START! より前（`IsIntro`）は演出を出さないようにしたことを書いた |

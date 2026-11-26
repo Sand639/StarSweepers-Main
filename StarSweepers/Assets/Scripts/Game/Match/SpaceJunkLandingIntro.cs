@@ -65,6 +65,9 @@ public class SpaceJunkLandingIntro : MonoBehaviour
     /// <summary>その下の小さな文字（「ラウンド ○」）。</summary>
     private Text subText;
 
+    /// <summary>3・2・1・START! の画像（プレハブが無ければ null で、文字のまま出す）。</summary>
+    private RoundCountdownImage countdownImage;
+
     /// <summary>演出が終わったか。終わったら、このラウンドの間は二度と動かない。</summary>
     private bool finished;
 
@@ -400,6 +403,14 @@ public class SpaceJunkLandingIntro : MonoBehaviour
     /// <summary>文字を変える。毎フレーム呼ばれるので、中身が変わったときだけ入れ直す。</summary>
     private void ShowTexts(string big, string sub)
     {
+        GameAudio.PlayCountdownLabel(big);
+
+        // 3・2・1・START! は画像で出し、そのときは文字を消す（画像の無い文字は、そのまま文字で出す）
+        if (countdownImage != null && countdownImage.Show(big))
+        {
+            big = string.Empty;
+        }
+
         if (bigText != null && bigText.text != big)
         {
             bigText.text = big;
@@ -472,6 +483,7 @@ public class SpaceJunkLandingIntro : MonoBehaviour
         Font font = UiFont.Find(64);
         bigText = CreateText("Big", font, 160, new Vector2(0f, 60f), new Vector2(1800f, 260f));
         subText = CreateText("Sub", font, 56, new Vector2(0f, -110f), new Vector2(1800f, 90f));
+        countdownImage = RoundCountdownImage.Create(overlay.transform);
     }
 
     /// <summary>
