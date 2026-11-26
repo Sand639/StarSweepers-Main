@@ -5,7 +5,7 @@ using UnityEngine;
 using UnityEngine.TestTools;
 
 /// <summary>
-/// **プレイヤーの動きのアニメーション（狙い歩き・撃つ・引っ張る・投げる・落ちる）が切り替わるかの自動テスト。**（2026/11/25・小野田さんの依頼）
+/// **プレイヤーの動きのアニメーション（狙い歩き・撃つ・引っ張る・投げる・落ちる・スタン）が切り替わるかの自動テスト。**（2026/11/25・小野田さんの依頼。2026/11/26 にスタンを追加）
 ///
 /// 通信なしで体のプレハブを置き、Animator がいまどの状態にいるかを見る。見た目（動きが自然か）は人が確かめる。
 /// `Window > General > Test Runner` の EditMode から実行できる。
@@ -27,6 +27,14 @@ public class SweeperAnimationTests
     {
         yield return new EnterPlayMode();
         yield return RunThrow();
+        yield return new ExitPlayMode();
+    }
+
+    [UnityTest]
+    public IEnumerator Stun_PlaysFallThenRise()
+    {
+        yield return new EnterPlayMode();
+        yield return RunStun();
         yield return new ExitPlayMode();
     }
 
@@ -126,6 +134,29 @@ public class SweeperAnimationTests
         }
     }
 
+    private static IEnumerator RunStun()
+    {
+        GameObject ground = MakeGround();
+        GameObject player = Object.Instantiate(AssetDatabase.LoadAssetAtPath<GameObject>(PlayerPrefabPath), Vector3.zero, Quaternion.identity);
+        try
+        {
+            Animator animator = player.GetComponentInChildren<Animator>();
+            yield return Wait(0.3f);
+            Assert.That(State(animator), Is.EqualTo("Idle"));
+
+            // スタンすると倒れる（Fall）。解けたら起き上がり（Rise）を流し切って、Idle に戻る
+            player.GetComponent<PlayerStun>().Stun(1f, false);
+            yield return WaitState(animator, "Fall", 0.5f);
+            yield return WaitState(animator, "Rise", 2f);
+            yield return WaitState(animator, "Idle", 2f);
+        }
+        finally
+        {
+            Object.Destroy(player);
+            Object.Destroy(ground);
+        }
+    }
+
     private static IEnumerator RunFall()
     {
         GameObject ground = MakeGround();
@@ -166,7 +197,7 @@ public class SweeperAnimationTests
         return ground;
     }
 
-    private static readonly string[] Names = { "Idle", "Walk", "AimWalk", "Shoot", "Pull", "Throw", "Drop", "DropLoot" };
+    private static readonly string[] Names = { "Idle", "Walk", "AimWalk", "Shoot", "Pull", "Throw", "Drop", "DropLoot", "Fall", "Rise" };
 
     /// <summary>Animator がいまいる状態の名前（移り変わり中なら行き先）。</summary>
     private static string State(Animator animator)
