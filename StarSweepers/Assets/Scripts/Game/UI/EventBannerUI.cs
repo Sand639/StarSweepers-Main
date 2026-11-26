@@ -1,15 +1,37 @@
+using System;
 using UnityEngine;
 using UnityEngine.UI;
 
 /// <summary>
-/// ラウンドイベントが始まる少し前から、画面を横切る赤い帯と「緊急連絡！」の文字を出して知らせる
-/// （帯が上下に開く → 文字が右から滑り込む → 帯が点滅しながらイベントの始まりまで残る → 始まったら帯が閉じて消える）。
+/// ラウンドイベントが始まる少し前から、画面を横切る赤い帯と「緊急連絡！」→「〇〇発生！」の文字を出して知らせる
+/// （帯が上下に開く → 文字が右から滑り込む → イベントの名前の文字に切り替わる → 帯が点滅しながらイベントの始まりまで残る → 始まったら帯が閉じて消える）。
 /// 説明：Documents/スクリプトの説明/Game/UI/EventBannerUI.md
 /// </summary>
 public sealed class EventBannerUI : MonoBehaviour
 {
     /// <summary>ゲームの開始時に読み込むプレハブ（Assets/Resources/EventBannerUI.prefab）。</summary>
     public const string PrefabResourcePath = "EventBannerUI";
+
+    /// <summary>イベントの種類ごとの文字。</summary>
+    [Serializable]
+    public sealed class EventMessage
+    {
+        [Tooltip("イベントの種類")]
+        public SpaceJunkEventKind kind;
+
+        [Tooltip("そのイベントのときに出す文字")]
+        public string text;
+
+        public EventMessage()
+        {
+        }
+
+        public EventMessage(SpaceJunkEventKind kind, string text)
+        {
+            this.kind = kind;
+            this.text = text;
+        }
+    }
 
     [Header("部品（プレハブで割り当て済み）")]
     [Tooltip("表示ごと隠すときにオン・オフする子オブジェクト")]
@@ -22,8 +44,19 @@ public sealed class EventBannerUI : MonoBehaviour
     [SerializeField] private Text label;
 
     [Header("文字")]
-    [Tooltip("帯の上に出す文字")]
+    [Tooltip("最初に出す文字")]
     [SerializeField] private string message = "緊急連絡！";
+
+    [Tooltip("最初の文字を出す秒数。そのあと、下のイベントごとの文字に切り替わる（イベントが一覧に無ければ、最初の文字のまま）")]
+    [SerializeField, Min(0f)] private float messageSeconds = 1.5f;
+
+    [Tooltip("イベントごとの文字。種類を選んで、出す文字を書く")]
+    [SerializeField] private EventMessage[] eventMessages =
+    {
+        new EventMessage(SpaceJunkEventKind.DebrisSet, "デブリセット発生！"),
+        new EventMessage(SpaceJunkEventKind.HighValueDebris, "高単価デブリ発生！"),
+        new EventMessage(SpaceJunkEventKind.HeavyDebris, "高重量デブリ発生！"),
+    };
 
     [Tooltip("文字のフォント。空ならパソコンに入っている日本語のフォントを使う（デザイナーさんの指定のフォントが来たら入れる）")]
     [SerializeField] private Font font;
@@ -54,7 +87,7 @@ public sealed class EventBannerUI : MonoBehaviour
     [Tooltip("オンなら、ラウンドが無くても一定の間隔でくり返し出す。検証シーン用。本番（Resources のプレハブ）ではオフ")]
     [SerializeField] private bool testMode;
 
-    [Tooltip("テストで出す間隔（秒）。出ている時間（Lead Seconds＋Close Seconds）より長くする")]
+    [Tooltip("テストで出す間隔（秒）。出ている時間（Lead Seconds＋Close Seconds）より長くする。回ごとに、イベントごとの文字を順に出す")]
     [SerializeField, Min(1f)] private float testInterval = 8f;
 
     /// <summary>いま動いている係（ゲーム中は1つだけ）。</summary>
@@ -127,22 +160,24 @@ public sealed class EventBannerUI : MonoBehaviour
 
     private void Update()
     {
-        float shown = ReadSecondsShown(Time.unscaledTime);
+        float shown = ReadSecondsShown(Time.unscaledTime, out SpaceJunkEventKind kind);
         bool visible = shown >= 0f && shown < TotalSeconds;
         SetVisible(visible);
 
         if (visible)
         {
-            Draw(shown);
+            Draw(shown, kind);
         }
     }
 
-    /// <summary>出始めてからの秒数（イベントの始まる Lead Seconds 秒前が 0）。出す時でなければ -1。</summary>
-    private float ReadSecondsShown(float now)
+    /// <summary>出始めてからの秒数（イベントの始まる Lead Seconds 秒前が 0）と、起きるイベントの種類。出す時でなければ -1。</summary>
+    private float ReadSecondsShown(float now, out SpaceJunkEventKind kind)
     {
         SpaceJunkRound round = SpaceJunkRound.Current;
         if (round != null)
         {
+            kind = round.ActiveEvent != SpaceJunkEventKind.None ? round.ActiveEvent : round.UpcomingEvent;
+
             // 始まる前（0 は「時刻になったが、ホストがまだ始めていない」一瞬）
             float until = round.SecondsUntilEvent;
             if (round.Phase == SpaceJunkRoundPhase.Playing && until >= 0f && until <= leadSeconds)
@@ -155,6 +190,7 @@ public sealed class EventBannerUI : MonoBehaviour
             return since >= 0f ? leadSeconds + since : -1f;
         }
 
+        kind = SpaceJunkEventKind.None;
         if (!testMode)
         {
             return -1f;
@@ -165,11 +201,18 @@ public sealed class EventBannerUI : MonoBehaviour
             testStart = now;
         }
 
-        return (now - testStart) % testInterval;
+        // 回ごとに、イベントごとの文字を順に見せる
+        float elapsed = now - testStart;
+        if (eventMessages != null && eventMessages.Length > 0)
+        {
+            kind = eventMessages[Mathf.FloorToInt(elapsed / testInterval) % eventMessages.Length].kind;
+        }
+
+        return elapsed % testInterval;
     }
 
-    /// <summary>出始めてから shown 秒の見た目にする。</summary>
-    private void Draw(float shown)
+    /// <summary>出始めてから shown 秒の見た目にする。kind は起きるイベントの種類（文字の切り替えに使う）。</summary>
+    private void Draw(float shown, SpaceJunkEventKind kind)
     {
         float closing = Clamp01Div(shown - leadSeconds, closeSeconds);
         float open = EaseOutCubic(Clamp01Div(shown, openSeconds)) * (1f - EaseInCubic(closing));
@@ -189,13 +232,46 @@ public sealed class EventBannerUI : MonoBehaviour
 
         if (label != null)
         {
-            float slide = EaseOutCubic(Clamp01Div(shown, textSlideSeconds));
+            // Message Seconds がたったら、イベントの名前の文字に切り替えて、もう一度右から滑り込ませる
+            string text = message;
+            bool switched = shown >= messageSeconds && TryGetEventText(kind, out text);
+            if (!switched)
+            {
+                text = message;
+            }
+            if (label.text != text)
+            {
+                label.text = text;
+            }
+
+            float slide = EaseOutCubic(Clamp01Div(shown - (switched ? messageSeconds : 0f), textSlideSeconds));
             label.rectTransform.anchoredPosition = labelPosition + new Vector2((1f - slide) * textSlideDistance, 0f);
 
             Color color = label.color;
             color.a = slide * (1f - closing);
             label.color = color;
         }
+    }
+
+    /// <summary>そのイベントの文字を探す。一覧に無い・空なら false。</summary>
+    private bool TryGetEventText(SpaceJunkEventKind kind, out string text)
+    {
+        text = null;
+        if (eventMessages == null || kind == SpaceJunkEventKind.None)
+        {
+            return false;
+        }
+
+        foreach (EventMessage entry in eventMessages)
+        {
+            if (entry != null && entry.kind == kind && !string.IsNullOrEmpty(entry.text))
+            {
+                text = entry.text;
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private void SetVisible(bool visible)
