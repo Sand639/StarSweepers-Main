@@ -3,7 +3,7 @@ using UnityEngine;
 using UnityEngine.UI;
 
 /// <summary>
-/// ラウンドイベント「期間限定高価値デブリ（高単価デブリ）」の種類を、時間の丸の下から出るルーレットで決めて見せる。
+/// ラウンドイベント「期間限定高価値デブリ（高単価デブリ）」の種類を、得点バーの下から出る半円のルーレットで決めて見せる。
 /// 説明：Documents/スクリプトの説明/Game/UI/HighValueRouletteUI.md
 /// </summary>
 public sealed class HighValueRouletteUI : MonoBehaviour
@@ -31,7 +31,7 @@ public sealed class HighValueRouletteUI : MonoBehaviour
     [Tooltip("物資の画像（デブリセットのUIと同じ画像）。上から 物資1＝装甲板、物資2＝回路基板、物資3＝燃料タンク、物資4＝アンテナ、物資5＝エンジン")]
     [SerializeField] private Sprite[] itemSprites = new Sprite[ItemKinds];
 
-    [Tooltip("ルーレットのフレームの画像。空ならプレハブの画像のまま")]
+    [Tooltip("ルーレットのフレームの画像（Assets/Art/Sprites/EventUI/HighValueDebris/UI_roulette）。空ならプレハブの画像のまま")]
     [SerializeField] private Sprite frameSprite;
 
     [Header("部品（プレハブで割り当て済み）")]
@@ -54,11 +54,11 @@ public sealed class HighValueRouletteUI : MonoBehaviour
     [Tooltip("回り始めの速さ（1秒に何個の物資が真下を通るか）。決まる時刻に向けて、だんだん遅くなる")]
     [SerializeField, Min(1f)] private float spinStartSpeed = 14f;
 
-    [Tooltip("フレームの中心から物資の中心までの距離（レールの半径）")]
-    [SerializeField, Min(0f)] private float railRadius = 200f;
+    [Tooltip("回る中心（半円の上の辺の真ん中）から物資の中心までの距離（レールの半径）。真下の物資が真ん中の三角に収まる長さ")]
+    [SerializeField, Min(0f)] private float railRadius = 92f;
 
-    [Tooltip("レールの上の、となりの物資との角度（度）")]
-    [SerializeField, Range(30f, 90f)] private float itemAngle = 45f;
+    [Tooltip("レールの上の、となりの物資との角度（度）。となりの物資が、三角の左右の扇の真ん中に来る角度")]
+    [SerializeField, Range(30f, 90f)] private float itemAngle = 64f;
 
     [Tooltip("出てくるとき・しまわれるときに動く秒数")]
     [SerializeField, Min(0f)] private float slideSeconds = 0.25f;

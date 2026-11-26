@@ -1,0 +1,46 @@
+# EventBannerUI（イベント開始の警告バナー）
+
+| 項目 | 内容 |
+| --- | --- |
+| スクリプト | `StarSweepers/Assets/Scripts/Game/UI/EventBannerUI.cs`（表示）・`StarSweepers/Assets/Scripts/Game/UI/Editor/EventBannerUISetup.cs`（プレハブ・検証シーンを作るメニュー）・`StarSweepers/Assets/Scripts/Game/UI/Editor/EventBannerUITests.cs`（自動テスト） |
+| 付いている場所 | `Resources/EventBannerUI.prefab` の一番上（Canvas と同じ物）。検証シーン `Scenes/Test/EventBannerUITest.unity` にはプレハブのまま置いてある（Test Mode だけオン） |
+| 関係するドキュメント | `機能ドキュメント/イベント開始の警告バナー.md`・`機能ドキュメント/宇宙ごみのラウンドイベント.md` |
+
+## 何をするスクリプトか
+
+ラウンドイベントが始まった瞬間に、赤い半透明の帯（`UI_EventBanner_base`）と「緊急連絡！」の文字を、約 2.25 秒だけ出す。**表示するだけで、何も送らない。**
+
+## 流れ
+
+1. `CreateOnStart`（`RuntimeInitializeOnLoadMethod`。ゲームの開始時に1回）… シーンにまだ無ければ、`Resources/EventBannerUI.prefab` から作って `DontDestroyOnLoad` にする
+2. `Awake` … 2つ目なら消える。帯の元の濃さと、文字の元の位置を覚える。文字に Message とフォント（Font が空ならパソコンの日本語フォント `UiFont.Find`）を入れる。最初は隠す
+3. `Update` … 毎フレーム
+   1. `ReadSecondsSinceStart` … ラウンドがあれば `SpaceJunkRound.SecondsSinceEventStarted`（イベントが起きていなければ -1）。ラウンドが無く Test Mode がオンなら、Test Interval 秒ごとにくり返す秒数
+   2. 0 以上で Open + Hold + Close 秒より前なら出し、`Draw` で見た目を決める。それ以外は隠す
+4. `Draw(秒数)` … 帯の縦の大きさ（開く：3乗の減速、閉じる：3乗の加速）、帯の濃さ（開ききったあと cos で点滅）、文字の横の位置（右から滑り込む）と濃さ（閉じるのに合わせて消える）を、秒数だけから決める
+
+## プレハブの作り（`EventBannerUISetup`）
+
+```
+EventBannerUI（Canvas：画面に重ねる・並び順 30、CanvasScaler：1920×1080 基準、EventBannerUI）
+└ Content（表示ごと隠す）
+   ├ Banner（帯の画像。横は画面いっぱい＋左右 40 ずつはみ出す・高さ 216。画面の真ん中から 280 下）
+   └ Label（Text「緊急連絡！」96・太字・白、薄い影。帯と同じ高さ）
+```
+
+- `Label` は `Banner` の子にしない（帯が上下に開くとき、文字までつぶれないように）
+- 帯の画像が読めないときは、エラーで止まる
+
+## 気をつけること
+
+- **Test Mode は、Resources のプレハブではオフのまま**にする（オンだと、タイトルやロビーでも帯が出る）。自動テスト `Prefab_IsInResourcesAndWired` が確かめる
+- 見た目は秒数だけで決まるので、途中から見え始めた人にも、同じ時刻の見た目が出る
+- `RoundResultPlayback.IsPresenting`（ラウンドの結果を見せている間）は出さない
+- 文字はフォントが再生中にしか入らないので、プレハブを開いても見えない
+- 画面に重ねる UI はカメラに写らないので、画面なしの Unity で画像を撮るときは、撮る間だけ Canvas を Screen Space - Camera にする（`AIの申し送り.md`）
+
+## 変更ログ
+
+| 日付 | 変更者 | 内容 |
+| --- | --- | --- |
+| 2026/11/26 | Claude Code（依頼：大槻 海斗） | 新規作成 |
