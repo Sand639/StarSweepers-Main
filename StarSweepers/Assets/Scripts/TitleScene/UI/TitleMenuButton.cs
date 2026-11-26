@@ -292,10 +292,12 @@ public class TitleMenuButton : MonoBehaviour,
 
         // highlighted … マウスか十字キーで指されている（重なり用の画像に変わる）
         // emphasized  … それに加えて「選ばれている」見た目も含む（色・文字・ふちが変わる）
-        bool highlighted = pointerOver || selectedByNavigation;
-        bool emphasized = highlighted || selectedLook;
+        bool highlighted = pointerOver || (!look.pointerHighlightOnly && selectedByNavigation);
+        bool selected = !look.pointerHighlightOnly && selectedLook;
+        bool emphasized = highlighted || selected;
 
-        Sprite sprite = highlighted && look.buttonHover != null ? look.buttonHover : look.button;
+        bool useHoverSprite = highlighted || (look.useHoverSpriteWhenSelected && selected);
+        Sprite sprite = useHoverSprite && look.buttonHover != null ? look.buttonHover : look.button;
         background.sprite = sprite;
 
         // Sprite Editor で9スライス（Border）を付けた画像は、角をつぶさずに引き伸ばす
