@@ -18,6 +18,7 @@ internal sealed class MonitorTransitionEffect : SceneTransitionEffect
     private RawImage destination;
     private Image blocker;
     private CanvasGroup opacity;
+    private MonitorScreenNoise screenNoise;
     private Texture2D sourceFrame;
     private Texture2D resultFrame;
     private RenderTexture destinationFrame;
@@ -39,6 +40,10 @@ internal sealed class MonitorTransitionEffect : SceneTransitionEffect
         result = AddScreen("SavedResult", SourceWindow);
         result.enabled = false;
         destination = AddScreen("NextScene", DestinationWindow);
+        // 筐体を最後に描くので、窓の角からノイズがはみ出さない。
+        screenNoise = composition.AddComponent<MonitorScreenNoise>();
+        screenNoise.Initialize(AddScreen("PreviousScreenNoise", SourceWindow),
+            AddScreen("NextScreenNoise", DestinationWindow));
         RawImage frame = AddScreen("MonitorArtwork", new Rect(Vector2.zero, ArtworkSize));
         frame.texture = artwork;
         frame.color = Color.white;
@@ -102,6 +107,7 @@ internal sealed class MonitorTransitionEffect : SceneTransitionEffect
         Vector2 offset = ArtworkCenter(window);
         board.localScale = new Vector3(scale, scale, 1f);
         board.anchoredPosition = -offset * scale * (1f - amount);
+        screenNoise.SetPullBack(amount);
         // 画面がいっぱいになった最後の数フレームで、生の画面へつなぐ。
         opacity.alpha = revealing ? Mathf.Clamp01(amount / 0.12f) : 1f;
         blocker.color = new Color(0f, 0f, 0f, opacity.alpha);

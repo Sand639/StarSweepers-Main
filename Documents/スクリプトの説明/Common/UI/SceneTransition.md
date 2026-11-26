@@ -67,6 +67,8 @@
 
 `MonitorTransitionEffect` は元画像の2つの透明窓の裏に画面を置き、操作盤を拡大縮小して視点が移るように見せる。前の画と試合結果は描画の最後に `CaptureScreenshotAsTexture` でUIごと記録し、正しい向きで左上に出す。次の画は切り替え後のベースカメラから一枚描く。
 
+`MonitorTransitionEffect.screenNoise` が画面に重ねる2枚のノイズの濃さを決める。`MonitorScreenNoise` は2枚で共用する `tile` を再生中に作り、`lastFrame` を使って砂嵐の模様を毎秒24回ずらす。走査線の間隔の倍数だけ上下にずらすので、線は動かない。操作盤が消えると `tile` も解放する。
+
 `SceneTransition` の `monitorPlaying` は演出中の操作を止める。`monitorTicket` と `nextMonitorTicket` は今回の完了通知を見分ける番号。`monitorWaitingClients` は通知待ちの参加者、`monitorDeadline` は待つ期限。`savedResultFrame` に勝利紹介直前の結果を置き、演出側へ渡すかシーン切り替え時に解放する。
 
 ## 変更ログ
