@@ -17,7 +17,11 @@ public static class EventBannerUISetup
     // 置き場所（1920×1080 の画面での値）。デザイン案の写真のとおり、画面の真ん中より下に、横いっぱいに出す
     private const float BannerY = -280f;          // 画面の真ん中からの高さ（下がマイナス）
     private const float BannerOverhang = 40f;     // 帯の左右の端（影のついた端）を、画面の外へどれだけ出すか
-    private const int FontSize = 96;
+    private const int FontSize = 96;            // 「緊急連絡！」
+    private const int TitleFontSize = 88;       // イベントの見出し
+    private const int SubtitleFontSize = 30;    // イベントの説明
+    private const float TitleOffsetY = 22f;     // 帯の真ん中から、見出しの真ん中までの高さ
+    private const float SubtitleOffsetY = -58f; // 帯の真ん中から、説明の真ん中までの高さ
 
     /// <summary>プレハブを作り直してから、それを置いただけの検証シーンを作って保存する。</summary>
     [MenuItem("Tools/StarSweepers/イベントの警告バナーの検証シーンを作る")]
@@ -96,36 +100,51 @@ public static class EventBannerUISetup
         banner.sprite = bannerSprite;
         banner.raycastTarget = false;
 
-        // 文字：帯の真ん中。帯とは別に動かす（帯が開くときにつぶれないように、帯の子にしない）
-        RectTransform labelRect = CreateRect("Label", content);
-        labelRect.anchorMin = new Vector2(0.5f, 0.5f);
-        labelRect.anchorMax = new Vector2(0.5f, 0.5f);
-        labelRect.pivot = new Vector2(0.5f, 0.5f);
-        labelRect.sizeDelta = new Vector2(1200f, bannerSprite.rect.height);
-        labelRect.anchoredPosition = new Vector2(0f, BannerY);
-        var label = labelRect.gameObject.AddComponent<Text>();
-        label.text = "緊急連絡！";
-        label.fontSize = FontSize;
-        label.fontStyle = FontStyle.Bold;
-        label.color = Color.white;
-        label.alignment = TextAnchor.MiddleCenter;
-        label.horizontalOverflow = HorizontalWrapMode.Overflow;
-        label.verticalOverflow = VerticalWrapMode.Overflow;
-        label.raycastTarget = false;
-        var shadow = labelRect.gameObject.AddComponent<Shadow>();
-        shadow.effectColor = new Color(0f, 0f, 0f, 0.35f);
-        shadow.effectDistance = new Vector2(3f, -3f);
+        // 文字は帯の子にしない（帯とは別に、横へ滑らせるため）
+        Text label = CreateText("Label", content, "緊急連絡！", FontSize, 0f, bannerSprite.rect.height);
+        Text title = CreateText("EventTitle", content, "特別調達依頼", TitleFontSize, TitleOffsetY, 110f);
+        Text subtitle = CreateText("EventSubtitle", content, "指定された資材を集めて、ボーナススコアを獲得しよう！", SubtitleFontSize, SubtitleOffsetY, 44f);
+        title.gameObject.SetActive(false);
+        subtitle.gameObject.SetActive(false);
 
         var so = new SerializedObject(ui);
         so.FindProperty("content").objectReferenceValue = content.gameObject;
         so.FindProperty("banner").objectReferenceValue = banner;
         so.FindProperty("label").objectReferenceValue = label;
+        so.FindProperty("eventTitle").objectReferenceValue = title;
+        so.FindProperty("eventSubtitle").objectReferenceValue = subtitle;
         so.FindProperty("testMode").boolValue = false;
         so.ApplyModifiedPropertiesWithoutUndo();
 
         GameObject prefab = PrefabUtility.SaveAsPrefabAsset(root, PrefabPath);
         Object.DestroyImmediate(root);
         return prefab;
+    }
+
+    /// <summary>帯の真ん中から offsetY の高さに、白い太字の文字（薄い影つき）を作る。</summary>
+    private static Text CreateText(string name, Transform parent, string value, int fontSize, float offsetY, float height)
+    {
+        RectTransform rect = CreateRect(name, parent);
+        rect.anchorMin = new Vector2(0.5f, 0.5f);
+        rect.anchorMax = new Vector2(0.5f, 0.5f);
+        rect.pivot = new Vector2(0.5f, 0.5f);
+        rect.sizeDelta = new Vector2(1600f, height);
+        rect.anchoredPosition = new Vector2(0f, BannerY + offsetY);
+
+        var text = rect.gameObject.AddComponent<Text>();
+        text.text = value;
+        text.fontSize = fontSize;
+        text.fontStyle = FontStyle.Bold;
+        text.color = Color.white;
+        text.alignment = TextAnchor.MiddleCenter;
+        text.horizontalOverflow = HorizontalWrapMode.Overflow;
+        text.verticalOverflow = VerticalWrapMode.Overflow;
+        text.raycastTarget = false;
+
+        var shadow = rect.gameObject.AddComponent<Shadow>();
+        shadow.effectColor = new Color(0f, 0f, 0f, 0.35f);
+        shadow.effectDistance = new Vector2(3f, -3f);
+        return text;
     }
 
     private static RectTransform CreateRect(string name, Transform parent)

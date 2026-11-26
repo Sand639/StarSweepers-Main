@@ -14,7 +14,7 @@ public class EventBannerUITests
         var so = new SerializedObject(prefab.GetComponent<EventBannerUI>());
         Assert.That(so.FindProperty("testMode").boolValue, Is.False, "プレハブのテストモードがオンになっている");
 
-        foreach (string part in new[] { "content", "banner", "label" })
+        foreach (string part in new[] { "content", "banner", "label", "eventTitle", "eventSubtitle" })
         {
             Assert.That(so.FindProperty(part).objectReferenceValue, Is.Not.Null, $"{part} が空");
         }
