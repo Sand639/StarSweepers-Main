@@ -95,6 +95,9 @@ public class GoalAbsorb : MonoBehaviour
         startTime = start;
         seconds = Mathf.Max(0.05f, duration);
         onFinished = finishedCallback;
+
+        // 吸い込まれる音（吸い込みの長さで切る）
+        GameAudio.PlaySe(GameSe.GoalAbsorb, seconds);
         settings = GoalEffect.In(gameObject.scene);
         startScale = transform.localScale;
         startRotation = transform.rotation;
@@ -265,6 +268,7 @@ public class GoalAbsorb : MonoBehaviour
         }
 
         finished = true;
+        GameAudio.PlaySe(GameSe.DebrisScore);
         item.SetAbsorbing(false);
         transform.localScale = startScale;
 

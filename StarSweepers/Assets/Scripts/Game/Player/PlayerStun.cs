@@ -246,6 +246,9 @@ public class PlayerStun : MonoBehaviour
         if (!IsStunned)
         {
             CaptureColors();
+
+            // 転ぶ音は、新しくスタンしたときだけ（重ねて食らったときは鳴らさない）
+            GameAudio.PlaySe(GameSe.PlayerStun);
         }
 
         remaining = Mathf.Max(remaining, seconds);

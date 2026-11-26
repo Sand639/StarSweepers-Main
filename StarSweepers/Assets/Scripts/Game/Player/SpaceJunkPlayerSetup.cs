@@ -71,6 +71,12 @@ public partial class SpaceJunkPlayerSetup : MonoBehaviour
     [Tooltip("この高さより下まで落ちたら、**自動で出てくる場所へ戻す**（メートル）")]
     [SerializeField] private float fallResetHeight = -8f;
 
+    /// <summary>戻る高さ（<see cref="fallResetHeight"/>）より何メートル上で、落ちる音を鳴らすか。</summary>
+    private const float FallSoundAboveReset = 6f;
+
+    /// <summary>今回の落下で、落ちる音を鳴らしたか。</summary>
+    private bool fallSoundPlayed;
+
     [Tooltip("**ラウンド中に**戻ったとき（キー・落下）、動けない秒数（復活時間）。0 で止めない。ロビーでは止めない")]
     [Min(0f)]
     [SerializeField] private float respawnLockSeconds = 3f;
@@ -325,9 +331,22 @@ public partial class SpaceJunkPlayerSetup : MonoBehaviour
     /// </summary>
     private void CheckReset()
     {
+        // 戻る高さの少し上まで落ちたら、落ちる音を1回鳴らす（戻ったら、また鳴らせるようにする）
+        if (!fallSoundPlayed && transform.position.y < fallResetHeight + FallSoundAboveReset)
+        {
+            fallSoundPlayed = true;
+            GameAudio.PlaySe(GameSe.PlayerFall);
+        }
+        else if (fallSoundPlayed && transform.position.y > fallResetHeight + FallSoundAboveReset + 1f)
+        {
+            // R キーで戻ったときなど、上へ戻っていたら次の落下でまた鳴らす
+            fallSoundPlayed = false;
+        }
+
         // 下まで落ちたら、押されなくても戻す
         if (transform.position.y < fallResetHeight)
         {
+            fallSoundPlayed = false;
             MoveToSpawnPoint();
             FollowWithCamera();
             StartRespawnLock();
