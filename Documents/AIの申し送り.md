@@ -209,6 +209,16 @@ Hans さんの動きのアニメーション5つ（Shoot・Pull・Throw・Drop�
 - 今回の違い：いちばん上（`GRP_ExportScale_DO_NOT_TOUCH/CTRL_Global/JNT_Tool` ↔ `SCL_Root/JNT_Root`）と、**右腕が `JNT_Shoulder_L2/JNT_Arm_L/JNT_Hand_L`（左の名前）**。**ただし原因はアニメーション側ではなく、`Assets/` の体のモデル `SK_Character.fbx` が、リグを直す前の古い版のままだったこと**（2026/11/25 にデザイナーさんに確認。新しい5つが正しい）。**骨が当たらないときは、アニメーションと体のどちらが新しいかを先に聞く**こと。
 - 対応：FBX と取り込みの設定は変えず（Hans さんの素材の決まり）、`SweeperAnimationSetup`（メニュー「プレイヤーの動きのアニメーションを取り込む」）で**骨の名前だけ置き換えた複製 `.anim`** を作った。新しい FBX が来たら、まずこの道具を通し、ログに「体に無い骨 〇本」が出たら置き換えの表 `PathRules` を足す。
 
+### アニメーションの「決めのコマ」は、手の骨の位置をコマごとに書き出して探す（2026/11/26）
+
+撃つ・引っ張るのアニメーションを、光線や物資の動きに合わせるときに使ったやり方。
+
+- 画面なしの Unity（`-batchmode -quit -executeMethod`）で体 `SK_Character.fbx` を置き、`clip.SampleAnimation(体, コマ/30f)` をコマごとにくり返して、`JNT_Hand_L`・`JNT_Hand_R` の位置（体から見た位置）を書き出す。**1コマで大きく飛ぶ所が、作者が「決め」にしたコマ**（Shoot は 7→8 コマの反動、Pull は 28→29 コマの引き）。
+- 姿の画像も、同じ体に `Camera.Render()` して並べると分かりやすい（`TempPoseProbe` を作って使い、消した）。
+- 時刻を合わせるだけなら、Animator の状態を変えずに `CrossFadeInFixedTime(状態, つなぎ, 0, 何秒の所から)` で途中から流せる。
+- 体の左手（`JNT_Hand_L`）には道具の目印 `LCT_Tool` があり、新しいリグの FBX の銃 `SM_Gun_01` と同じ位置。物を持たせるときはここに付ける。
+- **このPCには Python が無い**（`python` は Windows ストアの入口だけで、何もせず終わる）。ファイルの書き換えは Edit か sed で行う。
+
 ### 画面なしのテストでは、体の骨がアニメーションしない（2026/11/25）
 
 テストの場面にはカメラが無いので、体が「見えていない」扱いになり、Animator（Culling Mode が Cull Update Transforms）は**状態と時間だけ進めて、骨を動かさない**。`animator.GetCurrentAnimatorStateInfo` は正しく変わるのに、手の骨の位置がずっと同じだった。骨の位置を使うテストでは、テストの中で `animator.cullingMode = AnimatorCullingMode.AlwaysAnimate` にする（`SweeperAnimationTests` が実例）。
@@ -665,3 +675,4 @@ Hans さんの動きのアニメーション5つ（Shoot・Pull・Throw・Drop�
 | 2026/11/24 | Claude Code（依頼：小野田 喬） | スタンの通信を直したことに書き換え、Time.deltaTime をテストで使わない・Netcode がプレハブを自動で一覧に入れる・このPCに Python が無い、の3つを足した |
 | 2026/11/25 | Claude Code（依頼：小野田 喬） | 「失敗したこと」に、もらったアニメーションの骨が体に当たらなかったこと（確かめ方と複製の道具）と、画面なしのテストで骨がアニメーションしないことを足した |
 | 2026/11/25 | Claude Code（依頼：小野田 喬） | 骨が当たらなかった件に、原因は体のモデルが古いことだったと書き足した |
+| 2026/11/26 | Claude Code（依頼：小野田 喬） | 「失敗したこと」に、アニメーションの決めのコマの探し方・左手の LCT_Tool・このPCに Python が無いことを書いた |

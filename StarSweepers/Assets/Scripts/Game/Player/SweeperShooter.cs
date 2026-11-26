@@ -14,7 +14,8 @@ using UnityEngine.InputSystem;
 ///
 /// 光線の見た目は液体のビーム（<see cref="LiquidBeam"/>）。何もつかんでいない間は薄いチームの色、つかんだら濃くなる。
 /// **巻き取り中に向きを変えると、光線が釣り糸のようにしなる**（手元からは体の向きに少し遅れて出て、物資へ曲がってつながる。2026/11/4）。
-/// 撃った瞬間に <see cref="SweeperAnimation.PlayShoot"/>（Shoot → AimWalk）、つかんだら <see cref="SweeperAnimation.PlayPull"/> を呼ぶ。
+/// 撃った瞬間に <see cref="SweeperAnimation.PlayShoot"/>（Shoot → AimWalk）、つかんだら <see cref="SweeperAnimation.PlayPull"/>（構えたまま AimWalk）を呼ぶ。
+/// 引っ張って飛ばした瞬間の Pull は <see cref="SweeperReel.PulledBack"/> から流れる。光線は左手の銃の先（<see cref="muzzle"/>）から出る（2026/11/26）。
 ///
 /// **撃ち方は4つから選べる**（<see cref="shotStyle"/>。2026/11/17・小野田さんの変更案）。2026/11/18 から、ロビーコンソールの
 /// プレイヤー挙動「1 狙う・2 発射」（A＝Whip／B＝Aim／C＝SteerSnap／D＝ChargeWhip）で、ホストが全員ぶん決める（<see cref="PlayerBehavior"/>）。
@@ -239,7 +240,10 @@ public class SweeperShooter : MonoBehaviour
     [SerializeField] private bool stopAtWalls = true;
 
     [Header("光線の見た目")]
-    [Tooltip("光線が出てくる手元の高さ（足元から m）")]
+    [Tooltip("光線が出てくる所（左手に持った銃の先。2026/11/26）。体のアニメーションに合わせて動く。空なら、下の高さと出っぱりで決めた体の前の位置から出る")]
+    [SerializeField] private Transform muzzle;
+
+    [Tooltip("光線が出てくる手元の高さ（足元から m）。Muzzle が空のときだけ使う")]
     [Min(0f)]
     [SerializeField] private float handHeight = 1.0f;
 
@@ -910,6 +914,11 @@ public class SweeperShooter : MonoBehaviour
                 wrap?.Release();
                 aimArea?.Hide();
                 animationPlayer?.PlayIdle();
+                // 巻き取りから終わった＝引っ張って飛ばした（ほかの人の体。自分の体は SweeperReel.PulledBack で流す）
+                if (before == ShotPhase.Reeling)
+                {
+                    animationPlayer?.PlayPullRelease(0f);
+                }
                 break;
 
             case ShotPhase.Charging:
@@ -944,11 +953,16 @@ public class SweeperShooter : MonoBehaviour
         }
     }
 
-    /// <summary>光線が出てくる手元の位置。</summary>
+    /// <summary>光線が出てくる手元の位置。銃の先（<see cref="muzzle"/>）があればそこ、無ければ体の前・手の高さ。</summary>
     private Vector3 HandPosition
     {
         get
         {
+            if (muzzle != null && muzzle.gameObject.activeInHierarchy)
+            {
+                return muzzle.position;
+            }
+
             Vector3 forward = transform.forward;
             forward.y = 0f;
             forward = forward.sqrMagnitude > 0.0001f ? forward.normalized : Vector3.forward;

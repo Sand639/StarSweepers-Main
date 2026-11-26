@@ -8,12 +8,13 @@ using UnityEngine;
 /// | --- | --- |
 /// | 足場から落ちている | Drop（落ちる瞬間）→ DropLoot（落ちている間のくり返し。Animator の中でつながる） |
 /// | 物資を両手で持っている | Throw（持ち上げて前へ投げる。投げ終わるまで流し切る） |
-/// | 物資を巻き取っている | Pull（くり返し） |
-/// | 光線を撃った | Shoot（終わったら AimWalk へ戻る） |
-/// | 押して狙っている | AimWalk（歩く速さで再生の速さが変わる。止まっていると止まったポーズ） |
+/// | 物資を後ろへ引っ張った | Pull（1回。いちばん引く所が、物資が飛び出す瞬間に来るよう、途中から流す。2026/11/26） |
+/// | 光線を撃った | Shoot（構えたままの所は飛ばして、撃つ瞬間の少し前から流す。終わったら AimWalk へ戻る。2026/11/26） |
+/// | 押して狙っている・光線を振り回している・物資を巻き取っている | AimWalk（歩く速さで再生の速さが変わる。止まっていると止まったポーズ） |
 /// | それ以外 | Idle（Animator が Speed で Idle と Walk を切り替える） |
 ///
-/// 撃つ・巻き取る・やめるは <see cref="SweeperShooter"/> が呼ぶ。落ちる・両手で持つは、ここで毎フレーム調べる。
+/// 撃つ・巻き取る・やめるは <see cref="SweeperShooter"/> が呼ぶ。引っ張ったは <see cref="SweeperReel.PulledBack"/> から（ほかの人の体は <see cref="SweeperShooter"/> から）。
+/// 落ちる・両手で持つは、ここで毎フレーム調べる。
 /// Animator が無い・その名前の状態が無いときは、何もしない（エラーにもしない）。
 /// 詳しい説明は Documents/機能ドキュメント/プレイヤーの動きのアニメーション.md。
 /// </summary>
@@ -42,7 +43,7 @@ public class SweeperAnimation : MonoBehaviour
     [Tooltip("何もしていないときに戻す状態（Animator が Speed で Idle と Walk を切り替える）。空なら何もしない")]
     [SerializeField] private string idleState = "Idle";
 
-    [Tooltip("物資を巻き取っている間の状態")]
+    [Tooltip("物資を後ろへ引っ張った瞬間に1回流す状態")]
     [SerializeField] private string pullState = "Pull";
 
     [Tooltip("物資を両手で持って投げる状態")]
@@ -64,6 +65,26 @@ public class SweeperAnimation : MonoBehaviour
     [Tooltip("ほかの人の体の速さを、どれだけ早く実際の動きに合わせるか（大きいほど早い）")]
     [Min(0.1f)]
     [SerializeField] private float remoteSmoothing = 10f;
+
+    [Header("撃つ（Shoot）")]
+    [Tooltip("Shoot を、アニメーションの頭から何秒の所から流すか。Shoot は初めの約 0.25 秒が構えたまま止まっていて、0.27 秒で撃った反動が来るので、" +
+             "構えの所を飛ばして、押してすぐ反動が出るようにする（0 で頭から）")]
+    [Min(0f)]
+    [SerializeField] private float shootStartSeconds = 0.2f;
+
+    [Header("引っ張る（Pull）")]
+    [Tooltip("Pull の「いちばん引く所」（腕を振り上げて一気に後ろへ引く瞬間）が、アニメーションの頭から何秒か。ここが物資の飛び出す瞬間に来るように流す")]
+    [Min(0f)]
+    [SerializeField] private float pullPeakSeconds = 0.95f;
+
+    [Tooltip("押してから「いちばん引く所」まで、最低何秒かけるか（引く前の振りかぶりをどれだけ見せるか）。0 で押した瞬間がいちばん引く所。" +
+             "クリティカルで物資が一瞬止まるときは、その間のぶんだけ前から流す")]
+    [Min(0f)]
+    [SerializeField] private float pullLeadSeconds = 0.1f;
+
+    [Tooltip("いちばん引く所からこの秒数たったら、歩き出したときに Pull を切って歩きへ戻す（止まっていれば最後まで流す）")]
+    [Min(0f)]
+    [SerializeField] private float pullWalkCancelSeconds = 0.3f;
 
     [Header("落ちる（Drop）")]
     [Tooltip("最後に立っていた高さより、この距離（m）下へ落ちたら「落ちている」とする")]
@@ -110,6 +131,15 @@ public class SweeperAnimation : MonoBehaviour
     /// <summary>Shoot を流していて、終わったら AimWalk に戻す待ちか。</summary>
     private bool waitingShootEnd;
 
+    /// <summary>引っ張った知らせが来て、次の Update で Pull を流す待ちか。</summary>
+    private bool pullRequested;
+
+    /// <summary>Pull を、アニメーションの頭から何秒の所から流すか（引っ張った知らせのときに決める）。</summary>
+    private float pullOffset;
+
+    /// <summary>Pull の「いちばん引く所」に来る時刻（Time.time）。</summary>
+    private float pullPeakTime;
+
     private bool falling;
     private float groundY;
     private float lastY;
@@ -117,6 +147,7 @@ public class SweeperAnimation : MonoBehaviour
 
     private int shootHash;
     private int throwHash;
+    private int pullHash;
     private int speedHash;
     private int aimSpeedHash;
     private bool hasSpeed;
@@ -138,6 +169,7 @@ public class SweeperAnimation : MonoBehaviour
         groundY = lastY = transform.position.y;
         shootHash = Animator.StringToHash(shootState);
         throwHash = Animator.StringToHash(throwState);
+        pullHash = Animator.StringToHash(pullState);
 
         if (animator != null)
         {
@@ -160,10 +192,43 @@ public class SweeperAnimation : MonoBehaviour
         SetShotMode(Mode.Shoot);
     }
 
-    /// <summary>物資をつかんで巻き取り始めた（Pull）。</summary>
+    private void OnEnable()
+    {
+        if (reel != null)
+        {
+            reel.PulledBack += PlayPullRelease;
+        }
+    }
+
+    private void OnDisable()
+    {
+        if (reel != null)
+        {
+            reel.PulledBack -= PlayPullRelease;
+        }
+    }
+
+    /// <summary>
+    /// 物資をつかんで巻き取り始めた。巻き取っている間は構えたまま（AimWalk）。
+    /// 撃った反動（Shoot）の途中なら、それを流し切ってから AimWalk へ戻る。（2026/11/26：前は巻き取りの間ずっと Pull をくり返していた）
+    /// </summary>
     public void PlayPull()
     {
-        SetShotMode(Mode.Pull);
+        if (shotMode != Mode.Shoot)
+        {
+            shotMode = Mode.Aim;
+        }
+    }
+
+    /// <summary>
+    /// 物資を後ろへ引っ張った（Pull を1回流す）。<paramref name="launchDelay"/> は物資が実際に飛び出すまでの秒数（クリティカルの一瞬止まる間）。
+    /// 「いちばん引く所」が飛び出す瞬間に来るよう、Pull を途中から流す。
+    /// </summary>
+    public void PlayPullRelease(float launchDelay)
+    {
+        float lead = Mathf.Max(pullLeadSeconds, Mathf.Max(0f, launchDelay));
+        pullOffset = Mathf.Clamp(pullPeakSeconds - lead, 0f, pullPeakSeconds);
+        pullRequested = true;
     }
 
     /// <summary>投げ終わった・やめた。</summary>
@@ -220,10 +285,31 @@ public class SweeperAnimation : MonoBehaviour
 
         Mode want = falling ? Mode.Fall : ReadCarrying() ? Mode.Throw : shotMode;
 
+        // 引っ張った：Pull を1回流す（落ちている・両手で投げている間は流さない）
+        if (pullRequested)
+        {
+            pullRequested = false;
+            if (want != Mode.Fall && want != Mode.Throw && current != Mode.Throw)
+            {
+                Enter(Mode.Pull);
+                return;
+            }
+        }
+
         // 投げる動きは、持ち終わっても振り切るまで流す（落ちた・次を撃ったときは切り替える）
         if (current == Mode.Throw && want == Mode.Move && IsPlaying(throwHash))
         {
             want = Mode.Throw;
+        }
+
+        // 引っ張る動きも振り切るまで流す。ただし、いちばん引く所を過ぎてから歩き出したら歩きへ戻す（足が滑って見えないように）。次を撃ったら切り替える
+        if (current == Mode.Pull && want == Mode.Move && IsPlaying(pullHash))
+        {
+            bool walking = speed > 0.1f;
+            if (!walking || Time.time < pullPeakTime + pullWalkCancelSeconds)
+            {
+                want = Mode.Pull;
+            }
         }
 
         if (want != current)
@@ -248,8 +334,11 @@ public class SweeperAnimation : MonoBehaviour
         {
             case Mode.Fall: Play(dropState); break;
             case Mode.Throw: Play(throwState); break;
-            case Mode.Pull: Play(pullState); break;
-            case Mode.Shoot: waitingShootEnd = Play(shootState); break;
+            case Mode.Pull:
+                Play(pullState, pullOffset);
+                pullPeakTime = Time.time + (pullPeakSeconds - pullOffset);
+                break;
+            case Mode.Shoot: waitingShootEnd = Play(shootState, shootStartSeconds); break;
             case Mode.Aim: Play(aimState); break;
             default: Play(idleState); break;
         }
@@ -343,8 +432,8 @@ public class SweeperAnimation : MonoBehaviour
         return state.shortNameHash == hash && state.normalizedTime >= 1f;
     }
 
-    /// <summary>その名前の状態があれば切り替える。切り替えたら true。</summary>
-    private bool Play(string stateName)
+    /// <summary>その名前の状態があれば切り替える。<paramref name="startSeconds"/> はアニメーションの頭から何秒の所から流すか。切り替えたら true。</summary>
+    private bool Play(string stateName, float startSeconds = 0f)
     {
         if (animator == null || !animator.isActiveAndEnabled || string.IsNullOrEmpty(stateName))
         {
@@ -357,7 +446,7 @@ public class SweeperAnimation : MonoBehaviour
             return false;
         }
 
-        animator.CrossFadeInFixedTime(hash, crossFade, 0, 0f);
+        animator.CrossFadeInFixedTime(hash, crossFade, 0, Mathf.Max(0f, startSeconds));
         return true;
     }
 

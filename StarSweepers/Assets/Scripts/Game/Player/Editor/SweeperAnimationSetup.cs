@@ -18,7 +18,7 @@ public static class SweeperAnimationSetup
     {
         ("AN_Character_Aimwalk.fbx", "AN_AimWalk_SK.anim", "AimWalk", true),
         ("AN_Shoot.fbx", "AN_Shoot_SK.anim", "Shoot", false),
-        ("AN_Pull.fbx", "AN_Pull_SK.anim", "Pull", true),
+        ("AN_Pull.fbx", "AN_Pull_SK.anim", "Pull", false), // 2026/11/26：引っ張った瞬間に1回だけ流す形にしたので、くり返さない
         ("AN_Throw.fbx", "AN_Throw_SK.anim", "Throw", false),
         ("AN_Drop.fbx", "AN_Drop_SK.anim", "Drop", false),
         ("AN_DropLoot.fbx", "AN_DropLoot_SK.anim", "DropLoot", true),
