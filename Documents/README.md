@@ -255,7 +255,7 @@ StarSweepers-Main/                     ← リポジトリのルート
     │   │   └── SG_Character/・SG_Stage/  Hansさんのスクリプト（動かす前に本人の了承が要る）
     │   ├── Resources/            名前で読み込むもの（タイトル・ロビーの画面のプレハブ、ボタンのテーマ、名前タグ、デブリセットのUI、高単価デブリのルーレットUI、カウントダウンの画像、**音（Audio/BGM・Audio/SE）**）
     │   └── Scenes/               シーン（直下の SpaceJunkMapList.asset は、使うマップの一覧）
-    │       ├── MainLoop/             タイトルとロビー（TitleScene・Lobby。2026/11/11 から Lobby。前のロビー SpaceJunkLobby は使っていない）
+    │       ├── MainLoop/             タイトルとロビー（StarSweepersTitle・Lobby）
     │       ├── Stage/            ステージ（`STAGE_Simple`・`STAGE_Train` など。名前の付け方と一覧は `宇宙ごみのマップの作り方.md`）
     │       ├── HansStages/       Hansさんのステージ
     │       └── Test/             機能ごとの検証用シーン（ビルドには含めない）。いまは `SceneTransitionTest`・`TeamScoreBarUITest`・`DebrisSetUITest`・`StageBarrierTest`・`GoalScoreEffectTest`・`HighValueRouletteUITest`・`ProceduralStarrySkyTest`・`GoalEffectTest`・`SweeperWhipTest`・`ElectricDebrisTest`・`MatchVictoryShowcaseTest`（ほかはメニューで作る）
@@ -341,7 +341,7 @@ StarSweepers-Main/                     ← リポジトリのルート
 5. Unity Hub の「プロジェクトを開く」で、`StarSweepers-Main/StarSweepers`（`Assets` が入っている方）フォルダを選ぶ。
    - リポジトリのルートを選ぶと開けないので注意。
 6. 初回起動はライブラリ生成のため時間がかかる。エラーが出た場合はリーダーかAIに相談すること。
-7. `Assets/Scenes/MainLoop/TitleScene.unity` が開ければ成功。ゲームとして遊ぶときは、それを再生する（タイトルから始まる）。
+7. `Assets/Scenes/MainLoop/StarSweepersTitle.unity` が開ければ成功。ゲームとして遊ぶときは、それを再生する（タイトルから始まる）。
 
 > `Library/` や `Temp/` などUnityが自動生成するフォルダはGitに含めない設定になっている（`.gitignore` 済み）。
 > 「Gitに出てこないファイルがある」と感じても、それは正常な場合が多い。
@@ -765,3 +765,4 @@ Unityは `.meta` ファイルで各アセットの参照を管理しているた
 | 11/25（水） | Claude Code | リポジトリ構成の図の `Scenes/Test/` の検証シーンに `MatchVictoryShowcaseTest` を足した（勝利演出のメンバー紹介の検証シーンができたため）。ルールは変えていない |
 | 11/25（水） | Claude Code | リポジトリ構成の図の `Resources/` に、カウントダウンの画像のプレハブを足した（試合前の 3・2・1・START! を画像にしたため）。ルールは変えていない |
 | 11/26（木） | Claude Code | リポジトリ構成の図の `Resources/` に音の置き場所（`Audio/BGM`・`Audio/SE`）を、`Common/Settings` に音の係を足した（BGM とボタンの効果音を入れたため。小野田さんの依頼で `Resources/Audio` に置くと決めた）。ルールは変えていない |
+| 11/27（金） | Codex（依頼：ソウホイチョン） | 現在の起動・検証先を新しい StarSweepersTitle に更新 |

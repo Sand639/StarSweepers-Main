@@ -65,7 +65,7 @@ public class SceneTransition : MonoBehaviour
     private int nextMonitorTicket;
     private float monitorDeadline;
     private bool monitorPlaying;
-    private RenderTexture savedResultFrame;
+    private Texture2D savedResultFrame;
 
     /// <summary>勝利演出に入る直前の結果を、戻りのモニターに残す。フレームの描画後に呼ぶ。</summary>
     public static void SaveResultFrame()

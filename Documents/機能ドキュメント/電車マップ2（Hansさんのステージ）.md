@@ -58,7 +58,7 @@
 
 ## 試し方
 
-1. Unity で `Assets/Scenes/MainLoop/TitleScene.unity` を再生する
+1. Unity で `Assets/Scenes/MainLoop/StarSweepersTitle.unity` を再生する
 2. ロビーまで進み、マップで「電車マップ2」を選ぶ
 3. 試合を始める
 
@@ -120,3 +120,4 @@
 | 2026/11/18 | Codex（依頼：ソウホイチョン） | 列車2の場面に中央大型と左右小型2本のランダム切り替えを適用。再生確認はまだ |
 
 | 2026/11/17 | Claude Code（依頼：大槻 海斗） | 背景の星空をほかのマップと同じにした（星空の回転 `SkyboxController` とシーンの空の設定を外した）。回転の部品が実は動いていて、共通の星空の素材を書き換えていたことを書いた |
+| 2026/11/27 | Codex（依頼：ソウホイチョン） | 現在の起動・検証先を新しい StarSweepersTitle に更新 |

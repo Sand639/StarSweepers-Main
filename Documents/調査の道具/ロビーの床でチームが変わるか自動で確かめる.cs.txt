@@ -46,7 +46,7 @@ public static class TempLobbyPadPlayProbe
         SessionState.SetInt("TempLobbyPadPlayProbe.Out4", 0);
         SessionState.SetFloat(TimeKey, 0f);
         SessionState.SetFloat(StartKey, 0f);
-        EditorSceneManager.OpenScene("Assets/Scenes/MainLoop/TitleScene.unity");
+        EditorSceneManager.OpenScene("Assets/Scenes/MainLoop/StarSweepersTitle.unity");
         EditorApplication.update += Tick;
         EditorApplication.EnterPlaymode();
     }
@@ -226,3 +226,5 @@ public static class TempLobbyPadPlayProbe
         EditorApplication.Exit(code);
     }
 }
+
+// 2026/11/27 Codex: 起動先を StarSweepersTitle に更新。

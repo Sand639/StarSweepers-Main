@@ -88,14 +88,14 @@ public partial class PauseMenu
             QuitGame);
     }
 
-    /// <summary>「タイトルにもどる」を押したとき。確かめてから戻る。</summary>
+    /// <summary>「タイトルに戻る」を押したとき。確かめてから戻る。</summary>
     private void ConfirmReturnToTitle()
     {
         ShowConfirm(
-            IsInMatch() ? "試合から抜けてタイトル画面に戻ります" : "ロビーから抜けてタイトル画面に戻ります",
+            "タイトル画面に戻ります",
             "※ホストの場合は全員がタイトル画面に戻されます",
             "ゲームをつづける",
-            "タイトルにもどる",
+            "タイトルに戻る",
             () =>
             {
                 // 止めた時間やカーソルを元に戻してから移る
@@ -104,7 +104,7 @@ public partial class PauseMenu
             });
     }
 
-    /// <summary>いま「タイトルにもどる」を出せる場面か。</summary>
+    /// <summary>いま「タイトルに戻る」を出せる場面か。</summary>
     private static bool CanGoToTitle()
     {
         return CanReturnToTitle != null && ReturnToTitle != null && CanReturnToTitle();

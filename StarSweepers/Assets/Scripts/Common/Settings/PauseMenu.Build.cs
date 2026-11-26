@@ -85,11 +85,11 @@ public partial class PauseMenu
             CreateMenuItem(mainPage.transform, "ロビーに戻る", y, ConfirmReturnToLobby);
         }
 
-        // つながっている間は「タイトルにもどる」を出す（ロビーでも、ホスト以外でも出る。2026/10/6）
+        // ロビーや試合からタイトルへ戻れる場合に出す。
         if (CanGoToTitle())
         {
             y -= ItemHeight + ItemGap;
-            CreateMenuItem(mainPage.transform, "タイトルにもどる", y, ConfirmReturnToTitle);
+            CreateMenuItem(mainPage.transform, "タイトルに戻る", y, ConfirmReturnToTitle);
         }
 
         y -= ItemHeight + ItemGap;

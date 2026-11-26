@@ -3,7 +3,7 @@
 | 項目 | 内容 |
 | --- | --- |
 | スクリプト | `StarSweepers/Assets/Scripts/TitleScene/UI/TitleScreen.cs`（まとめ役）と、同じフォルダの係のスクリプト10本（下の表） |
-| 付いている場所 | `Assets/Resources/TitleScreen.prefab`（`Scenes/MainLoop/TitleScene.unity` に置いてある）。**プレハブに付いているのは `TitleScreen` だけ**で、係はコードの中で作られる |
+| 付いている場所 | `Assets/Scenes/MainLoop/StarSweepersTitle.unity` の `TitleScreen`。各画面の係はコードの中で作られる |
 | 遊ぶ人から見た説明 | `機能ドキュメント/タイトル画面.md` |
 | 関係するスクリプト | 印：`TitleMenuButton`・`TitlePart`・`TitleInput`・`TitleSettingRow`（同じフォルダ）／タイトルとロビーの行き来：`TitleSceneFlow`／つなぐ係：`InternetConnection`・`LanRoomDiscovery`・`SteamFriendsService` |
 
@@ -142,3 +142,4 @@ TitleScreen ─┬→ TitleCreateRoom ──┐
 | 2026/11/26 | Codex（依頼：ソウホイチョン） | ノートのページ切り替えとロボットの表示を切り離し、キーホルダーの登場時の処理名を更新 |
 | 2026/11/26 | Claude Code（依頼：ソウホイチョン） | 部屋を作るの部品を新デザインに組み替え、公開のしかたの行を出さないようにした（TitleCreateRoom） |
 | 2026/11/27 | Codex（依頼：ソウホイチョン） | 部屋作成の接続方法と人数の選択を、金色の下地が滑る表示にした。C# コンパイル確認済み、再生確認は未実施。シーン・プレハブの変更なし |
+| 2026/11/27 | Codex（依頼：ソウホイチョン） | 現在の起動・検証先を新しい StarSweepersTitle に更新 |

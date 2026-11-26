@@ -13,7 +13,7 @@ using UnityEngine.UI;
 [DisallowMultipleComponent]
 public class TitleScreen : MonoBehaviour
 {
-    public const string TitleSceneName = "TitleScene";
+    public const string TitleSceneName = "StarSweepersTitle";
     public const string LobbySceneName = "Lobby";
 
     /// <summary>Resources の中の画面のプレハブの名前。</summary>

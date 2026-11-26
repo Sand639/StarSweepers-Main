@@ -18,8 +18,8 @@ internal sealed class MonitorTransitionEffect : SceneTransitionEffect
     private RawImage destination;
     private Image blocker;
     private CanvasGroup opacity;
-    private RenderTexture sourceFrame;
-    private RenderTexture resultFrame;
+    private Texture2D sourceFrame;
+    private Texture2D resultFrame;
     private RenderTexture destinationFrame;
     private bool loaded;
 
@@ -45,7 +45,7 @@ internal sealed class MonitorTransitionEffect : SceneTransitionEffect
         frame.enabled = artwork != null;
     }
 
-    public void CaptureSource(RenderTexture savedResult)
+    public void CaptureSource(Texture2D savedResult)
     {
         sourceFrame = CaptureScreen("MonitorPreviousFrame");
         source.texture = sourceFrame;
@@ -140,19 +140,12 @@ internal sealed class MonitorTransitionEffect : SceneTransitionEffect
         return new RenderTexture(Mathf.Max(1, width), Mathf.Max(1, height), 24) { name = name };
     }
 
-    public static RenderTexture CaptureScreen(string name)
+    public static Texture2D CaptureScreen(string name)
     {
-        RenderTexture frame = CreateFrame(name, Screen.width, Screen.height);
-        try
-        {
-            ScreenCapture.CaptureScreenshotIntoRenderTexture(frame);
-            return frame;
-        }
-        catch
-        {
-            Object.Destroy(frame);
-            throw;
-        }
+        // 画面の向きがそろったスクリーンショットを使う。描画先を直接写すと上下が逆になることがある。
+        Texture2D frame = ScreenCapture.CaptureScreenshotAsTexture();
+        frame.name = name;
+        return frame;
     }
 
     private static Rect CropUV(Texture texture, Rect window)

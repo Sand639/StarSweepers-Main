@@ -65,7 +65,7 @@
 
 ## モニターの演出（2026/11/27）
 
-`MonitorTransitionEffect` は元画像の2つの透明窓の裏に画面を置き、操作盤を拡大縮小して視点が移るように見せる。前の画は描画の最後にUIごと記録し、次の画は切り替え後のベースカメラから一枚描く。試合結果の保存分があれば、引いている間に左上へ出す。
+`MonitorTransitionEffect` は元画像の2つの透明窓の裏に画面を置き、操作盤を拡大縮小して視点が移るように見せる。前の画と試合結果は描画の最後に `CaptureScreenshotAsTexture` でUIごと記録し、正しい向きで左上に出す。次の画は切り替え後のベースカメラから一枚描く。
 
 `SceneTransition` の `monitorPlaying` は演出中の操作を止める。`monitorTicket` と `nextMonitorTicket` は今回の完了通知を見分ける番号。`monitorWaitingClients` は通知待ちの参加者、`monitorDeadline` は待つ期限。`savedResultFrame` に勝利紹介直前の結果を置き、演出側へ渡すかシーン切り替え時に解放する。
 
@@ -79,3 +79,4 @@
 丸い色帯はSceneTransitionType.RoundedStripes。RoundedStripesTransitionEffectが6本の帯を右から広げ、次のシーンが届いたら左へ抜く。既存のPlay・PlayForEveryoneで選べる。
 
 | 2026/11/19 | Codex | 丸い色帯の種類と、結果検証からの呼び出しを追記 |
+| 2026/11/27 | Codex（依頼：ソウホイチョン） | 切り替え前と保存した結果が上下逆に見える問題に対応し、ゲーム画面のスクリーンショットに変更。C# コンパイル確認済み、再生確認は未実施 |

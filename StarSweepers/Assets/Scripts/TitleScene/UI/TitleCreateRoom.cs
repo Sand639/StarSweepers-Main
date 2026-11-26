@@ -115,7 +115,7 @@ public class TitleCreateRoom
         NetworkManager manager = NetworkManager.Singleton;
         if (manager == null)
         {
-            Debug.LogError("[UI] NetworkManager が見つかりません。TitleScene に SpaceJunkNetworkManager のプレハブがあるか確かめてください。");
+            Debug.LogError($"[UI] NetworkManager が見つかりません。{TitleScreen.TitleSceneName} に SpaceJunkNetworkManager のプレハブがあるか確かめてください。");
             return;
         }
 
