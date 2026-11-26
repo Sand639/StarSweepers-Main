@@ -35,7 +35,7 @@ public static class DebrisSetUISetup
 
     // 1チームの表示の大きさ（画像の元の大きさに対する倍率。1920×1080 の画面での値）と置き場所
     private const float PanelScale = 0.825f;
-    private const float PanelSide = -20f; // マイナス＝画面の外。腕の付け根（棒の先）が画面に見えないように
+    private const float PanelSide = 20f; // 画面の枠（ScreenFrameUI。太さ 40）の内側に腕が来るように。棒の端は枠の下に隠れる
     private const float PanelTop = 150f;
     private const float PanelRowGap = 176f;
 
