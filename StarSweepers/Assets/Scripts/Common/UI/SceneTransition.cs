@@ -89,6 +89,7 @@ public class SceneTransition : MonoBehaviour
     }
 
     public static bool BlocksGameplayInput => Current != null && Current.monitorPlaying;
+    internal static bool IsPlaying => Current != null && Current.playing;
 
     /// <summary>最初のラウンドの時計は、参加者全員の画面が開いてから始める。</summary>
     public static bool MonitorHandoffPending

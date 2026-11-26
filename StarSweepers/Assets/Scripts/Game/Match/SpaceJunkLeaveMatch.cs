@@ -70,7 +70,7 @@ public static class SpaceJunkLeaveMatch
         {
             if (manager.IsServer)
             {
-                // ホスト：全員でロビーへ戻る（試合が終わったときと同じ戻り方）
+                // ホスト：モニターの演出を出し、全員でロビーへ戻る。
                 if (session != null && session.ServerReturnToLobby())
                 {
                     Debug.Log("[JUNK] ホストがポーズ画面から試合を打ち切りました。全員でロビーへ戻ります。");

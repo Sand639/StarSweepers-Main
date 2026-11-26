@@ -224,19 +224,40 @@ public partial class SpaceJunkSession
     public string LobbySceneName => lobbySceneName;
 
     /// <summary>
-    /// **ポーズ画面の「ロビーに戻る」をホストが押したとき。** 試合を打ち切って、全員をロビーへ戻す。
+    /// **ポーズ画面の「ロビーに戻る」をホストが押したとき。** モニターを通って全員をロビーへ戻す。
     /// ホストでなければ何もせず false（<see cref="SpaceJunkLeaveMatch"/> から呼ばれる）。
     /// </summary>
     public bool ServerReturnToLobby()
     {
-        if (!IsServer)
+        if (!IsSpawned || !IsServer)
         {
             return false;
         }
 
+        if (state.Value == SpaceJunkMatchState.Lobby)
+        {
+            return true;
+        }
+
         StopAllCoroutines();
-        AbortToLobby();
+        // 戻る途中にラウンドが終わっても、次のラウンドや結果表示を始めない。
+        roundResultActive = true;
+        StartCoroutine(ReturnToLobbyWithMonitor());
         return true;
+    }
+
+    private IEnumerator ReturnToLobbyWithMonitor()
+    {
+        // すでにシーンが切り替わり始めていれば、覆いが消えるのを待つ。
+        while (IsSpawned && IsServer && state.Value != SpaceJunkMatchState.Lobby)
+        {
+            if (!SceneTransition.IsPlaying && SceneTransition.PlayForEveryone(AbortToLobby, SceneTransitionType.Monitor))
+            {
+                yield break;
+            }
+
+            yield return null;
+        }
     }
 
     /// <summary>試合を打ち切って、全員をロビーへ戻す。</summary>
