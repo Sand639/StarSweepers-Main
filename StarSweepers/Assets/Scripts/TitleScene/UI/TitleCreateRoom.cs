@@ -11,6 +11,8 @@ public class TitleCreateRoom
     private readonly TitleInputFields inputs;
     private readonly Button namedRoomSubmit;
     private readonly CanvasGroup submitAppearance;
+    private readonly TitleSelectionRail connectionRail;
+    private readonly TitleSelectionRail playersRail;
 
     // LAN（lan）／パブリック（どちらも false）／プライベート（privateRoom だけ true）
     private int maxPlayers = SpaceJunkTeams.MaxPlayers;
@@ -27,7 +29,17 @@ public class TitleCreateRoom
             maxPlayers = MinPlayers;
             submitAppearance = namedRoomSubmit.GetComponent<CanvasGroup>();
             inputs.ServerNameChanged += RefreshSubmit;
+            GameObject page = parts.Object(TitlePartRole.PageCreate);
+            connectionRail = TitleSelectionRail.Create(page, TitleButtonAction.UseInternet, TitleButtonAction.SetLan);
+            playersRail = TitleSelectionRail.Create(page, TitleButtonAction.SetPlayerLimit2,
+                TitleButtonAction.SetPlayerLimit4, TitleButtonAction.SetPlayerLimit6, TitleButtonAction.SetPlayerLimit8);
         }
+    }
+
+    public void Update()
+    {
+        connectionRail?.Update(Time.unscaledDeltaTime);
+        playersRail?.Update(Time.unscaledDeltaTime);
     }
 
     /// <summary>画面を、今の選び方（人数・公開のしかた）で出し直す。</summary>

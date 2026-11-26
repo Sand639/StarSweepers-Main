@@ -105,6 +105,7 @@ public class TitleScreen : MonoBehaviour
         }
 
         tablet.Update();
+        createRoom.Update();
 
         // つないでいる途中の表示が出ている間は戻らない（表示のボタンで閉じる）
         if (WasBackPressed() && !busy.IsShown)
