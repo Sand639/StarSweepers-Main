@@ -70,7 +70,7 @@ public static class ScreenFrameUISetup
         var root = new GameObject("ScreenFrameUI", typeof(RectTransform));
         var canvas = root.AddComponent<Canvas>();
         canvas.renderMode = RenderMode.ScreenSpaceOverlay;
-        canvas.sortingOrder = 40; // 試合のUI（得点バー 10・デブリセット 20・警告の帯 30）より手前、始まりの演出（85）・ポーズ画面（100）より奥
+        canvas.sortingOrder = -100; // UI の中でいちばん奥（ステージに置いた画面の 0、得点バー 10・デブリセット 20 などより後ろ）
 
         var scaler = root.AddComponent<CanvasScaler>();
         scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;

@@ -76,7 +76,7 @@ Test Event Running をオフにすると「イベントが終わった」扱い�
 ```
 DebrisSetUI（Canvas：画面に重ねる・並び順 20、CanvasScaler：1920×1080 基準、DebrisSetUI）
 └ Content（表示ごと隠す）
-   ├ Panel0（左上の角。Scale 0.825。画面の端から 20 ＝画面の枠（ScreenFrameUI）の内側。棒の端は画面の枠の下に隠れる）
+   ├ Panel0（左上の角。Scale 0.825。画面の端から -20 ＝棒の端を画面の外に。画面の枠（ScreenFrameUI）より手前）
    │  ├ Rod（腕の棒 UI_SET_03_03。腕とは別に回す。いちばん奥）
    │  └ Body（腕・枠・カードをまとめて回す）
    │     ├ Frame（枠 UI_SET_04_01。Filled・横）
@@ -122,3 +122,4 @@ DebrisSetUI（Canvas：画面に重ねる・並び順 20、CanvasScaler：1920×
 | 2026/11/25 | Claude Code（依頼：大槻 海斗） | 仮の画面のお題の文字の行を消したので、`IsShowing` を見ている所が無くなったことを書いた |
 | 2026/11/26 | Claude Code（依頼：大槻 海斗） | 腕と棒を別の画像（`UI_SET_03_01`・`UI_SET_03_03`）にして、つなぎ目を中心に別々に回す動き（`ArmSwing`、`Rod`）にしたことを書いた。Arm Root・`ArmMoveEnd`・`ArmSwingStart`・`EaseOutBack` はやめた |
 | 2026/11/26 | Claude Code（依頼：大槻 海斗） | お題の枠の置き場所を、画面の枠の内側（画面の端から 20）にしたことを書いた |
+| 2026/11/26 | Claude Code（依頼：大槻 海斗） | お題の枠の置き場所を -20 に戻したことを書いた（画面の枠を UI のいちばん後ろにしたため） |

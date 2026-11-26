@@ -19,7 +19,7 @@
 ## プレハブの作り（`ScreenFrameUISetup`）
 
 ```
-ScreenFrameUI（Canvas：画面に重ねる・並び順 40、CanvasScaler：1920×1080 基準、ScreenFrameUI）
+ScreenFrameUI（Canvas：画面に重ねる・並び順 -100（UI の中でいちばん奥）、CanvasScaler：1920×1080 基準、ScreenFrameUI）
 └ Content（表示ごと隠す）
    └ Frame（枠の画像。9分割（Sliced）。画面いっぱいから右に 5、下に 3 はみ出す）
 ```
@@ -30,7 +30,7 @@ ScreenFrameUI（Canvas：画面に重ねる・並び順 40、CanvasScaler：1920
 ## 気をつけること
 
 - **Test Mode は、Resources のプレハブではオフのまま**にする（オンだと、タイトルやロビーでも枠が出る）。自動テスト `Prefab_IsInResourcesAndWired` が確かめる
-- 並び順 40 より手前に出したい試合のUIができたら、そちらの並び順を 40 より大きくする（いまは始まりの演出 85・ポーズ画面 100・勝敗の切り替え 30000）
+- 並び順は -100 で、ほかの UI（ステージに置いた画面の 0 など）よりすべて後ろ。枠より後ろに出したい UI を作るときは、そちらを -100 より小さくする
 - 2026/11/26 のプレハブは、Unity を使わずにファイルを直接作った（本人が Unity を開いていたため）。メニューで作り直すと、ツールの通りに作り直される
 
 ## 変更ログ
@@ -38,3 +38,4 @@ ScreenFrameUI（Canvas：画面に重ねる・並び順 40、CanvasScaler：1920
 | 日付 | 変更者 | 内容 |
 | --- | --- | --- |
 | 2026/11/26 | Claude Code（依頼：大槻 海斗） | 新規作成 |
+| 2026/11/26 | Claude Code（依頼：大槻 海斗） | 並び順を 40 → -100（UI の中でいちばん奥）にした |
