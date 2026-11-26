@@ -42,7 +42,7 @@
 | --- | --- |
 | `SpaceJunkRound` / `SpaceJunkSession` / `SpaceJunkTeams` | 値を読むだけ（得点は NetworkList、残り時間はサーバーの時刻から計算、チーム数は NetworkVariable なので、**どのPCでも同じ値**） |
 | `TeamScoreFlameEffect` | `ScoreChanged` を受けて炎を燃え上がらせる。`SlotOfTeam`・`SegmentOfSlot`・`ScoreTextOfSlot` で帯と数字を探す |
-| `SpaceJunkMatchUI`（仮の画面） | `OccupiedScreenHeight` が 0 より大きい間、残り時間を出さず、見出し・イベントの一行・左のチームの行をバーの下へずらす。0 のときは前と同じ位置 |
+| `SpaceJunkMatchUI`（仮の画面） | `OccupiedScreenHeight` が 0 より大きい間、残り時間を出さない（バーの丸に任せる）。見出し・イベントの一行・左のチームの行は、2026/11/25〜26 にやめた |
 
 ## メニュー（`TeamScoreBarUISetup`）
 
@@ -104,3 +104,4 @@
 | 2026/11/12 | Claude Code（依頼：ソウホイチョン） | DSEG のフォントの作り方と、フォントを付けるメニューを書いた |
 | 2026/11/12 | Claude Code（依頼：ソウホイチョン） | フレーム版の炎の層（FireArea）と、それを足すメニューを書いた |
 | 2026/11/17 | Claude Code（依頼：ソウホイチョン） | ステージに置くメニューを、フレーム版を全ステージに置く（今までの版と入れ替える）形に直したので書き直した |
+| 2026/11/26 | Claude Code（依頼：大槻 海斗） | 仮の画面が `OccupiedScreenHeight` を見て行うことを、残り時間を出さないことだけに直した（イベントの一行などをやめたため） |
