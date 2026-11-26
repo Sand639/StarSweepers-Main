@@ -56,6 +56,9 @@ EditorBuildSettings:
   - enabled: 1
     path: Assets/Scenes/Test/LobbyTestVersion.unity
     guid: 0265d9b4a4b14378a79adebbe49671b2
+  - enabled: 1
+    path: Assets/Scenes/MainLoop/StarSweepersTitle.unity
+    guid: 48fc8bceb8ed65742ad3a5d01b31e53c
   m_configObjects:
     com.unity.input.settings.actions: {fileID: -944628639613478452, guid: 052faaac586de48259a63d0c4782560b, type: 3}
   m_UseUCBPForAssetBundles: 0
