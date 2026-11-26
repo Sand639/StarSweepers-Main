@@ -1,33 +1,70 @@
 using UnityEngine;
 
 /// <summary>
-/// **プレイヤー（本実装）のアニメーションの切り替え口。**（2026/10/27・小野田さんの仕様）
+/// **プレイヤー（本実装）のアニメーションの切り替え口。**（2026/10/27・小野田さんの仕様。2026/11/25 に動きのアニメーションを追加）
 ///
-/// ・狙い始めたら <c>A_AIM_01</c>
-/// ・光線を撃った瞬間に <c>A_SHOOT</c> を流し、**終わったら <c>A_AIM_01</c> に戻る**
-/// ・投げ終わったら Idle State（空なら何もしない。Animator の流れに任せる）
+/// 優先の高い順に、1つだけ流す。
+/// | いまの様子 | 流す状態 |
+/// | --- | --- |
+/// | 足場から落ちている | Drop（落ちる瞬間）→ DropLoot（落ちている間のくり返し。Animator の中でつながる） |
+/// | スタンしている | Fall（倒れる。終わったら倒れたポーズのまま）。スタンが解けたら Rise（起き上がる。流し切る）。2026/11/26 |
+/// | 物資を両手で持っている | Throw（持ち上げて前へ投げる。投げ終わるまで流し切る） |
+/// | 物資を巻き取っている | Pull（くり返し） |
+/// | 光線を撃った | Shoot（終わったら AimWalk へ戻る） |
+/// | 押して狙っている | AimWalk（歩く速さで再生の速さが変わる。止まっていると止まったポーズ） |
+/// | それ以外 | Idle（Animator が Speed で Idle と Walk を切り替える） |
 ///
-/// ・歩く速さを Animator の Speed に渡す（AC_SweeperPlayer が Idle と Walk を切り替える。2026/11/12）
-///
+/// 撃つ・巻き取る・やめるは <see cref="SweeperShooter"/> が呼ぶ。落ちる・スタン・両手で持つは、ここで毎フレーム調べる。
 /// Animator が無い・その名前の状態が無いときは、何もしない（エラーにもしない）。
+/// 詳しい説明は Documents/機能ドキュメント/プレイヤーの動きのアニメーション.md。
 /// </summary>
 public class SweeperAnimation : MonoBehaviour
 {
+    private enum Mode
+    {
+        Move,
+        Aim,
+        Shoot,
+        Pull,
+        Throw,
+        Drop,
+        Stun,
+        Rise,
+    }
+
     [Tooltip("動かす Animator。空なら体の子から探す")]
     [SerializeField] private Animator animator;
 
     [Header("状態の名前（Animator の中の名前）")]
     [Tooltip("撃った瞬間に流す状態")]
-    [SerializeField] private string shootState = "A_SHOOT";
+    [SerializeField] private string shootState = "Shoot";
 
     [Tooltip("狙っている間の状態。撃ったあとも、ここへ戻る")]
-    [SerializeField] private string aimState = "A_AIM_01";
+    [SerializeField] private string aimState = "AimWalk";
 
-    [Tooltip("投げ終わったときに戻す状態。空なら何もしない")]
-    [SerializeField] private string idleState = "";
+    [Tooltip("何もしていないときに戻す状態（Animator が Speed で Idle と Walk を切り替える）。空なら何もしない")]
+    [SerializeField] private string idleState = "Idle";
+
+    [Tooltip("物資を巻き取っている間の状態")]
+    [SerializeField] private string pullState = "Pull";
+
+    [Tooltip("物資を両手で持って投げる状態")]
+    [SerializeField] private string throwState = "Throw";
+
+    [Tooltip("足場から落ち始めたときの状態（終わると Animator の中で落ちている間のくり返しへ移る）")]
+    [SerializeField] private string dropState = "Drop";
+
+    [Tooltip("スタンしたときの状態（倒れる。2026/11/26）")]
+    [SerializeField] private string stunState = "Fall";
+
+    [Tooltip("スタンが解けたときの状態（起き上がる。流し切る）")]
+    [SerializeField] private string riseState = "Rise";
 
     [Tooltip("歩く速さを渡す float のパラメーター名。空・無ければ渡さない")]
     [SerializeField] private string speedParameter = "Speed";
+
+    [Tooltip("狙い歩きの再生の速さを渡す float のパラメーター名（歩く速さ ÷ ふだんの歩く速さ）。空・無ければ渡さない")]
+    [SerializeField] private string aimSpeedParameter = "AimSpeed";
 
     [Tooltip("状態を切り替えるときのつなぎの秒数")]
     [Min(0f)]
@@ -37,18 +74,64 @@ public class SweeperAnimation : MonoBehaviour
     [Min(0.1f)]
     [SerializeField] private float remoteSmoothing = 10f;
 
+    [Header("落ちる（Drop）")]
+    [Tooltip("最後に立っていた高さより、この距離（m）下へ落ちたら「落ちている」とする")]
+    [Min(0f)]
+    [SerializeField] private float fallDepth = 1f;
+
+    [Tooltip("下向きにこの速さ（m/秒）より速く動いているときだけ「落ちている」とする（ゆっくり下がる床で誤って流さないため）")]
+    [Min(0f)]
+    [SerializeField] private float fallSpeed = 3f;
+
+    [Tooltip("上下の動きがこの秒数止まったら、立っている（着いた）とする")]
+    [Min(0f)]
+    [SerializeField] private float landSeconds = 0.15f;
+
+    [Header("両手（両手で持った物を手に合わせる）")]
+    [Tooltip("左手の骨。名前か、途中の骨からのたどり方（例：JNT_Shoulder_L/JNT_Arm_L/JNT_Hand_L）")]
+    [SerializeField] private string leftHandBone = "JNT_Shoulder_L/JNT_Arm_L/JNT_Hand_L";
+
+    [Tooltip("右手の骨。新しいリグ（2026/11/26）では右腕も JNT_Arm_L・JNT_Hand_L という名前なので、肩からのたどり方で書く")]
+    [SerializeField] private string rightHandBone = "JNT_Shoulder_L2/JNT_Arm_L/JNT_Hand_L";
+
+    /// <summary>上下の速さがこれより小さければ「止まっている」（m/秒）。</summary>
+    private const float StillSpeed = 0.5f;
+
+    /// <summary>1 フレームでこれより大きく上下に動いたら、瞬間移動（出てくる場所へ戻された等）とみなす（m）。</summary>
+    private const float TeleportDistance = 2f;
+
     private SweeperMover mover;
+    private SweeperReel reel;
+    private SweeperNetSync netSync;
+    private PlayerStun stun;
     private CharacterController characterController;
     private Unity.Netcode.NetworkObject network;
+    private Transform leftHand;
+    private Transform rightHand;
     private Vector3 lastPosition;
     private float remoteSpeed;
 
-    /// <summary>A_SHOOT を流していて、終わったら A_AIM_01 に戻す待ちか。</summary>
+    /// <summary>光線の様子から決まる状態（<see cref="SweeperShooter"/> が呼ぶ）。</summary>
+    private Mode shotMode = Mode.Move;
+
+    /// <summary>いま流している状態。</summary>
+    private Mode current = Mode.Move;
+
+    /// <summary>Shoot を流していて、終わったら AimWalk に戻す待ちか。</summary>
     private bool waitingShootEnd;
 
+    private bool falling;
+    private float groundY;
+    private float lastY;
+    private float stillTime;
+
     private int shootHash;
+    private int throwHash;
+    private int riseHash;
     private int speedHash;
+    private int aimSpeedHash;
     private bool hasSpeed;
+    private bool hasAimSpeed;
 
     private void Awake()
     {
@@ -58,42 +141,74 @@ public class SweeperAnimation : MonoBehaviour
         }
 
         mover = GetComponent<SweeperMover>();
+        reel = GetComponent<SweeperReel>();
+        netSync = GetComponent<SweeperNetSync>();
+        stun = GetComponent<PlayerStun>();
         characterController = GetComponent<CharacterController>();
         network = GetComponent<Unity.Netcode.NetworkObject>();
         lastPosition = transform.position;
+        groundY = lastY = transform.position.y;
         shootHash = Animator.StringToHash(shootState);
+        throwHash = Animator.StringToHash(throwState);
+        riseHash = Animator.StringToHash(riseState);
 
-        if (animator != null && !string.IsNullOrEmpty(speedParameter))
+        if (animator != null)
         {
-            speedHash = Animator.StringToHash(speedParameter);
-            foreach (AnimatorControllerParameter parameter in animator.parameters)
-            {
-                if (parameter.nameHash == speedHash && parameter.type == AnimatorControllerParameterType.Float)
-                {
-                    hasSpeed = true;
-                }
-            }
+            hasSpeed = HasFloat(speedParameter, out speedHash);
+            hasAimSpeed = HasFloat(aimSpeedParameter, out aimSpeedHash);
+            leftHand = FindChild(animator.transform, leftHandBone);
+            rightHand = FindChild(animator.transform, rightHandBone);
         }
     }
 
-    /// <summary>狙い始めた（A_AIM_01）。</summary>
+    /// <summary>狙い始めた（AimWalk）。</summary>
     public void PlayAim()
     {
-        waitingShootEnd = false;
-        Play(aimState);
+        SetShotMode(Mode.Aim);
     }
 
-    /// <summary>撃った（A_SHOOT を流し、終わったら A_AIM_01 に戻る）。</summary>
+    /// <summary>撃った（Shoot を流し、終わったら AimWalk に戻る）。</summary>
     public void PlayShoot()
     {
-        waitingShootEnd = Play(shootState);
+        SetShotMode(Mode.Shoot);
+    }
+
+    /// <summary>物資をつかんで巻き取り始めた（Pull）。</summary>
+    public void PlayPull()
+    {
+        SetShotMode(Mode.Pull);
     }
 
     /// <summary>投げ終わった・やめた。</summary>
     public void PlayIdle()
     {
-        waitingShootEnd = false;
-        Play(idleState);
+        SetShotMode(Mode.Move);
+    }
+
+    /// <summary>
+    /// 投げるアニメーション（Throw）を流している間だけ、両手の真ん中の位置を返す。
+    /// <see cref="SweeperReel"/> が、両手で持った物を手に合わせて動かすのに使う。
+    /// </summary>
+    public bool TryGetHandsCenter(out Vector3 center)
+    {
+        center = default;
+        if (animator == null || !animator.isActiveAndEnabled || leftHand == null || rightHand == null || current != Mode.Throw)
+        {
+            return false;
+        }
+
+        center = (leftHand.position + rightHand.position) * 0.5f;
+        return true;
+    }
+
+    private void SetShotMode(Mode mode)
+    {
+        shotMode = mode;
+        // 同じ撃つ・狙うを続けて呼ばれたときも、頭から流し直す（今までと同じ動き）
+        if (mode == current && (mode == Mode.Shoot || mode == Mode.Aim))
+        {
+            Enter(mode);
+        }
     }
 
     private void Update()
@@ -103,22 +218,116 @@ public class SweeperAnimation : MonoBehaviour
             return;
         }
 
-        if (hasSpeed && mover != null)
+        float speed = mover != null ? ReadSpeed() : 0f;
+        if (hasSpeed)
         {
-            animator.SetFloat(speedHash, ReadSpeed());
+            animator.SetFloat(speedHash, speed);
+        }
+        if (hasAimSpeed)
+        {
+            float normal = mover != null ? mover.MoveSpeed : 0f;
+            animator.SetFloat(aimSpeedHash, normal > 0.01f ? Mathf.Clamp(speed / normal, 0f, 1.5f) : 0f);
         }
 
-        if (!waitingShootEnd || animator.IsInTransition(0))
+        UpdateFalling();
+
+        bool stunned = stun != null && stun.IsStunned;
+        Mode want = falling ? Mode.Drop : stunned ? Mode.Stun : ReadCarrying() ? Mode.Throw : shotMode;
+
+        // スタンが解けたら起き上がる。起き上がりは流し切る（落ちた・スタンし直した・撃ち始めたときは切り替える）
+        if (current == Mode.Stun && want == Mode.Move)
         {
+            want = Mode.Rise;
+        }
+        if (current == Mode.Rise && want == Mode.Move && IsPlaying(riseHash))
+        {
+            want = Mode.Rise;
+        }
+
+        // 投げる動きは、持ち終わっても振り切るまで流す（落ちた・次を撃ったときは切り替える）
+        if (current == Mode.Throw && want == Mode.Move && IsPlaying(throwHash))
+        {
+            want = Mode.Throw;
+        }
+
+        if (want != current)
+        {
+            Enter(want);
             return;
         }
 
-        AnimatorStateInfo state = animator.GetCurrentAnimatorStateInfo(0);
-        if (state.shortNameHash == shootHash && state.normalizedTime >= 1f)
+        if (waitingShootEnd && !animator.IsInTransition(0) && IsFinished(shootHash))
         {
             waitingShootEnd = false;
             Play(aimState);
         }
+    }
+
+    /// <summary>その状態に入る（アニメーションを頭から流す）。</summary>
+    private void Enter(Mode mode)
+    {
+        current = mode;
+        waitingShootEnd = false;
+        switch (mode)
+        {
+            case Mode.Drop: Play(dropState); break;
+            case Mode.Stun: Play(stunState); break;
+            case Mode.Rise: Play(riseState); break;
+            case Mode.Throw: Play(throwState); break;
+            case Mode.Pull: Play(pullState); break;
+            case Mode.Shoot: waitingShootEnd = Play(shootState); break;
+            case Mode.Aim: Play(aimState); break;
+            default: Play(idleState); break;
+        }
+    }
+
+    /// <summary>
+    /// 足場から落ちているかを調べる。位置の上下の動きだけで決めるので、ほかの人の体（通信で位置だけ届く）でも同じに働く。
+    /// 吹き飛ばされて跳ねた・ゆっくり下がる床に乗っている・出てくる場所へ戻されたときは、落ちたことにしない。
+    /// </summary>
+    private void UpdateFalling()
+    {
+        float dt = Time.deltaTime;
+        float y = transform.position.y;
+        float moved = y - lastY;
+        lastY = y;
+        if (dt <= 0f)
+        {
+            return;
+        }
+
+        if (Mathf.Abs(moved) > TeleportDistance)
+        {
+            falling = false;
+            groundY = y;
+            stillTime = 0f;
+            return;
+        }
+
+        float vy = moved / dt;
+        stillTime = Mathf.Abs(vy) < StillSpeed ? stillTime + dt : 0f;
+        bool standing = stillTime >= landSeconds;
+
+        if (standing)
+        {
+            falling = false;
+            groundY = y;
+        }
+        else if (!falling && vy < -fallSpeed && y < groundY - fallDepth)
+        {
+            falling = true;
+        }
+    }
+
+    /// <summary>物資を両手で持っているか。自分で動かしている体は <see cref="SweeperReel"/>、ほかの人の体は通信で届いた値。</summary>
+    private bool ReadCarrying()
+    {
+        if (network != null && network.IsSpawned && !network.IsOwner)
+        {
+            return netSync != null && netSync.IsCarrying;
+        }
+
+        return reel != null && reel.IsCarrying;
     }
 
     /// <summary>
@@ -146,6 +355,20 @@ public class SweeperAnimation : MonoBehaviour
         return characterController != null && !characterController.enabled ? 0f : mover.CurrentSpeed;
     }
 
+    /// <summary>その状態を流していて、まだ終わりまで来ていないか。</summary>
+    private bool IsPlaying(int hash)
+    {
+        AnimatorStateInfo state = animator.GetCurrentAnimatorStateInfo(0);
+        return state.shortNameHash == hash && state.normalizedTime < 1f;
+    }
+
+    /// <summary>その状態を終わりまで流したか。</summary>
+    private bool IsFinished(int hash)
+    {
+        AnimatorStateInfo state = animator.GetCurrentAnimatorStateInfo(0);
+        return state.shortNameHash == hash && state.normalizedTime >= 1f;
+    }
+
     /// <summary>その名前の状態があれば切り替える。切り替えたら true。</summary>
     private bool Play(string stateName)
     {
@@ -162,5 +385,43 @@ public class SweeperAnimation : MonoBehaviour
 
         animator.CrossFadeInFixedTime(hash, crossFade, 0, 0f);
         return true;
+    }
+
+    private bool HasFloat(string parameterName, out int hash)
+    {
+        hash = 0;
+        if (string.IsNullOrEmpty(parameterName))
+        {
+            return false;
+        }
+
+        hash = Animator.StringToHash(parameterName);
+        foreach (AnimatorControllerParameter parameter in animator.parameters)
+        {
+            if (parameter.nameHash == hash && parameter.type == AnimatorControllerParameterType.Float)
+            {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /// <summary>骨を探す。<paramref name="bonePath"/> は名前か「途中の骨/…/骨」のたどり方（同じ名前の骨が2つあるとき用）。</summary>
+    private static Transform FindChild(Transform root, string bonePath)
+    {
+        if (string.IsNullOrEmpty(bonePath))
+        {
+            return null;
+        }
+
+        foreach (Transform node in root.GetComponentsInChildren<Transform>(true))
+        {
+            Transform found = node.Find(bonePath);
+            if (found != null)
+            {
+                return found;
+            }
+        }
+        return null;
     }
 }

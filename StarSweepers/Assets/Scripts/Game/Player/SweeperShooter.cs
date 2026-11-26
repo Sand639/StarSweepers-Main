@@ -14,7 +14,7 @@ using UnityEngine.InputSystem;
 ///
 /// 光線の見た目は液体のビーム（<see cref="LiquidBeam"/>）。何もつかんでいない間は薄いチームの色、つかんだら濃くなる。
 /// **巻き取り中に向きを変えると、光線が釣り糸のようにしなる**（手元からは体の向きに少し遅れて出て、物資へ曲がってつながる。2026/11/4）。
-/// 撃った瞬間に <see cref="SweeperAnimation.PlayShoot"/>（A_SHOOT → A_AIM_01）を呼ぶ。
+/// 撃った瞬間に <see cref="SweeperAnimation.PlayShoot"/>（Shoot → AimWalk）、つかんだら <see cref="SweeperAnimation.PlayPull"/> を呼ぶ。
 ///
 /// **撃ち方は4つから選べる**（<see cref="shotStyle"/>。2026/11/17・小野田さんの変更案）。2026/11/18 から、ロビーコンソールの
 /// プレイヤー挙動「1 狙う・2 発射」（A＝Whip／B＝Aim／C＝SteerSnap／D＝ChargeWhip）で、ホストが全員ぶん決める（<see cref="PlayerBehavior"/>）。
@@ -926,6 +926,7 @@ public class SweeperShooter : MonoBehaviour
             case ShotPhase.Reeling:
                 beam?.ChangeColorFromTip(teamColor);
                 PlayWrap(ShownReelItem);
+                animationPlayer?.PlayPull();
                 break;
         }
 
@@ -1061,6 +1062,7 @@ public class SweeperShooter : MonoBehaviour
                 reel.Begin(hookable);
                 beam?.ChangeColorFromTip(teamColor);
                 PlayWrap(hookable);
+                animationPlayer?.PlayPull();
                 return;
             }
 
@@ -1420,6 +1422,7 @@ public class SweeperShooter : MonoBehaviour
         reel.Begin(hookable);
         beam?.ChangeColorFromTip(teamColor);
         PlayWrap(hookable);
+        animationPlayer?.PlayPull();
     }
 
     /// <summary>
