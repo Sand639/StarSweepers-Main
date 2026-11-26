@@ -310,6 +310,8 @@ public class SpaceJunkGoalFlyIntro : MonoBehaviour
     /// <summary>文字を変える。毎フレーム呼ばれるので、中身が変わったときだけ入れ直す。</summary>
     private void ShowTexts(string big, string sub)
     {
+        GameAudio.PlayCountdownLabel(big);
+
         // 3・2・1・START! は画像で出し、そのときは文字を消す（画像の無い文字は、そのまま文字で出す）
         if (countdownImage != null && countdownImage.Show(big))
         {

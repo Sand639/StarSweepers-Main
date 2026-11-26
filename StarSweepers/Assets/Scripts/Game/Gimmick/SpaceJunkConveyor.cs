@@ -149,10 +149,20 @@ public class SpaceJunkConveyor : MonoBehaviour
     // 向き
     // ------------------------------------------------------------
 
+    /// <summary>前のフレームの向き（0 はまだ見ていない）。向きが変わった音のため。</summary>
+    private float soundSign;
+
     private void Update()
     {
         float sign = CurrentSign(out bool warning);
         FlowDirection = transform.forward * sign;
+
+        // 向きが逆になった瞬間に音を鳴らす（最初のフレームは鳴らさない）
+        if (soundSign != 0f && sign != soundSign)
+        {
+            GameAudio.PlaySe(GameSe.ConveyorReverse);
+        }
+        soundSign = sign;
 
         UpdateSlats(sign, warning);
         CarryPlayers();

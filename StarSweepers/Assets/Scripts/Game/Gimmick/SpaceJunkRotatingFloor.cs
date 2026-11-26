@@ -74,6 +74,7 @@ public class SpaceJunkRotatingFloor : MonoBehaviour
     /// <summary>時計から今の向きを決め、前のフレームからの差だけ乗っている人を回す。</summary>
     private void Update()
     {
+        PlayTurnSound();
         Quaternion target = TargetRotation();
         // 「前の向き → 今の向き」の回転。乗っている人をこれだけ回す
         Quaternion delta = target * Quaternion.Inverse(currentRotation);
@@ -91,6 +92,28 @@ public class SpaceJunkRotatingFloor : MonoBehaviour
     {
         // 物資が床と一緒に動くように、物理の床として回す
         body.MoveRotation(currentRotation);
+    }
+
+    /// <summary>前のフレームで何回目の回転の中にいたか（回り始めた瞬間に音を鳴らすため。最初のフレームは鳴らさない）。</summary>
+    private long soundIndex = long.MinValue;
+
+    /// <summary>回り始めたら、回っている秒数だけ回る音を鳴らす。</summary>
+    private void PlayTurnSound()
+    {
+        double clock = SharedClock() - timeOffsetSeconds;
+        float interval = Mathf.Max(0.1f, intervalSeconds);
+        long index = (long)System.Math.Floor(clock / interval);
+        if (index == soundIndex)
+        {
+            return;
+        }
+
+        bool first = soundIndex == long.MinValue;
+        soundIndex = index;
+        if (!first)
+        {
+            GameAudio.PlaySe(GameSe.RotatingFloor, Mathf.Clamp(rotateSeconds, 0.01f, interval));
+        }
     }
 
     /// <summary>いまの時刻での床の向き。</summary>
