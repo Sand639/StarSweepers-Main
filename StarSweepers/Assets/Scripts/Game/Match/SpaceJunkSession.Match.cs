@@ -19,8 +19,8 @@ public partial class SpaceJunkSession
     public void ServerStartMatch()
     {
         LobbyTestDeparture departure = LobbyTestDeparture.Current;
-        if (!IsServer ||
-            (departure != null && (State != SpaceJunkMatchState.Lobby || TestBoardingTime <= 0 ||
+        if (!IsServer || State != SpaceJunkMatchState.Lobby ||
+            (departure != null && (TestBoardingTime <= 0 ||
                                    NetworkManager.ServerTime.Time < TestBoardingTime + departure.Duration)))
         {
             return;
@@ -36,6 +36,12 @@ public partial class SpaceJunkSession
             return;
         }
 
+        // 全員の画面をモニターに引いてから、マップへ移る。
+        if (!SceneTransition.PlayForEveryone(LoadNextMap, SceneTransitionType.Monitor))
+        {
+            return;
+        }
+
         for (int i = 0; i < roundWins.Count; i++)
         {
             roundWins[i] = 0;
@@ -45,9 +51,6 @@ public partial class SpaceJunkSession
         lastRoundWinner.Value = -1;
         matchWinner.Value = -1;
         state.Value = SpaceJunkMatchState.Playing;
-
-        // 全員の画面をトランジションで覆ってから、マップへ移る
-        SceneTransition.PlayForEveryone(LoadNextMap);
     }
 
     /// <summary>
@@ -160,7 +163,7 @@ public partial class SpaceJunkSession
                 state.Value = SpaceJunkMatchState.Lobby;
                 currentRound.Value = 0;
                 LoadScene(lobbySceneName);
-            }, SceneTransitionType.RoundedStripes))
+            }, SceneTransitionType.Monitor))
             {
                 yield break;
             }
