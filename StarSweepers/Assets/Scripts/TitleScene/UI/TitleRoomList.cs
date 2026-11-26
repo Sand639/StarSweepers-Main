@@ -551,6 +551,7 @@ public class TitleRoomList
             button.onClick.RemoveAllListeners();
             if (!entry.Full && entry.Join != null)
             {
+                button.onClick.AddListener(() => GameAudio.PlayUi(UiSound.Confirm));
                 button.onClick.AddListener(entry.Join);
             }
         }
