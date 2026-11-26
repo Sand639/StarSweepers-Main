@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
@@ -13,6 +14,7 @@ public class TitleInputFields
 
     /// <summary>部屋を作る画面のサーバーの名前。</summary>
     public string ServerName { get; private set; } = string.Empty;
+    public event Action ServerNameChanged;
 
     /// <summary>作る部屋のパスワード（空ならなし）。</summary>
     public string CreatePassword { get; private set; } = string.Empty;
@@ -113,6 +115,7 @@ public class TitleInputFields
         {
             case TitleInputKind.ServerName:
                 ServerName = value;
+                ServerNameChanged?.Invoke();
                 break;
             case TitleInputKind.PrivateCode:
                 RoomCode = value;
