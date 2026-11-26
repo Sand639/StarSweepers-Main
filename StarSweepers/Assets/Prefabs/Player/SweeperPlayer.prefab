@@ -388,6 +388,8 @@ MonoBehaviour:
   carryWindup: 0.63
   carryThrowDistance: 7
   carryArcHeight: 2.4
+  carryWithHands: 1
+  carryHandsForward: 0.3
   forwardSpeed: 12
   forwardLift: 1.5
   heavyDragDistance: 4
@@ -453,9 +455,25 @@ MonoBehaviour:
   shootState: Shoot
   aimState: AimWalk
   idleState: Idle
+  pullState: Pull
+  throwState: Throw
+  dropState: Drop
+  stunState: Fall
+  riseState: Rise
+  stunSpeedParameter: StunSpeed
+  stunFallStart: 0.9
+  stunFallSeconds: 0.8
+  stunRiseSeconds: 1
+  stunMaxSpeed: 4
   speedParameter: Speed
+  aimSpeedParameter: AimSpeed
   crossFade: 0.05
   remoteSmoothing: 10
+  fallDepth: 1
+  fallSpeed: 3
+  landSeconds: 0.15
+  leftHandBone: JNT_Shoulder_L/JNT_Arm_L/JNT_Hand_L
+  rightHandBone: JNT_Shoulder_L2/JNT_Arm_L/JNT_Hand_L
 --- !u!114 &9160595561438689809
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -978,6 +996,14 @@ PrefabInstance:
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
       objectReference: {fileID: 0}
+    - target: {fileID: -8590595907907032514, guid: fd1be6c06e4df544fae31bc85f6c9b14, type: 3}
+      propertyPath: 'm_Materials.Array.data[0]'
+      value: 
+      objectReference: {fileID: 2100000, guid: e56f37e253844764aa9a61780f10cbc6, type: 2}
+    - target: {fileID: -8590595907907032514, guid: fd1be6c06e4df544fae31bc85f6c9b14, type: 3}
+      propertyPath: 'm_Materials.Array.data[1]'
+      value: 
+      objectReference: {fileID: 2100000, guid: 599ae74bd01a1ce40b850b3acc818bff, type: 2}
     - target: {fileID: 919132149155446097, guid: fd1be6c06e4df544fae31bc85f6c9b14, type: 3}
       propertyPath: m_Name
       value: Model
