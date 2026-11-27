@@ -201,6 +201,13 @@
 
 > こういう手順でやったら失敗した、という記録。次に来たAIへの警告。
 
+### ビルドの作り方（2026/11/27・β版を作ったときのやり方）
+
+- Unity エディタを閉じた状態で、一時的なエディタ用スクリプト（既存の `Assets/Scripts/Game/Match/Editor/` に置いた）から `BuildPipeline.BuildPlayer` を呼んだ。`Unity.exe -batchmode -nographics -projectPath … -executeMethod クラス.Run -logFile …`。終わったら .cs と .meta を消す。この PC では Unity は `C:/Program Files/Unity/Hub/Editor/6000.3.14f1/Editor/Unity.exe`。ビルドは約2分。
+- **ビルドの一覧（`EditorBuildSettings.asset`）に、検証用の `Assets/Scenes/Test/LobbyTestVersion.unity` が入っている**（11/5 のコミット 5ff4e78 から）。README の「検証用シーンは製品のビルドに含めない」に合わせ、スクリプト側で `Assets/Scenes/Test/` を外して作った。一覧そのものを直すかは、入れた人に確かめてから。
+- 出力は `StarSweepers/Builds/`（`.gitignore` 済み）。`StarSweepers_BurstDebugInformation_DoNotShip` は配らないので、zip には入れない（`tar.exe -a -c -f x.zip --exclude "*_DoNotShip" フォルダ`）。
+- 画面なしの Unity を動かすと、`ProjectSettings/Packages/com.unity.probuilder/Settings.json` に既定値が1項目書き足される。中身に意味は無いので `git checkout` で戻した。
+
 ### 体のプレハブの通信用の番号（GlobalObjectIdHash）が、11/24 から違う値で保存されていた（2026/11/27 に直した）
 
 `SweeperPlayer.prefab` の `NetworkObject` の番号は、もともと `4185652134`。11/24 のコミット `d00dc98`（調整値の保存）で `3160497423` に変わり、そのまま 9 回保存されていた。
@@ -697,3 +704,4 @@
 | 2026/11/26 | Claude Code（依頼：小野田 喬） | 「失敗したこと」に、もらったアニメーションの骨が当たらなかった件（原因は体の FBX が古いこと）・骨の大きさで体が縮んだ件・確かめ方を足した |
 | 2026/11/27 | Claude Code（依頼：小野田 喬） | 「失敗したこと」に、Animator の流している判定で2回つまずいた件と、新しいリグの左手の LCT_Tool・2つのブランチの片付けを書いた |
 | 2026/11/27 | Claude Code（依頼：小野田 喬） | 「失敗したこと」に、体のプレハブの通信用の番号（GlobalObjectIdHash）が 11/24 から違う値で保存されていた件を書いた |
+| 2026/11/27 | Claude Code（依頼：小野田 喬） | 「失敗したこと」の先頭に、β版のビルドの作り方と、ビルドの一覧に検証用シーンが入っている件を書いた |
