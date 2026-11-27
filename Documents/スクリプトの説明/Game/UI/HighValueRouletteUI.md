@@ -2,13 +2,13 @@
 
 | 項目 | 内容 |
 | --- | --- |
-| スクリプト | `StarSweepers/Assets/Scripts/Game/UI/HighValueRouletteUI.cs`（表示）・`StarSweepers/Assets/Scripts/Game/UI/Editor/HighValueRouletteUISetup.cs`（プレハブ・検証シーン・仮の画像を作るメニュー）・`StarSweepers/Assets/Scripts/Game/UI/Editor/HighValueRouletteUITests.cs`（自動テスト） |
-| 付いている場所 | `Resources/HighValueRouletteUI.prefab` の一番上（Canvas と同じ物）。検証シーン `Scenes/Test/HighValueRouletteUITest.unity` にはプレハブのまま置いてある（Test Mode だけオン。得点バー `Prefabs/UI/TeamScoreBarUI.prefab` もテストモードで置いてある） |
+| スクリプト | `StarSweepers/Assets/Scripts/Game/UI/HighValueRouletteUI.cs`（表示）・`StarSweepers/Assets/Scripts/Game/UI/Editor/HighValueRouletteUISetup.cs`（プレハブ・検証シーンを作るメニュー）・`StarSweepers/Assets/Scripts/Game/UI/Editor/HighValueRouletteUITests.cs`（自動テスト） |
+| 付いている場所 | `Resources/HighValueRouletteUI.prefab` の一番上（Canvas と同じ物）。検証シーン `Scenes/Test/HighValueRouletteUITest.unity` にはプレハブのまま置いてある（Test Mode だけオン。得点バー（ステージと同じフレーム版 `Prefabs/UI/TeamScoreBarFrameUI.prefab`）もテストモードで置いてある） |
 | 関係するドキュメント | `機能ドキュメント/高単価デブリのルーレットUI.md`・`機能ドキュメント/宇宙ごみのラウンドイベント.md`・`スクリプトの説明/Game/UI/DebrisSetUI.md`・`スクリプトの説明/Game/UI/TeamScoreBarUI.md` |
 
 ## 何をするスクリプトか
 
-ラウンドイベント「期間限定高価値デブリ」が始まると、時間の丸の下に半円のルーレットを出し、レールの物資を回して、
+ラウンドイベント「期間限定高価値デブリ」が始まると、得点バーの時間の板の下に半円のルーレットを出し、レールの物資を回して、
 **Spin Seconds（2秒）ちょうどで高単価の種類を真下に止める。** イベントが終わるとしまう。**表示するだけで、何も送らない。**
 
 ## 流れ
@@ -23,12 +23,7 @@
 
 ## ほかのスクリプトとのつながり
 
-仮の画面 `SpaceJunkMatchUI` が、次の2つを見ている（2026/11/12。大槻さんの了承で仮の画面に数行足した）。
-
-| 値（static） | 何か | 仮の画面での使い道 |
-| --- | --- | --- |
-| `OccupiedScreenHeight` | 画面の上から、**下りきったときの**ルーレットの下の端までのピクセル数。出していなければ 0。下りてくる・しまう途中でも同じ値（`MeasureOccupiedHeight` が、いま上へずらしているぶんを戻して測る） | ラウンド数の見出しとイベントの一行を、この下へずらす（`TeamScoreBarUI.OccupiedScreenHeight` と同じ考え方） |
-| `IsSpinning` | 出していて、イベントが続いていて、回り始めてから Spin Seconds たっていない | 始まった合図の大きな文字で、高単価の種類（「紫（回路基板）のデブリが +2点」）を出さない |
+（2026/11/26 まで、仮の画面 `SpaceJunkMatchUI` のために `OccupiedScreenHeight`（ルーレットの下の端の高さ）と `IsSpinning`（回っているか）を出していた。仮の画面のイベントの一行をやめたので、どちらも消した。）
 
 ## レールの計算
 
@@ -54,20 +49,28 @@
 ```
 HighValueRouletteUI（Canvas：画面に重ねる・並び順 9、CanvasScaler：1920×1080 基準、HighValueRouletteUI）
 └ Content（表示ごと隠す）
-   └ Clip（RectMask2D。画面の上から 48 より下、幅 800・高さ 420）
-      └ Wheel（520×520。中心は Clip の上の端より 88 上＝画面の上の端より 40 上）
-         ├ Frame（フレームの画像）
-         └ Item0〜Item6（64×64。物資の画像。位置はスクリプトが毎フレーム決める）
+   └ Clip（RectMask2D。画面の上から 110（得点バーの横長の枠の上の端）より下、幅 800・高さ 420）
+      └ Wheel（フレームの画像の大きさ 382×169。基準点は上の端の真ん中。Clip の上の端より 90 下）
+         ├ Frame（フレームの画像 EventUI/HighValueDebris/UI_roulette）
+         └ Window（RectMask2D。半円の上の辺（画像の上から 8）より下。物資を半円の中だけに見せる）
+            └ Item0〜Item6（64×64。物資の画像。Window の上の辺の真ん中から測った位置を、スクリプトが毎フレーム決める）
 ```
 
-- 並び順 9 は、得点バー（10）のすぐ奥。得点バーと時間の丸が円盤の上の部分を隠すので、「裏から出てくる」ように見える
-- `Clip` は、得点バーの上の端（画面の上から 48）より上を切り抜く。円盤の上の半分が、画面の上の端に見えないように
+- 並び順 9 は、得点バー（10）のすぐ奥。得点バーと時間の板が半円の上の部分を隠すので、「裏から出てくる」ように見える
+- `Clip` は、得点バーの横長の枠の上の端（画面の上から 110）より上を切り抜く。しまう途中の半円が、得点バーより上に見えないように
 - 物資の画像は `Assets/Art/Sprites/DebrisSetItem1〜5.png`（デブリセットのUIと同じ）を読む。無ければエラーで止まる
-- 仮のフレームの画像は**ファイルが無いときだけ**描いて作る（薄い灰色の円盤・半径の 77％ にレールの線・濃い灰色の縁）
+- フレームの画像が読めないときは、エラーで止まる
 
 ## 気をつけること
 
 - **Test Mode は、Resources のプレハブではオフのまま**にする（オンだと、タイトルやロビーでもルーレットが出てしまう）。自動テスト `Prefab_IsInResourcesAndWired` が確かめる
-- 得点バーの大きさ・位置（`TeamScoreBarUISetup` の BarTop 48・CircleTop 34・CircleSize 96）を変えたら、`HighValueRouletteUISetup` の `ClipTop` と円盤の位置も見直す
+- 得点バー（フレーム版）の大きさ・位置（`TeamScoreBarUISetup` の FrameWidth 900・FrameTop 8）を変えたら、`HighValueRouletteUISetup` の `ClipTop`・`WheelTop` も見直す
 - `Tick` は時刻を引数で受け取る（`Time.unscaledTime`）。ポーズで `timeScale` が 0 になってもルーレットは止まらない
 - 画面に重ねる UI（Screen Space - Overlay）はカメラに写らないので、画面なしの Unity で画像を撮るときは、撮る間だけ Canvas を Screen Space - Camera にする（`AIの申し送り.md`）
+
+## 変更ログ
+
+| 日付 | 変更者 | 内容 |
+| --- | --- | --- |
+| 2026/11/26 | Claude Code（依頼：大槻 海斗） | フレームをデザイナーさんの本素材に差し替え、新しい得点バー（フレーム版）に合わせて置き直したのに合わせて、プレハブの作り（`Window` を足した）と置き場所を書き直した。仮のフレームを描く処理はやめた。「気をつけること」が2回書かれていたのを1回にし、この変更ログを足した |
+| 2026/11/26 | Claude Code（依頼：大槻 海斗） | `OccupiedScreenHeight`・`IsSpinning`・`MeasureOccupiedHeight` を消した（使っていた仮の画面のイベントの一行をやめたため） |

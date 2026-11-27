@@ -130,7 +130,8 @@ public class SweeperPulledHit : MonoBehaviour
 
     private void FixedUpdate()
     {
-        if (!IsControlledHere() || Time.time < immuneUntil || (stun != null && stun.IsStunned))
+        // スタン中・スタン後の無敵の間（PlayerStun の Invincible Seconds）は当たらない（2026/11/27）
+        if (!IsControlledHere() || Time.time < immuneUntil || (stun != null && (stun.IsStunned || stun.IsInvincible)))
         {
             return;
         }

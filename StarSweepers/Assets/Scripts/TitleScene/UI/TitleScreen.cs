@@ -13,7 +13,7 @@ using UnityEngine.UI;
 [DisallowMultipleComponent]
 public class TitleScreen : MonoBehaviour
 {
-    public const string TitleSceneName = "TitleScene";
+    public const string TitleSceneName = "StarSweepersTitle";
     public const string LobbySceneName = "Lobby";
 
     /// <summary>Resources の中の画面のプレハブの名前。</summary>
@@ -105,6 +105,7 @@ public class TitleScreen : MonoBehaviour
         }
 
         tablet.Update();
+        createRoom.Update();
 
         // つないでいる途中の表示が出ている間は戻らない（表示のボタンで閉じる）
         if (WasBackPressed() && !busy.IsShown)
@@ -266,6 +267,11 @@ public class TitleScreen : MonoBehaviour
             case TitleButtonAction.SetPublic: createRoom.SetPrivate(false); break;
             case TitleButtonAction.SetPrivate: createRoom.SetPrivate(true); break;
             case TitleButtonAction.SetLan: createRoom.SetLan(); break;
+            case TitleButtonAction.UseInternet: createRoom.SetInternet(); break;
+            case TitleButtonAction.SetPlayerLimit2: createRoom.SetMaxPlayers(2); break;
+            case TitleButtonAction.SetPlayerLimit4: createRoom.SetMaxPlayers(4); break;
+            case TitleButtonAction.SetPlayerLimit6: createRoom.SetMaxPlayers(6); break;
+            case TitleButtonAction.SetPlayerLimit8: createRoom.SetMaxPlayers(8); break;
 
             case TitleButtonAction.TabSound: settings.ShowTab(TitleSettingsPage.Tab.Sound); break;
             case TitleButtonAction.TabGraphics: settings.ShowTab(TitleSettingsPage.Tab.Graphics); break;

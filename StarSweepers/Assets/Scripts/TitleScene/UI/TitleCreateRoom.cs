@@ -1,5 +1,6 @@
 using Unity.Netcode;
 using UnityEngine;
+using UnityEngine.UI;
 
 /// <summary>タイトル画面の「部屋を作る」（人数・公開のしかたを選んで部屋を作る）。</summary>
 public class TitleCreateRoom
@@ -8,6 +9,10 @@ public class TitleCreateRoom
 
     private readonly TitleParts parts;
     private readonly TitleInputFields inputs;
+    private readonly Button namedRoomSubmit;
+    private readonly CanvasGroup submitAppearance;
+    private readonly TitleSelectionRail connectionRail;
+    private readonly TitleSelectionRail playersRail;
 
     // LAN（lan）／パブリック（どちらも false）／プライベート（privateRoom だけ true）
     private int maxPlayers = SpaceJunkTeams.MaxPlayers;
@@ -18,6 +23,23 @@ public class TitleCreateRoom
     {
         this.parts = parts;
         this.inputs = inputs;
+        namedRoomSubmit = parts.Component<Button>(TitlePartRole.CreateRoomButton);
+        if (namedRoomSubmit != null)
+        {
+            maxPlayers = MinPlayers;
+            submitAppearance = namedRoomSubmit.GetComponent<CanvasGroup>();
+            inputs.ServerNameChanged += RefreshSubmit;
+            GameObject page = parts.Object(TitlePartRole.PageCreate);
+            connectionRail = TitleSelectionRail.Create(page, TitleButtonAction.UseInternet, TitleButtonAction.SetLan);
+            playersRail = TitleSelectionRail.Create(page, TitleButtonAction.SetPlayerLimit2,
+                TitleButtonAction.SetPlayerLimit4, TitleButtonAction.SetPlayerLimit6, TitleButtonAction.SetPlayerLimit8);
+        }
+    }
+
+    public void Update()
+    {
+        connectionRail?.Update(Time.unscaledDeltaTime);
+        playersRail?.Update(Time.unscaledDeltaTime);
     }
 
     /// <summary>画面を、今の選び方（人数・公開のしかた）で出し直す。</summary>
@@ -33,16 +55,38 @@ public class TitleCreateRoom
         parts.SetSelectedLook(TitleButtonAction.SetPublic, publicChecked);
         parts.SetSelectedLook(TitleButtonAction.SetPrivate, privateChecked);
         parts.SetSelectedLook(TitleButtonAction.SetLan, lan);
+        parts.SetSelectedLook(TitleButtonAction.UseInternet, !lan);
+        parts.SetSelectedLook(TitleButtonAction.SetPlayerLimit2, maxPlayers == 2);
+        parts.SetSelectedLook(TitleButtonAction.SetPlayerLimit4, maxPlayers == 4);
+        parts.SetSelectedLook(TitleButtonAction.SetPlayerLimit6, maxPlayers == 6);
+        parts.SetSelectedLook(TitleButtonAction.SetPlayerLimit8, maxPlayers == 8);
 
         // パスワードはインターネットの部屋だけ
         parts.SetActive(TitlePartRole.PasswordRow, !lan);
+        if (namedRoomSubmit != null)
+        {
+            // 新しいデザイン（2026/11/26）には公開のしかたの行が無い。部屋はパブリックで作る
+            parts.SetActive(TitlePartRole.PrivateRow, false);
+            RefreshSubmit();
+        }
 
         RefreshCodeBox();
     }
 
     public void ChangeMaxPlayers(int delta)
     {
-        maxPlayers = Mathf.Clamp(maxPlayers + delta, MinPlayers, SpaceJunkTeams.MaxPlayers);
+        SetMaxPlayers(maxPlayers + delta);
+    }
+
+    public void SetMaxPlayers(int players)
+    {
+        maxPlayers = Mathf.Clamp(players, MinPlayers, SpaceJunkTeams.MaxPlayers);
+        Refresh();
+    }
+
+    public void SetInternet()
+    {
+        lan = false;
         Refresh();
     }
 
@@ -63,10 +107,15 @@ public class TitleCreateRoom
     /// <summary>「サーバーを作成」。LAN ならホストになって部屋を知らせ、インターネットなら部屋を作ってもらう。</summary>
     public void Create()
     {
+        if (namedRoomSubmit != null && string.IsNullOrWhiteSpace(inputs.ServerName))
+        {
+            return;
+        }
+
         NetworkManager manager = NetworkManager.Singleton;
         if (manager == null)
         {
-            Debug.LogError("[UI] NetworkManager が見つかりません。TitleScene に SpaceJunkNetworkManager のプレハブがあるか確かめてください。");
+            Debug.LogError($"[UI] NetworkManager が見つかりません。{TitleScreen.TitleSceneName} に SpaceJunkNetworkManager のプレハブがあるか確かめてください。");
             return;
         }
 
@@ -90,6 +139,15 @@ public class TitleCreateRoom
         }
 
         internet.HostGame(serverName, maxPlayers, privateRoom, inputs.CreatePassword.Trim());
+    }
+
+    private void RefreshSubmit()
+    {
+        namedRoomSubmit.interactable = !string.IsNullOrWhiteSpace(inputs.ServerName);
+        if (submitAppearance != null)
+        {
+            submitAppearance.alpha = namedRoomSubmit.interactable ? 1f : 0.55f;
+        }
     }
 
     /// <summary>画面の下の枠に、参加する人へ伝えることを出す。</summary>

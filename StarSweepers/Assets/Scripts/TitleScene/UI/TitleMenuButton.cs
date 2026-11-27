@@ -77,6 +77,10 @@ public enum TitleButtonAction
     // 部屋を探す（2026/10/22）：「募集中の部屋」の ⟳（すぐ取り直す）と、■パスワード不要
     RefreshRoomList = 57,
     ToggleSearchNoPassword = 58,
+    SetPlayerLimit2 = 59,
+    SetPlayerLimit4 = 60,
+    SetPlayerLimit6 = 61,
+    SetPlayerLimit8 = 62,
 }
 
 /// <summary>
@@ -129,6 +133,21 @@ public class TitleMenuButton : MonoBehaviour,
 
     /// <summary>「選ばれている」見た目にしているか（タブ・切り替えボタン用。<see cref="SetSelectedLook"/>）。</summary>
     private bool selectedLook;
+
+    // 部屋作成の切り替えは、各ボタンの下地ではなく共通の滑る下地を使う。
+    private TitleSelectionRail selectionRail;
+
+    public void UseSelectionRail(TitleSelectionRail rail, Image indicator)
+    {
+        selectionRail = rail;
+        TitleScreenTheme look = Theme;
+        indicator.sprite = look.useHoverSpriteWhenSelected && look.buttonHover != null
+            ? look.buttonHover : look.button;
+        indicator.type = indicator.sprite != null && indicator.sprite.border != Vector4.zero
+            ? Image.Type.Sliced : Image.Type.Simple;
+        indicator.color = look.buttonHoverColor;
+        Refresh();
+    }
 
     /// <summary>Resources から読んだ共通のテーマ。全部のボタンで1つを使い回す。</summary>
     private static TitleScreenTheme defaultTheme;
@@ -229,6 +248,10 @@ public class TitleMenuButton : MonoBehaviour,
     public void SetSelectedLook(bool selected)
     {
         selectedLook = selected;
+        if (selected && selectionRail != null)
+        {
+            selectionRail.Select((RectTransform)transform);
+        }
         Refresh();
     }
 
@@ -303,6 +326,11 @@ public class TitleMenuButton : MonoBehaviour,
         // Sprite Editor で9スライス（Border）を付けた画像は、角をつぶさずに引き伸ばす
         background.type = sprite != null && sprite.border != Vector4.zero ? Image.Type.Sliced : Image.Type.Simple;
         background.color = emphasized ? look.buttonHoverColor : look.buttonColor;
+        if (selectionRail != null)
+        {
+            // Image は残すので、透明でも従来どおりクリックできる。
+            background.color = Color.clear;
+        }
 
         if (label != null)
         {

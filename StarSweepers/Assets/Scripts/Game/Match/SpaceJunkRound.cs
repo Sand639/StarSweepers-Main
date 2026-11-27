@@ -513,11 +513,34 @@ public partial class SpaceJunkRound : NetworkBehaviour
         bool firstRound = SpaceJunkSession.Current == null || SpaceJunkSession.Current.CurrentRound <= 1;
         roundIntroStyle.Value = firstRound ? firstRoundIntroStyle : nextRoundIntroStyle;
 
-        // **始まりの演出のぶん、動き出す時刻を後ろにずらす。** 残り時間とイベントは、動き出してから数える
+        if (firstRound && SceneTransition.MonitorHandoffPending)
+        {
+            // 開幕カメラを最初の位置に置き、試合の時計もまだ進めない。
+            playStartServerTime.Value = NetworkManager.ServerTime.Time + 86400d;
+            StartCoroutine(ServerStartClockAfterMonitor(seconds));
+            return;
+        }
+
+        ServerStartRoundClock(seconds, false);
+    }
+
+    private System.Collections.IEnumerator ServerStartClockAfterMonitor(float seconds)
+    {
+        while (IsSpawned && IsServer && SceneTransition.MonitorHandoffPending)
+        {
+            yield return null;
+        }
+
+        if (IsSpawned && IsServer) ServerStartRoundClock(seconds, true);
+    }
+
+    private void ServerStartRoundClock(float seconds, bool afterMonitor)
+    {
+        // 残り時間とイベントは、開幕演出が終わって動き出してから数える。
         double now = NetworkManager.ServerTime.Time;
         double playStart = playIntro
             ? now + introLeadSeconds + IntroTotalSeconds
-            : 0d;
+            : afterMonitor ? now + 0.25d : 0d;
         playStartServerTime.Value = playStart;
 
         endServerTime.Value = (playStart > 0d ? playStart : now) + seconds;

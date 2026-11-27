@@ -74,6 +74,9 @@ public sealed class DebrisSetUI : MonoBehaviour
         [Tooltip("腕（左の金具つき）の画像")]
         public Image arm;
 
+        [Tooltip("腕の棒（画面の外の付け根から、腕の金具までの斜めの棒）の画像。腕とは別に回る")]
+        public Image rod;
+
         [Tooltip("お題を並べる枠の画像")]
         public Image panel;
 
@@ -121,7 +124,13 @@ public sealed class DebrisSetUI : MonoBehaviour
     [SerializeField] private bool swapLeftRight = true;
 
     [Header("並べ方（画像の元の大きさのピクセル。枠ごとの大きさは Panel0〜3 の Scale で変える）")]
-    [Tooltip("腕の左端から、枠の左端までの距離（枠の左端が腕の金具の下に入る）")]
+    [Tooltip("腕の画像の左端の位置。腕・棒・枠の位置は、どれも棒の左端（腕と棒が1枚の画像だったころの左端）から測る")]
+    [SerializeField] private float armImageLeft = 27f;
+
+    [Tooltip("棒の画像の中心の位置（棒の左端から。下はマイナス）")]
+    [SerializeField] private Vector2 rodCenter = new Vector2(25.5f, -103.5f);
+
+    [Tooltip("棒の左端から、枠の左端までの距離（枠の左端が腕の金具の下に入る）")]
     [SerializeField] private float panelLeft = 72f;
 
     [Tooltip("枠の中心の、上からの距離")]
@@ -151,18 +160,27 @@ public sealed class DebrisSetUI : MonoBehaviour
     [Tooltip("入ってくる前の腕が、画面の外へどれだけ下がっているか")]
     [SerializeField] private float armHideDistance = 160f;
 
-    [Tooltip("腕の付け根（棒の先）の位置。腕はここを中心に回りながら入ってくる（腕の画像の左上から。下はマイナス）")]
-    [SerializeField] private Vector2 armRoot = new Vector2(1f, -117f);
+    [Tooltip("棒と腕のつなぎ目（オレンジの金具の中）の位置。腕・枠・カードも棒も、ここを中心に回る")]
+    [SerializeField] private Vector2 armJoint = new Vector2(40f, -82f);
 
-    [Tooltip("入ってくる前の腕の傾き（度）。ここから 0 度へ回りながら入ってくる")]
-    [SerializeField] private float armSwingAngle = 40f;
+    [Tooltip("入ってくるときの腕の傾き（度。プラス＝上の端が画面の外の側へ傾く）。まっすぐに起き上がってから、反対側へ揺れて落ち着く")]
+    [SerializeField] private float armSwingAngle = 25f;
 
-    [Tooltip("回り終わりの行き過ぎ（0＝行き過ぎない。大きいほど、いちど行き過ぎてから戻る）")]
-    [SerializeField, Min(0f)] private float armSwingOvershoot = 1.2f;
+    [Tooltip("起き上がったあと、反対側へ揺れる傾き（度。0＝揺れない）")]
+    [SerializeField, Min(0f)] private float armOvershootAngle = 20f;
+
+    [Tooltip("腕が入りきって、まっすぐに起き上がる時刻（Arm Slide Seconds に対する割合）。そのあとは揺れて落ち着くだけ")]
+    [SerializeField, Range(0.1f, 0.9f)] private float armUprightRatio = 0.45f;
+
+    [Tooltip("入ってくるときの棒の向き（度。画像の向きから。プラス＝下へ垂れる）")]
+    [SerializeField] private float rodStartAngle = 30f;
+
+    [Tooltip("落ち着いたときの棒の向き（度。画像の向きから。-45 で水平になり、画面の外へのびる）")]
+    [SerializeField] private float rodRestAngle = -45f;
 
     [Header("出てくる・しまう演出")]
-    [Tooltip("腕が画面の外から回りながら入ってくる秒数")]
-    [SerializeField, Min(0f)] private float armSlideSeconds = 0.5f;
+    [Tooltip("腕が画面の外から入ってきて、揺れが落ち着くまでの秒数")]
+    [SerializeField, Min(0f)] private float armSlideSeconds = 0.7f;
 
     [Tooltip("枠が開く秒数（反対側の金具が外へ動き、枠が伸びる）。開ききってからカードが落ちてくる")]
     [SerializeField, Min(0f)] private float openSeconds = 0.25f;
@@ -287,10 +305,6 @@ public sealed class DebrisSetUI : MonoBehaviour
     private bool testStarted;
     private float testEventStart;
     private float testNextAction;
-
-    // 腕が入ってくる時間（Arm Slide Seconds）のうち、横に動き終わる割合と、回り始める割合
-    private const float ArmMoveEnd = 0.5f;
-    private const float ArmSwingStart = 0.3f;
 
     /// <summary>腕が入ってきてから、カードが落ち始めるまでの秒数。</summary>
     private float IntroSeconds => armSlideSeconds + openSeconds;
@@ -608,23 +622,37 @@ public sealed class DebrisSetUI : MonoBehaviour
         float width = cardMargin + cardPitch * Mathf.Max(1, state.size);
         float left = panelLeft;
 
-        // 腕・枠・カードをまとめて、付け根を中心に回しながら画面の外から入れる
-        if (parts.body != null)
+        // 腕は傾いたまま画面の外から入り、起き上がる → 反対側へ揺れる → 落ち着く。
+        // 棒はつなぎ目を中心に、下へ垂れた向きから水平へ回る（腕とは別に回る）
         {
-            // 前半で傾いたまま入ってきて、少し遅れて回り始め、起き上がる（回るところが画面の中で見えるように）
-            float move = EaseOutCubic(Mathf.Clamp01(slideTime / ArmMoveEnd));
-            float swing = EaseOutBack(Mathf.Clamp01((slideTime - ArmSwingStart) / (1f - ArmSwingStart)), armSwingOvershoot);
-            Quaternion rotation = Quaternion.Euler(0f, 0f, (1f - swing) * armSwingAngle * side);
-            var pivot = new Vector2(side * armRoot.x, armRoot.y);
-            var slideOffset = new Vector2((move - 1f) * armHideDistance * side, 0f);
-            parts.body.localRotation = rotation;
-            parts.body.anchoredPosition = slideOffset + pivot - (Vector2)(rotation * pivot);
+            float arrive = EaseOutCubic(Mathf.Clamp01(slideTime / armUprightRatio));
+            Vector2 joint = Mirror(armJoint, side);
+            Vector2 jointNow = joint + new Vector2((arrive - 1f) * armHideDistance * side, 0f);
+
+            if (parts.rod != null)
+            {
+                // 棒は腕より遅れて回り始める（入り始めは下へ垂れたまま）
+                float rodTurn = Mathf.SmoothStep(0f, 1f, slideTime / armUprightRatio);
+                float rodAngle = Mathf.Lerp(rodStartAngle, rodRestAngle, rodTurn) * side;
+                Quaternion rodRotation = Quaternion.Euler(0f, 0f, rodAngle);
+                Vector2 center = jointNow + (Vector2)(rodRotation * (Mirror(rodCenter, side) - joint));
+                parts.rod.rectTransform.localRotation = rodRotation;
+                Place(parts.rod.rectTransform, center.x, center.y, side);
+            }
+
+            if (parts.body != null)
+            {
+                float headAngle = ArmSwing(slideTime, armUprightRatio, armSwingAngle, armOvershootAngle) * side;
+                Quaternion headRotation = Quaternion.Euler(0f, 0f, headAngle);
+                parts.body.localRotation = headRotation;
+                parts.body.anchoredPosition = jointNow - (Vector2)(headRotation * joint);
+            }
         }
 
         if (parts.arm != null)
         {
             RectTransform arm = parts.arm.rectTransform;
-            Place(arm, side * arm.rect.width * 0.5f, -bodyCenterY, side);
+            Place(arm, side * (armImageLeft + arm.rect.width * 0.5f), -bodyCenterY, side);
         }
 
         if (parts.panel != null)
@@ -778,16 +806,35 @@ public sealed class DebrisSetUI : MonoBehaviour
         rect.localScale = scale;
     }
 
+    /// <summary>左右反対（side が -1）なら、横の位置を反対にする。</summary>
+    private static Vector2 Mirror(Vector2 point, float side)
+    {
+        return new Vector2(side * point.x, point.y);
+    }
+
     private static float Clamp01Div(float value, float duration)
     {
         return duration <= 0f ? (value >= 0f ? 1f : 0f) : Mathf.Clamp01(value / duration);
     }
 
-    /// <summary>終わりで少し行き過ぎてから 1 に戻る（overshoot が 0 なら行き過ぎない）。</summary>
-    private static float EaseOutBack(float t, float overshoot)
+    // sin(πs)×(1−s) のいちばん大きな値（反対側への揺れを、ちょうど overshoot 度にするための割り算に使う）
+    private const float SwingPeak = 0.5792f;
+
+    /// <summary>
+    /// 入ってくる腕の傾き（度）。t は入ってくる時間に対する割合（0〜1）。
+    /// 0 で start 度 → upright で 0 度（まっすぐ） → 反対側へ overshoot 度まで揺れる → 1 で 0 度に止まる。
+    /// </summary>
+    public static float ArmSwing(float t, float upright, float start, float overshoot)
     {
-        float u = Mathf.Clamp01(t) - 1f;
-        return 1f + (overshoot + 1f) * u * u * u + overshoot * u * u;
+        t = Mathf.Clamp01(t);
+        if (t < upright)
+        {
+            return start * Mathf.Cos(t / upright * Mathf.PI * 0.5f);
+        }
+
+        // 終わりで速さが 0 になる揺れ（止まるときに、かくっとしない）
+        float s = upright >= 1f ? 1f : (t - upright) / (1f - upright);
+        return -overshoot * Mathf.Sin(s * Mathf.PI) * (1f - s) / SwingPeak;
     }
 
     private static float EaseOutCubic(float t)

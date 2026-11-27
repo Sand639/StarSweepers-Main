@@ -25,6 +25,9 @@ public enum SceneTransitionType
 
     [InspectorName("丸い色帯（右から覆って左へ抜ける）")]
     RoundedStripes = 3,
+
+    [InspectorName("モニター（画面から引いて次の画面へ寄る）")]
+    Monitor = 4,
 }
 
 /// <summary>
@@ -44,6 +47,7 @@ public abstract class SceneTransitionEffect
             case SceneTransitionType.Wipe: return new WipeTransitionEffect();
             case SceneTransitionType.RoundWinner: return new RoundWinnerTransitionEffect();
             case SceneTransitionType.RoundedStripes: return new RoundedStripesTransitionEffect();
+            case SceneTransitionType.Monitor: return new MonitorTransitionEffect();
         }
 
         Debug.LogWarning($"[TRANSITION] 種類「{type}」の演出が SceneTransitionEffect.Create に書かれていないので、フェードで出します。");

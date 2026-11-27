@@ -134,6 +134,16 @@ public class SupplyTugTests
             SweeperReel reelB = b.GetComponent<SweeperReel>();
             reelA.Begin(hookable);
             Assert.That(reelA.IsActive, Is.True, "A がつかめなかった");
+
+            // つかんだ直後（Grab Lock Seconds）は、B は引っ張り合いを挑めない（2026/11/27）
+            Assert.That(reelB.CanHook(hookable), Is.False, "A がつかんだ直後なのに、B が引っ張り合いを挑めてしまう");
+            float lockUntil = Time.realtimeSinceStartup + 5f;
+            while (hookable.IsProtected && Time.realtimeSinceStartup < lockUntil)
+            {
+                yield return null;
+            }
+            Assert.That(hookable.IsProtected, Is.False, "つかんだ直後のロックが解けない");
+
             Assert.That(reelB.CanHook(hookable), Is.True, "A がつかんでいる物を、B が引っ張り合いでつかめない");
 
             reelB.Begin(hookable);
@@ -156,8 +166,17 @@ public class SupplyTugTests
             Assert.That(hookable.IsHooked, Is.True, "B がつかんでいるのに、つかまれている印が消えた");
             Assert.That(box.GetComponent<Rigidbody>().useGravity, Is.False, "B がつかんでいるのに、重力が戻っている");
 
+            // 負けた A は、B が持っている間は手を出せない（取った直後のロックが解けたあとも。2026/11/27）
+            lockUntil = Time.realtimeSinceStartup + 5f;
+            while (hookable.IsProtected && Time.realtimeSinceStartup < lockUntil)
+            {
+                yield return null;
+            }
+            Assert.That(reelA.CanHook(hookable), Is.False, "引っ張り合いに負けた A が、B の持っている物をまたつかめてしまう");
+
             reelB.Cancel();
             Assert.That(box.GetComponent<Rigidbody>().useGravity, Is.True, "B が離したのに、重力が戻っていない");
+            Assert.That(reelA.CanHook(hookable), Is.True, "B が離したのに、A のロックが解けていない");
         }
         finally
         {

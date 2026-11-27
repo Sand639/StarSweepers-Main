@@ -8,8 +8,9 @@ using UnityEngine;
 ///
 /// ## 流れ（2026/9/29・大槻さん）
 ///
-/// 1. ラウンドが始まってから <see cref="SpaceJunkEventSettings.startSeconds"/> 秒（初期値20秒）たったら
-/// 2. <see cref="SpaceJunkEventSettings.pool"/>（候補の一覧）から、選ばれやすさの比で1つを選んで始める
+/// 1. ラウンドの始まりに、<see cref="SpaceJunkEventSettings.pool"/>（候補の一覧）から、選ばれやすさの比で1つを選んでおく
+///    （始まる前の知らせ <see cref="EventBannerUI"/> にイベントの名前を出すため、種類だけ先に全員へ配る）
+/// 2. ラウンドが始まってから <see cref="SpaceJunkEventSettings.startSeconds"/> 秒（初期値20秒）たったら、選んでおいたイベントを始める
 /// 3. 候補ごとの「続く秒数」が過ぎたら終わる（0 ならラウンドの終わりまで続く）
 ///
 /// 設定は <see cref="SpaceJunkSession"/>（プレハブ）の「イベント」の欄。**得点制（Score）のときだけ起きる。**
@@ -56,6 +57,13 @@ public partial class SpaceJunkRound
     private readonly NetworkVariable<SpaceJunkEventKind> activeEvent =
         new NetworkVariable<SpaceJunkEventKind>(SpaceJunkEventKind.None);
 
+    /// <summary>これから起きるイベント（ラウンドの始まりに選んでおく）。起きないラウンドなら None。</summary>
+    private readonly NetworkVariable<SpaceJunkEventKind> upcomingEvent =
+        new NetworkVariable<SpaceJunkEventKind>(SpaceJunkEventKind.None);
+
+    /// <summary>ラウンドの始まりに選んでおいた候補（ホストだけが使う）。</summary>
+    private SpaceJunkEventEntry serverUpcomingEntry;
+
     /// <summary>イベントが始まる（始まった）時刻。0 なら、このラウンドではイベントは起きない。</summary>
     private readonly NetworkVariable<double> eventServerTime = new NetworkVariable<double>(0d);
 
@@ -75,6 +83,9 @@ public partial class SpaceJunkRound
 
     /// <summary>いま起きている（起きた）イベント。起きていなければ None。</summary>
     public SpaceJunkEventKind ActiveEvent => activeEvent.Value;
+
+    /// <summary>このラウンドで起きる（起きた）イベントの種類。始まる前から分かる。起きないラウンドなら None。</summary>
+    public SpaceJunkEventKind UpcomingEvent => upcomingEvent.Value;
 
     /// <summary>画面に出すイベントの名前。</summary>
     public string EventName => eventName.Value.ToString();
@@ -158,13 +169,15 @@ public partial class SpaceJunkRound
     /// ラウンドの始まりに、イベントの時刻を決める。<see cref="OnNetworkSpawn"/> から呼ぶ。
     ///
     /// 流れ：一覧を空の枠に作り直す → ホストの設定を全員へ配る値に写す →
-    /// 得点制で候補があるときだけ、動き出してから <see cref="SpaceJunkEventSettings.startSeconds"/> 秒後を開始時刻にする。
+    /// 得点制で候補があるときだけ、イベントを1つ選んでおき、動き出してから <see cref="SpaceJunkEventSettings.startSeconds"/> 秒後を開始時刻にする。
     /// </summary>
     private void ServerInitEvents(float roundSeconds)
     {
         ServerResetEventLists();
 
         activeEvent.Value = SpaceJunkEventKind.None;
+        upcomingEvent.Value = SpaceJunkEventKind.None;
+        serverUpcomingEntry = null;
         eventServerTime.Value = 0d;
         eventEndServerTime.Value = 0d;
         eventName.Value = default;
@@ -195,6 +208,18 @@ public partial class SpaceJunkRound
                       "このラウンドではイベントは起きません。");
             return;
         }
+
+        // 起きるイベントは先に選んでおく（始まる前の知らせに名前を出すため）
+        SpaceJunkEventEntry picked = settings.PickRandom();
+        if (picked == null || picked.kind == SpaceJunkEventKind.None)
+        {
+            // 候補に None が入っていた（または選べる候補が無い）。**「今回は何も起きない」**
+            Debug.Log("[JUNK] イベントの抽選：今回は何も起きません。");
+            return;
+        }
+
+        serverUpcomingEntry = picked;
+        upcomingEvent.Value = picked.kind;
 
         // 動き出してから数える（始まりの演出があれば、その終わりから。2026/10/7）
         double playStart = PlayStartServerTime > 0d ? PlayStartServerTime : NetworkManager.ServerTime.Time;
@@ -267,17 +292,14 @@ public partial class SpaceJunkRound
             return;
         }
 
-        SpaceJunkEventEntry picked = EventSettings.PickRandom();
-
-        if (picked == null || picked.kind == SpaceJunkEventKind.None)
+        // ラウンドの始まりに選んでおいたイベントを始める
+        if (serverUpcomingEntry == null)
         {
-            // 候補に None が入っていた（または選べる候補が無い）。**「今回は何も起きない」**として、もう選び直さない
             eventServerTime.Value = 0d;
-            Debug.Log("[JUNK] イベントの抽選：今回は何も起きません。");
             return;
         }
 
-        ServerStartEvent(picked);
+        ServerStartEvent(serverUpcomingEntry);
     }
 
     /// <summary>

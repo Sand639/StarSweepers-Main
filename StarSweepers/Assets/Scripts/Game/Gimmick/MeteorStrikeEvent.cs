@@ -366,6 +366,12 @@ public class MeteorStrikeEvent : NetworkBehaviour
             return;
         }
 
+        // スタン後の無敵の間・スタン中は、吹き飛ばしもスタンも受けない（続けてスタンし続けないように。2026/11/27）
+        if (stun != null && !stun.CanTakeHit)
+        {
+            return;
+        }
+
         launchable.Launch(velocity);
         if (stun != null && stunSeconds > 0f)
         {

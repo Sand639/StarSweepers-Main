@@ -23,6 +23,7 @@ public static class DebrisSetUISetup
     private const string CoverPath = SpriteFolder + "UI_SET_01.png";
     private const string CardPath = SpriteFolder + "UI_SET_02.png";
     private const string ArmPath = SpriteFolder + "UI_SET_03_01.png";
+    private const string RodPath = SpriteFolder + "UI_SET_03_03.png"; // 腕の棒（腕とは別に回す）
     private const string BracketPath = SpriteFolder + "UI_SET_03_02.png";
     private const string PanelPath = SpriteFolder + "UI_SET_04_01.png";
 
@@ -115,14 +116,15 @@ public static class DebrisSetUISetup
     private static GameObject BuildPrefab()
     {
         Sprite arm = LoadSprite(ArmPath);
+        Sprite rod = LoadSprite(RodPath);
         Sprite bracket = LoadSprite(BracketPath);
         Sprite panelSprite = LoadSprite(PanelPath);
         Sprite card = LoadSprite(CardPath);
         Sprite cover = LoadSprite(CoverPath);
         Sprite check = LoadSprite(CheckPath);
-        if (arm == null || bracket == null || panelSprite == null || card == null || cover == null || check == null)
+        if (arm == null || rod == null || bracket == null || panelSprite == null || card == null || cover == null || check == null)
         {
-            Debug.LogError($"デブリセットUIの素材が {SpriteFolder} に足りません（UI_SET_00〜04_01）。");
+            Debug.LogError($"デブリセットUIの素材が {SpriteFolder} に足りません（UI_SET_00〜04_01、03_03）。");
             return null;
         }
 
@@ -135,7 +137,7 @@ public static class DebrisSetUISetup
 
         var sprites = new PanelSprites
         {
-            arm = arm, bracket = bracket, panel = panelSprite, card = card, cover = cover, check = check, item = itemSprites,
+            arm = arm, rod = rod, bracket = bracket, panel = panelSprite, card = card, cover = cover, check = check, item = itemSprites,
         };
 
         // ---- 一番上：画面全体を覆う Canvas ----
@@ -180,11 +182,11 @@ public static class DebrisSetUISetup
 
     private sealed class PanelSprites
     {
-        public Sprite arm, bracket, panel, card, cover, check;
+        public Sprite arm, rod, bracket, panel, card, cover, check;
         public Sprite[] item;
     }
 
-    /// <summary>1チームぶん（腕・枠・金具・文字・カード）を作り、スクリプトの欄に割り当てる。</summary>
+    /// <summary>1チームぶん（棒・腕・枠・金具・文字・カード）を作り、スクリプトの欄に割り当てる。</summary>
     private static void BuildPanel(int index, Transform parent, PanelSprites sprites, SerializedProperty property)
     {
         bool right = index % 2 == 1;
@@ -199,6 +201,11 @@ public static class DebrisSetUISetup
         root.sizeDelta = Vector2.zero;
         root.anchoredPosition = new Vector2(right ? -PanelSide : PanelSide, -top);
         root.localScale = new Vector3(PanelScale, PanelScale, 1f);
+
+        // 腕の棒。腕より奥に置き、腕とは別に回す（棒が先に起き上がり、腕が遅れてついてくる）
+        Image rod = AddImage(CreateRect("Rod", root), sprites.rod);
+        rod.SetNativeSize();
+        property.FindPropertyRelative("rod").objectReferenceValue = rod;
 
         // 腕・枠・カードをまとめて回す・動かす物（腕が回りながら入ってくる演出）
         RectTransform body = CreateRect("Body", root);

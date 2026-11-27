@@ -34,7 +34,7 @@
 
 | ファイル | 置いてある変数・定数 |
 | --- | --- |
-| `SpaceJunkRoundEvents.cs` | どのイベントが起きているか・始まりと終わりの時刻・画面に出す名前と説明（通信の値 `activeEvent`・`event…`）、`serverEventFinished` |
+| `SpaceJunkRoundEvents.cs` | どのイベントが起きているか・これから起きるか・始まりと終わりの時刻・画面に出す名前と説明（通信の値 `activeEvent`・`upcomingEvent`・`event…`）、`serverEventFinished`・`serverUpcomingEntry`（ラウンドの始まりに選んでおいた候補。ホストだけ） |
 | `SpaceJunkRoundEvents.DebrisSet.cs` | デブリセットのお題・進み具合・ボーナス（通信の値 `set…`）、`serverSetSize`・`MaxSetSize` |
 | `SpaceJunkRoundEvents.Heavy.cs` | 重いデブリの番号・重さ・得点（通信の値 `heavy…`・`stageHeavy…`）、`appliedHeavyIds`・`MinHeavyWeight` |
 | `SpaceJunkRoundEvents.HighValue.cs` | 高価値デブリの種類とボーナス（通信の値 `highValue…`） |
@@ -55,3 +55,5 @@
 | --- | --- | --- |
 | 2026/11/6 | Claude Code | 新規作成（大槻さんの依頼）。長いスクリプトを機能ごとのファイルに分けたので、分け方を書いた |
 | 2026/11/7 | Claude Code | 「変数の置き場所」を足し、ずれやすい行数の列を表から消した（大槻さんの依頼。AIが読んで気づいた弱点の修正） |
+| 2026/11/26 | Claude Code（依頼：大槻 海斗） | イベントをラウンドの始まりに先に選んでおくようにしたので、変数の置き場所に `upcomingEvent`・`serverUpcomingEntry` を足した |
+| 2026/11/27 | Codex（依頼：ソウホイチョン） | 初戦はモニターの演出中に開幕カメラを最初の画で待機させ、完了後に開幕・終了・イベントの時刻を決める。`ServerStartClockAfterMonitor` から `ServerStartRoundClock` を呼ぶ |

@@ -201,6 +201,44 @@
 
 > こういう手順でやったら失敗した、という記録。次に来たAIへの警告。
 
+### ビルドの作り方（2026/11/27・β版を作ったときのやり方）
+
+- Unity エディタを閉じた状態で、一時的なエディタ用スクリプト（既存の `Assets/Scripts/Game/Match/Editor/` に置いた）から `BuildPipeline.BuildPlayer` を呼んだ。`Unity.exe -batchmode -nographics -projectPath … -executeMethod クラス.Run -logFile …`。終わったら .cs と .meta を消す。この PC では Unity は `C:/Program Files/Unity/Hub/Editor/6000.3.14f1/Editor/Unity.exe`。ビルドは約2分。
+- **ビルドの一覧（`EditorBuildSettings.asset`）に、検証用の `Assets/Scenes/Test/LobbyTestVersion.unity` が入っている**（11/5 のコミット 5ff4e78 から）。README の「検証用シーンは製品のビルドに含めない」に合わせ、スクリプト側で `Assets/Scenes/Test/` を外して作った。一覧そのものを直すかは、入れた人に確かめてから。
+- 出力は `StarSweepers/Builds/`（`.gitignore` 済み）。`StarSweepers_BurstDebugInformation_DoNotShip` は配らないので、zip には入れない（`tar.exe -a -c -f x.zip --exclude "*_DoNotShip" フォルダ`）。
+- 画面なしの Unity を動かすと、`ProjectSettings/Packages/com.unity.probuilder/Settings.json` に既定値が1項目書き足される。中身に意味は無いので `git checkout` で戻した。
+
+### 体のプレハブの通信用の番号（GlobalObjectIdHash）が、11/24 から違う値で保存されていた（2026/11/27 に直した）
+
+`SweeperPlayer.prefab` の `NetworkObject` の番号は、もともと `4185652134`。11/24 のコミット `d00dc98`（調整値の保存）で `3160497423` に変わり、そのまま 9 回保存されていた。
+11/27 にスクリプトへ項目を足したら、開いていた Unity が `4185652134` に書き直した。**画面なしの Unity（`-runTests`）で開いても `4185652134` になる**ので、こちらが正しい。
+番号が PC ごとに違うと、オンラインでその体がほかの人の画面に出ない・つながらない原因になる。
+**プレハブの差分に `GlobalObjectIdHash` が出たら、`git log -S"番号" -- プレハブ` で、いつから その値かを見て、元々の値に戻っているのかどうかを確かめる**（勝手に戻さない）。
+
+### `Assets/` の画像を消す・名前を変えるときは、画面なしの Unity の中で行う（2026/11/26）
+
+デザイナーさんが `UI_SET_03_01 1.png` という名前で新しい版を入れ、「古いのを消して、新しいのを `UI_SET_03_01` にして」と頼まれた。OS で消したり名前を変えたりはしない決まりなので、**Unity を閉じた状態で、画面なしの Unity（`-batchmode -executeMethod`）から `AssetDatabase.DeleteAsset` と `AssetDatabase.MoveAsset` を呼んだ**。作業用のスクリプトは一時的に `Editor/` に置き、終わったら消した。
+
+- `MoveAsset` は、うまくいくと**空の文字**を返す（失敗したときだけ理由の文字が入る）
+- 付け替えた画像の `.meta`（見分け番号）は新しい画像の物になるので、古い画像を参照していたプレハブは参照が外れる。**同じ実行の中でプレハブを作り直す**か、参照している所が無いことを先に確かめる
+- 同じ実行の中で、Canvas を Screen Space - Camera にしてカメラで撮れば、UI の見た目を画像で確かめられる（得点バー・ルーレット・デブリセットの腕を並べて確認した）
+
+### もらったアニメーションは「骨が当たるか」と「いちばん上の骨の大きさ」を先に確かめる（2026/11/26）
+
+プレイヤーの動きのアニメーションで、2回つまずいた。どちらもエラーも警告も出ないので、見た目を確かめないと気づけない。
+
+1. **体のモデルが古いリグのままで、新しいアニメーションの骨が1本も当たらなかった**（2026/11/25）。最初はアニメーション側の名前がおかしいと思い、骨の名前を置き換えた複製を作ったが、**原因は体の FBX が書き出し直されていなかったこと**だった。骨が当たらないときは、**アニメーションと体のどちらが新しいかを先にデザイナーさんに聞く**。FBX は骨の名前がそのまま文字で入っているので、`grep -a -c GRP_ExportScale_DO_NOT_TOUCH ファイル` で新しいリグかすぐ分かる。
+2. **書き出し直した Idle・歩きで、体が約 1/3 に縮んだ**（2026/11/26）。いちばん上の骨 `GRP_ExportScale_DO_NOT_TOUCH` の大きさが、体は 3.3、その2つだけ 1.0 で書き出されていた。新しいアニメーションは `AnimationUtility.GetCurveBindings` でこの骨の `m_LocalScale` を見て、体と同じか確かめる。
+
+確かめ方：**本体を開かず、スクラッチに空の Unity プロジェクトを作って FBX を写して調べる**（`-batchmode -quit -projectPath 空のフォルダ -executeMethod`。初回でも1分くらい）。骨が当たるかは `transform.Find(binding.path)`。ポーズの画像は `clip.SampleAnimation` → `Camera.Render()` で撮れるが、**体のプレハブ（Animator 付き）で撮ると皮膚の形が更新されず全部同じポーズに写った**。`SkinnedMeshRenderer.BakeMesh` で焼いた形を別の MeshRenderer に入れて撮ると写る。
+
+
+### Animator の「流している状態か」の判定で、2回つまずいた（2026/11/27）
+
+1. **つなぎ（CrossFade）の途中は、`GetCurrentAnimatorStateInfo` が前の状態を返す。** 「流している間は続ける」判定に使うと、切り替えた次のフレームで「流していない」となって戻してしまう（Pull が見えなかった原因）。`IsInTransition` なら `GetNextAnimatorStateInfo` で見る。テストも「切り替わった」だけでなく「少し待っても続いている」まで確かめる。
+2. **このプロジェクトの「くり返し」は、FBX の Loop Time ではなく、Animator の「自分へ戻る移り変わり」で作っている**（`SweeperAnimationSetup` の `States` の loop 列）。1回だけ流したい状態を loop にしたままだと、終わりが来ずにずっと流れる。loop を変えたら、メニュー **Tools > StarSweepers > プレイヤーのアニメーションを Animator に並べる** を押し直すこと。
+- 体の左手の道具の目印 `LCT_Tool` は、新しいリグの体（`.../JNT_Shoulder_L/JNT_Arm_L/JNT_Hand_L/LCT_Tool`）にもある。**新しいリグは右手も `JNT_Hand_L` という名前**なので、名前だけで探すと右手を拾うことがある。肩（`JNT_Shoulder_L` か `_L2`）からたどること。
+- ブランチ `feature/player-action-animation`（古いリグ）と `feature/player-animation-new-rig`（新しいリグ）が並んでいた。11/27 に前者の変更を後者へ手で移した。**前者はもう使わない。**
 ### スタンは通信で配られていなかった（2026/11/24 に直した）
 
 `PlayerStun.Stun` は、ぶつかられた人のPCで呼ばれるだけで、**他の人の画面では赤い点滅も頭の印も出なかった**（吹き飛ぶ動きは位置が届くので見える）。
@@ -255,6 +293,8 @@
 | 日付 | 書いたAI | 何をしようとして | どう失敗したか | どうすればよかったか |
 | --- | --- | --- | --- | --- |
 | 2026/11/25 | Claude Code | 大槻さんの「試合の背景の星のエフェクトが無い」を調べた | **11/18 のロビーのブランチ（`Sou-Lobby`、PR #28）のマージで、全マップ共通の空の素材 `Resources/SpaceJunkSkybox.mat` が、計算で作る星空（11/17）より前の版に上書きされていた。** Hans さんの空を回す部品 `Script_SkyboxRotation` が `RenderSettings.skybox`（＝この共通の素材）を書き換えて保存するため、古い develop から作ったブランチでこの素材に差分ができ、マージのときに古いほうが採用されたと思われる。この部品は今も `STAGE_Train2`・`HansStages/` の2つ・`WuStage/longstage_01・02` に付いている | マージで `SpaceJunkSkybox.mat` がぶつかったら、**シェーダーが `StarSweepers/ProceduralStarrySky`（guid `8c5d0e83…`）の版を残す**。マージのあとは `grep m_Shader StarSweepers/Assets/Resources/SpaceJunkSkybox.mat` で確かめる。11/25 に `f4959c4` の中身へ戻し、試合では写しを空に貼るようにした（`SpaceJunkSkybox.cs`）。**戻すときの注意：Unity を開いたままだと、閉じるときに Unity が手元の古い版でファイルを上書きする**（1回目はこれでコミットに入らなかった）。Unity を閉じてから戻し、`git hash-object` と `git rev-parse :パス` が同じかを確かめてからコミットする。同じ 11/18 のマージではロビーのゴールの演出も消えていたので、**このマージで消えた物がほかにもあるかもしれない** |
+| 2026/11/26 | Claude Code | タイトル画面（StarSweepersTitle）を作り替えた | ソウホイチョンさんに「渡した画像を使わず、自分で作った物で代わりをしている」と叱られた。Codex は**ノートの画像に描いてある「○確認 ×戻る」を、同じ画像の切り抜き（NotebookLegendBacking）で隠し**、その上に文字「Esc 戻る」を出していた。わたしも、素材が無い部分を内蔵の丸や自分で描いた画像で埋めた。さらに、ボタンの画像がテーマから**再生時（OnEnable）にしか入らず**、シーンには空の Image が保存されていた。フォントも再生時にパソコンのものへ差し替えていた | **まず共有フォルダの `GAME_UI/Title` の画像を全部開いて、どこに何が描いてあるかを確かめる**（ノートの画像には戻る矢印・リング・操作の案内まで入っている）。画像に描いてある物を隠したり、同じ物を作り直したりしない。素材が無い部分は勝手に作らず、**「どの名前の画像が無いか」をユーザーに伝えて**、仮の物はドキュメントに「仮」と書く。見た目は**再生しなくてもシーンに入っている状態**にする（テーマの画像も Image に入れて保存する）。文字は `Assets/Art/Title/HarmonyOS_Sans_SC_Black.ttf` |
+| 2026/11/26 | Claude Code | 本人が Unity エディタを開いている間に、シーン（StarSweepersTitle）を道具で組み替えて、画像で確かめたかった（画面なしの Unity はエディタが開いていると使えない） | 失敗ではなく、うまくいったやり方の記録。computer-use でエディタを前に出すのは、ウィンドウが他の画面の後ろに隠れていて手間取った（`open_application` は「Unity」だと別の版 6000.6 の exe が許可されるので、`request_access` で `Unity.exe` を頼むと動いている 6000.3.14f1 が許可された。前に出すのはタスクバーの Unity をクリック＝File Explorer の許可が要る） | 一時的なエディタ用スクリプトに `[InitializeOnLoad]` で `EditorApplication.update` を登録し、**`Temp/ClaudeBridge/request.txt` があれば中の命令（status・refresh・apply・capture・save）を実行して `result.txt` に結果を書く**「受け口」を作った。最初の1回だけエディタを前に出してコンパイルさせれば、あとは**エディタが裏にあっても**ファイルを置くだけで動く（`refresh` で `AssetDatabase.Refresh()` を呼べば、スクリプトを直したあとのコンパイルも裏で進んだ）。撮影は 11/25 の行と同じく画面を一時的に ScreenSpaceCamera にして `Render()`。**保存（save）の前に `status` で、本人の未保存の変更（dirty）が無いかを確かめる**。使い終わったら .meta ごと消す。ついでに：エディタでは `GetComponent<T>() ?? AddComponent<T>()` は使えない（無い部品が「偽の null」で返り、`??` を通り抜ける）。`TryGetComponent` を使う |
 | 2026/11/25 | Claude Code | 本人が Unity エディタを開いている間に、コンパイルが通るかを確かめた（画面なしの Unity は、エディタが開いていると使えない。`Temp/UnityLockfile` があり、`Unity.exe -projectpath …` の処理が動いていれば開いている） | Git Bash から `dotnet.exe exec csc.dll @写したrsp` を動かしたら、①`/nostdlib` などの `/` 始まりの引数がフォルダの名前に化けた ②`/d/011_Unity/…/csc.dll` の形のパスを dotnet が見つけられなかった | `Library/Bee/artifacts/1900b0aE.dag/Assembly-CSharp.rsp` を作業用の場所へ写し、**`-out:` と `-refout:` の両方**を作業用の場所に書き換える（`-refout` を残すと、エディタの使う ref.dll を上書きしてしまう）。動かすときは `MSYS_NO_PATHCONV=1` を付け、パスは `D:/011_Unity/Editor/6000.3.14f1/Editor/Data/NetCoreRuntime/dotnet.exe exec D:/…/DotNetSdkRoslyn/csc.dll "@写したrsp"` のように `D:/` の形で書く。rsp はエディタが最後にコンパイルしたときのファイルの一覧なので、**新しく足した .cs が入っているか**を `grep` で確かめること |
 | 2026/11/25 | Claude Code | 勝利演出（`MatchVictoryShowcase`。3D をテクスチャに描き、いちばん手前の画面 Screen Space Overlay に貼る形）を、画面なしの Unity（`-batchmode -quit -executeMethod`）で時刻ごとに撮って確かめた | 失敗ではなく、うまくいったやり方の記録。**Screen Space Overlay の画面はカメラの `Render()` では写らない**ので、そのままでは文字や名前の帯が撮れない | 撮る道具の中だけ、画面を `RenderMode.ScreenSpaceCamera` にして UI の層（5）だけ写すカメラを渡し、`演出.DrawAt(秒)` → `Canvas.ForceUpdateCanvases()` → 3D のカメラの `Render()` → UI のカメラの `Render()` の順に呼んで、`ReadPixels` で PNG にする。Screen.width が小さい（画面なし）ときは、演出のテクスチャを 1920×1080 で作るようにしておく。再生していないので `Destroy` は使えず `DestroyImmediate`、`OnDestroy` も呼ばれないので作った物は道具の中で消す。体のモデルは Animator が進まず腕を広げた形で写るが、再生中は待機のアニメーションになる。道具（一時的なエディタ用スクリプト）は使い終わったら .meta ごと消す |
 | 2026/11/18 | Claude Code | Hans さんの服の色・表情の部品（`SG_Character/`）をプレイヤーのプレハブに付けた。本体のフォルダには別の作業（未コミット）があったので、`git worktree` で develop から別フォルダを作り、`Library` を持たずに画面なしの Unity で開いた | ①**ファイル名とクラス名が違う MonoBehaviour**（`Script_CharacterColor.cs` の中が `CharacterColorController`）は、そのままではプレハブに付けられない ②その部品は `MaterialPropertyBlock` で `_SuitColor` を上書きするので、`PlayerStun` が `material` の `_SuitColor` を赤くしても**上書きに隠れて点滅が見えなくなる**ところだった（気づいて `PlayerStun` を直した） ③`Library` 無しの最初の起動は全部の取り込みで **約 6 分**かかった | ①`AssetDatabase.RenameAsset` でファイル名をクラス名に合わせる（2026/11/17 の行のやり方。中身・GUID は変わらず、git では名前の変更として出る）。付けるのは**次の起動**で ②同じ体に `MaterialPropertyBlock` で色を塗る部品が2つあるときは、**同じ項目を両方が触っていないか**を見る。体の色を変える部品を足したら、スタン・爆弾の点滅など「体を一時的に塗る所」を `bodyRenderers`・`material.SetColor` で検索して確かめる ③worktree で急ぐなら、2026/11/17 の行のとおり `Library` を robocopy する |
@@ -658,3 +698,10 @@
 | 2026/11/25 | Claude Code | 「失敗したこと」に、エディタが開いているときに csc でコンパイルを確かめる手順（パスの書き方・-refout も書き換える）を足した |
 | 2026/11/25 | Claude Code | 「失敗したこと」に、空の素材が古いブランチのマージで上書きされたことを書いた |
 | 2026/11/25 | Claude Code | 空の素材の申し送りに、Unity を開いたまま戻すと上書きされることを書き足した |
+| 2026/11/26 | Claude Code（依頼：大槻 海斗） | 「失敗したこと・気をつけること」に、画像を消す・名前を変えるときは画面なしの Unity の中で `DeleteAsset`・`MoveAsset` を使ったことを足した |
+| 2026/11/26 | Claude Code | 「失敗したこと」に、開いているエディタを裏からファイルで動かす受け口のやり方を書いた |
+| 2026/11/26 | Claude Code | 「失敗したこと」に、渡された画像を使わずに作った物で代わりをしていた件を書いた |
+| 2026/11/26 | Claude Code（依頼：小野田 喬） | 「失敗したこと」に、もらったアニメーションの骨が当たらなかった件（原因は体の FBX が古いこと）・骨の大きさで体が縮んだ件・確かめ方を足した |
+| 2026/11/27 | Claude Code（依頼：小野田 喬） | 「失敗したこと」に、Animator の流している判定で2回つまずいた件と、新しいリグの左手の LCT_Tool・2つのブランチの片付けを書いた |
+| 2026/11/27 | Claude Code（依頼：小野田 喬） | 「失敗したこと」に、体のプレハブの通信用の番号（GlobalObjectIdHash）が 11/24 から違う値で保存されていた件を書いた |
+| 2026/11/27 | Claude Code（依頼：小野田 喬） | 「失敗したこと」の先頭に、β版のビルドの作り方と、ビルドの一覧に検証用シーンが入っている件を書いた |

@@ -102,6 +102,23 @@ public class DebrisSetUITests
     }
 
     [Test]
+    public void ArmSwing_TiltsUprightSwingsBackAndSettles()
+    {
+        // 25 度傾いて入り、0.45 でまっすぐ、反対側へ 20 度まで揺れて、最後はまっすぐに止まる
+        Assert.That(DebrisSetUI.ArmSwing(0f, 0.45f, 25f, 20f), Is.EqualTo(25f).Within(1e-3f), "入り始めの傾きが違う");
+        Assert.That(DebrisSetUI.ArmSwing(0.45f, 0.45f, 25f, 20f), Is.EqualTo(0f).Within(1e-3f), "起き上がる時刻にまっすぐでない");
+        Assert.That(DebrisSetUI.ArmSwing(1f, 0.45f, 25f, 20f), Is.EqualTo(0f).Within(1e-3f), "最後にまっすぐに止まっていない");
+
+        float lowest = 0f;
+        for (int i = 0; i <= 1000; i++)
+        {
+            lowest = Mathf.Min(lowest, DebrisSetUI.ArmSwing(i / 1000f, 0.45f, 25f, 20f));
+        }
+
+        Assert.That(lowest, Is.EqualTo(-20f).Within(0.1f), "反対側への揺れの大きさが違う");
+    }
+
+    [Test]
     public void Prefab_IsInResourcesAndWired()
     {
         GameObject prefab = Resources.Load<GameObject>(DebrisSetUI.PrefabResourcePath);
@@ -122,7 +139,7 @@ public class DebrisSetUITests
         for (int p = 0; p < panels.arraySize; p++)
         {
             UnityEditor.SerializedProperty panel = panels.GetArrayElementAtIndex(p);
-            foreach (string part in new[] { "root", "body", "arm", "panel", "bracket", "title" })
+            foreach (string part in new[] { "root", "body", "arm", "rod", "panel", "bracket", "title" })
             {
                 Assert.That(panel.FindPropertyRelative(part).objectReferenceValue, Is.Not.Null, $"枠{p}の {part} が空");
             }

@@ -187,7 +187,7 @@ public class SweeperReel : MonoBehaviour
     [Tooltip("押してから、物資が両手の位置に来るまでの秒数")]
     [SerializeField] private float carryInSeconds = 0.1f;
 
-    [Tooltip("両手の位置に来てから投げるまでの秒数（投げる動きの溜め。アニメーションが来たら合わせる）")]
+    [Tooltip("両手の位置に来てから投げるまでの秒数（投げる動きの溜め。投げるアニメーション AN_Throw の振り下ろす瞬間＝約 0.73 秒に、Carry In Seconds と合わせて合わせる）")]
     [SerializeField] private float carryWindup = 0.25f;
 
     [Tooltip("投げた物が落ちる所：プレイヤーの中心から向いている方向へ何 m（ふつうの引っ張りの Back Distance くらい。クリティカルより弱く）")]
@@ -195,6 +195,12 @@ public class SweeperReel : MonoBehaviour
 
     [Tooltip("投げた物の放物線のいちばん高い所（足元から m）")]
     [SerializeField] private float carryArcHeight = 2.4f;
+
+    [Tooltip("投げるアニメーション（Throw）を流している間は、持った物を両手の真ん中に合わせて動かす（2026/11/25）。OFF なら上の位置のまま")]
+    [SerializeField] private bool carryWithHands = true;
+
+    [Tooltip("両手に合わせるとき、両手の真ん中からさらに体の前へ何 m ずらすか（物が体にめり込まないように）")]
+    [SerializeField] private float carryHandsForward = 0.3f;
 
     [Header("前へ投げる（距離で変わる操作で、押さなかったとき）")]
     [Tooltip("前へ飛ばす速さ（m/秒）")]
@@ -305,6 +311,18 @@ public class SweeperReel : MonoBehaviour
     [Min(0.5f)]
     [SerializeField] private float tugMaxLengthScale = 1.15f;
 
+    [Tooltip("ON：引っ張り合いに負けた人のチームは、勝った人が持っている間その物をつかめない（引っ張り合いも挑めない）。勝った人が投げる・離すと解ける（2026/11/27）")]
+    [SerializeField] private bool tugLoserTeamLockout = true;
+
+    [Header("投げた直後・つかんだ直後のロック（2026/11/27）")]
+    [Tooltip("投げた物は、この秒数のあいだ誰もつかめない（投げた瞬間にほかの人に取られないように）。0 でロックしない")]
+    [Min(0f)]
+    [SerializeField] private float throwLockSeconds = 0.75f;
+
+    [Tooltip("つかんだ物（引っ張り合いに勝って取った物も）は、この秒数のあいだほかの人が引っ張り合いを挑めない。0 でロックしない")]
+    [Min(0f)]
+    [SerializeField] private float grabLockSeconds = 0.75f;
+
     [Header("クリティカルプル")]
     [Tooltip("クリティカルの受付が始まる時刻を、Reel Seconds（手前に着くまでの秒数）の割合で。0.5 なら引き寄せの真ん中。Reel Seconds を変えても同じ所に付いてくる（2026/11/24。前は秒で持っていた）")]
     [Range(0f, 1f)]
@@ -384,6 +402,7 @@ public class SweeperReel : MonoBehaviour
 
     private Collider playerCollider;
     private SweeperShooter shooter;
+    private SweeperAnimation animationPlayer;
 
     /// <summary>つかむ前の物資の重力の設定（離したときに戻す）。</summary>
     private bool itemGravityWas;
@@ -571,6 +590,12 @@ public class SweeperReel : MonoBehaviour
     public event System.Action CarryThrown;
 
     /// <summary>
+    /// 物資を後ろへ引っ張った（押した・クリティカル・手前まで来て引っ張り切った）瞬間に呼ばれる（2026/11/26）。
+    /// 引数は、物資が実際に飛び出すまでの秒数（クリティカルの一瞬止まる間。ふだんは 0）。引っ張るアニメーションの「いちばん引く所」を飛び出す瞬間に合わせるのに使う。
+    /// </summary>
+    public event System.Action<float> PulledBack;
+
+    /// <summary>
     /// **当たってから、物資が「両手で持って投げる」距離（Near Throw Distance）に入るまでの秒数**（ボットが押す時刻に使う）。
     /// いつもの引き寄せは、距離が時間に比例して縮むので計算で出せる。初めからその距離にいれば 0。
     /// </summary>
@@ -597,25 +622,33 @@ public class SweeperReel : MonoBehaviour
     /// </summary>
     public bool CanHook(HookableObject target)
     {
-        // クリティカルで飛んでいる物は、だれもつかめない（2026/11/24）
-        if (target != null && target.IsProtected)
-        {
-            return false;
-        }
-
         if (target == null)
         {
             return false;
         }
 
         NetSupply netSupply = target.GetComponent<NetSupply>();
-        if (netSupply == null || !netSupply.IsSpawned || !IsOnline)
+        bool online = netSupply != null && netSupply.IsSpawned && IsOnline;
+
+        // 自分がつかんでいる物は、ロックに関係なくつかみ直せる
+        if (online && netSupply.IsClaimed && netSupply.HookedByPlayerIndex == MyIndex)
+        {
+            return true;
+        }
+
+        // クリティカルで飛んでいる物・投げた直後の物・つかまれた直後の物は、だれもつかめない（2026/11/24・11/27）
+        if (target.IsProtected)
+        {
+            return false;
+        }
+
+        if (!online)
         {
             // 通信なし：ほかの体がつかんでいる物は、引っ張り合いになれるときだけ
             return !target.IsHooked || CanJoinLocalTug(target, out _);
         }
 
-        if (!netSupply.IsClaimed || netSupply.HookedByPlayerIndex == MyIndex)
+        if (!netSupply.IsClaimed)
         {
             return true;
         }
@@ -681,13 +714,21 @@ public class SweeperReel : MonoBehaviour
     {
         holder = FindLocalHolder(target);
         return holder != null && !holder.tugging && !holder.waitingForClaim && !holder.IsCarrying && !holder.InCriticalWindow
-            && SupplyTug.Of(target) == null && holder.AllowsTug(target, -1, -1);
+            && SupplyTug.Of(target) == null && holder.AllowsTug(target, -1, -1)
+            // 引っ張り合いに負けた人（のチーム）は、勝った人が持っている間は挑めない（2026/11/27）
+            && !target.IsTugLockedOut(holder, this, MyTeam);
     }
 
     /// <summary>オンライン：ほかの人がつかんでいるこの物資に、引っ張り合いで加われそうか（最後はホストが決める）。</summary>
     private bool CanJoinOnlineTug(HookableObject target, NetSupply netSupply)
     {
         if (netSupply.IsTugging || SweeperNetSync.IsPlayerCarrying(netSupply.HookedByPlayerIndex))
+        {
+            return false;
+        }
+
+        // 引っ張り合いに負けた人（のチーム）は、勝った人が持っている間は挑めない（2026/11/27。最後はホストも確かめる）
+        if (netSupply.IsTugLockedOut(MyIndex, MyTeam))
         {
             return false;
         }
@@ -735,15 +776,25 @@ public class SweeperReel : MonoBehaviour
     /// <summary>通信なしの引っ張り合いが決着した。</summary>
     private static void OnLocalTugEnded(SweeperReel holder, SweeperReel challenger, int result)
     {
+        HookableObject target = holder.item != null ? holder.item : challenger.item;
+        bool lockout = holder.tugLoserTeamLockout;
         switch (result)
         {
             case SupplyTug.HolderLost:
                 holder.LoseTug(true);
                 challenger.WinTug();
+                if (lockout && challenger.IsActive && challenger.item == target)
+                {
+                    target.SetTugLock(challenger, holder, holder.MyTeam);
+                }
                 break;
             case SupplyTug.ChallengerLost:
                 challenger.LoseTug(true);
                 holder.WinTug();
+                if (lockout && holder.IsActive && holder.item == target)
+                {
+                    target.SetTugLock(holder, challenger, challenger.MyTeam);
+                }
                 break;
             default:
                 challenger.LoseTug(true);
@@ -751,6 +802,18 @@ public class SweeperReel : MonoBehaviour
                 break;
         }
     }
+
+    /// <summary>自分のチーム（オンラインでチームが決まっているときだけ。ほかは -1）。</summary>
+    private int MyTeam => netPlayer != null && netPlayer.IsSpawned ? netPlayer.TeamIndex : -1;
+
+    /// <summary>投げた物を誰もつかめなくする秒数（ホストも読む）。</summary>
+    public float ThrowLockSeconds => throwLockSeconds;
+
+    /// <summary>つかんだ物にほかの人が引っ張り合いを挑めない秒数（ホストも読む）。</summary>
+    public float GrabLockSeconds => grabLockSeconds;
+
+    /// <summary>引っ張り合いに負けた人のチームを、勝った人が持っている間しめ出すか（ホストも読む）。</summary>
+    public bool TugLoserTeamLockout => tugLoserTeamLockout;
 
     /// <summary>引っ張り合いに勝った：いつもの引き寄せに戻り、いまの位置から引き直す（時間とクリティカルも数え直す）。</summary>
     private void WinTug()
@@ -763,6 +826,12 @@ public class SweeperReel : MonoBehaviour
         tugging = false;
         localTug = null;
         ResumeAfterTug();
+
+        // 取った直後は、ほかの人が続けて引っ張り合いを挑めない（2026/11/27）。オンラインはホストが記録する
+        if (supply == null && item != null && grabLockSeconds > 0f)
+        {
+            item.Protect(grabLockSeconds);
+        }
     }
 
     /// <summary>いまの位置から引き寄せをやり直す。</summary>
@@ -825,6 +894,7 @@ public class SweeperReel : MonoBehaviour
     {
         playerCollider = GetComponent<Collider>();
         shooter = GetComponent<SweeperShooter>();
+        animationPlayer = GetComponent<SweeperAnimation>();
         netPlayer = GetComponent<SweeperNetPlayer>();
         input = PlayerInputSource.Get(this);
         windowStart = CriticalStartSeconds;
@@ -934,6 +1004,11 @@ public class SweeperReel : MonoBehaviour
         {
             StartLocalTug(localHolder);
         }
+        else if (supply == null && grabLockSeconds > 0f)
+        {
+            // つかんだ直後は、ほかの人が引っ張り合いを挑めない（2026/11/27）。オンラインはホストが記録する（NetSupply）
+            item.Protect(grabLockSeconds);
+        }
 
         LightFuseIfBomb(target);
     }
@@ -1009,8 +1084,19 @@ public class SweeperReel : MonoBehaviour
         CarryStarted?.Invoke();
     }
 
-    /// <summary>両手で持つ位置（体の前・胸の高さ）。</summary>
-    private Vector3 CarryPoint => transform.position + Flat(transform.forward) * carryForward + Vector3.up * carryHeight;
+    /// <summary>両手で持つ位置。投げるアニメーションを流している間は両手の真ん中（の少し前）、それ以外は体の前・胸の高さ。</summary>
+    private Vector3 CarryPoint
+    {
+        get
+        {
+            if (carryWithHands && animationPlayer != null && animationPlayer.TryGetHandsCenter(out Vector3 hands))
+            {
+                return hands + Flat(transform.forward) * carryHandsForward;
+            }
+
+            return transform.position + Flat(transform.forward) * carryForward + Vector3.up * carryHeight;
+        }
+    }
 
     /// <summary>
     /// **両手で持った物を、向いている方向へ投げる**（2026/11/24）。落ちる所はプレイヤーの中心から前へ Carry Throw Distance。
@@ -1856,10 +1942,12 @@ public class SweeperReel : MonoBehaviour
         if (critical && hitStopSeconds > 0f)
         {
             StartCoroutine(LaunchAfterStop(body, supply, velocity, hitStopSeconds, protect));
+            PulledBack?.Invoke(hitStopSeconds);
         }
         else
         {
             Launch(body, supply, velocity, protect);
+            PulledBack?.Invoke(0f);
         }
     }
 
@@ -1999,6 +2087,13 @@ public class SweeperReel : MonoBehaviour
     /// <summary><paramref name="protectSeconds"/> が 0 より大きければ、その秒数だけ誰もつかめなくする（クリティカル。ホストにも頼む）。</summary>
     private void Launch(Rigidbody target, NetSupply netSupply, Vector3 velocity, float protectSeconds = 0f)
     {
+        // 投げた物は、少しのあいだ誰もつかめない（投げた瞬間にほかの人に取られないように。2026/11/27）
+        protectSeconds = Mathf.Max(protectSeconds, throwLockSeconds);
+        if (protectSeconds > 0f && target != null)
+        {
+            target.GetComponent<HookableObject>()?.Protect(protectSeconds);
+        }
+
         if (netSupply != null)
         {
             // オンライン：飛ばすのはホスト。計算した速さをそのまま渡し、離した位置から飛ばしてもらう

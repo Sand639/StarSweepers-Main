@@ -63,6 +63,14 @@
 - プレハブ（`Resources/SceneTransition.prefab`）が無くても初期値で動くが、自動テスト（`Prefab_IsInResources`）が失敗する
 - `SpaceJunkSession.ServerStartMatch` は、**状態を「試合中」にしてから約0.5秒後にマップへ移る**ようになった（覆っている間）。その間にもう一度呼ばれても、演出が動いているので2回目のマップ移動は起きない
 
+## モニターの演出（2026/11/27）
+
+`MonitorTransitionEffect` は元画像の2つの透明窓の裏に画面を置き、操作盤を拡大縮小して視点が移るように見せる。前の画と試合結果は描画の最後に `CaptureScreenshotAsTexture` でUIごと記録し、正しい向きで左上に出す。次の画は切り替え後のベースカメラから一枚描く。
+
+`MonitorTransitionEffect.screenNoise` が画面に重ねる2枚のノイズの濃さを決める。`MonitorScreenNoise` は2枚で共用する `tile` を再生中に作り、`lastFrame` を使って砂嵐の模様を毎秒24回ずらす。走査線の間隔の倍数だけ上下にずらすので、線は動かない。操作盤が消えると `tile` も解放する。
+
+`SceneTransition` の `monitorPlaying` は演出中の操作を止める。`monitorTicket` と `nextMonitorTicket` は今回の完了通知を見分ける番号。`monitorWaitingClients` は通知待ちの参加者、`monitorDeadline` は待つ期限。`savedResultFrame` に勝利紹介直前の結果を置き、演出側へ渡すかシーン切り替え時に解放する。
+
 ## 変更ログ
 
 | 日付 | 変更者 | 内容 |
@@ -73,3 +81,5 @@
 丸い色帯はSceneTransitionType.RoundedStripes。RoundedStripesTransitionEffectが6本の帯を右から広げ、次のシーンが届いたら左へ抜く。既存のPlay・PlayForEveryoneで選べる。
 
 | 2026/11/19 | Codex | 丸い色帯の種類と、結果検証からの呼び出しを追記 |
+| 2026/11/27 | Codex（依頼：ソウホイチョン） | 切り替え前と保存した結果が上下逆に見える問題に対応し、ゲーム画面のスクリーンショットに変更。C# コンパイル確認済み、再生確認は未実施 |
+| 2026/11/27 | Codex（依頼：ソウホイチョン） | `IsPlaying` を追加。試合の中断を受けたときに、他の切り替えの終了を判定する |

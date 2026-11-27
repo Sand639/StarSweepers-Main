@@ -6,8 +6,6 @@ using UnityEngine.UI;
 [RequireComponent(typeof(TitleScreen))]
 public sealed class StarSweepersTitlePresentation : MonoBehaviour
 {
-    public const string SceneName = "StarSweepersTitle";
-
     [SerializeField] private RectTransform robotGroup;
     [SerializeField] private RectTransform[] floatingRobots;
     [SerializeField] private Button[] keychainButtons;
