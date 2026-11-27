@@ -2,7 +2,7 @@ using UnityEngine;
 using UnityEngine.SceneManagement;
 
 /// <summary>
-/// **宇宙ごみのマップ（ゲームのシーン）の背景を、星空にする。**（2026/10/28・大槻さん）
+/// **宇宙ごみのマップ（ゲームのシーン）とロビーの背景を、星空にする。**（2026/10/28・大槻さん。ロビーは 2026/11/27 から）
 ///
 /// 星空は `Assets/Resources/SpaceJunkSkybox.mat`。2026/11/17 から、画像ではなく計算で星を描くシェーダー
 /// （`StarSweepers/ProceduralStarrySky`。星ごとに色・大きさ・瞬きが違う）を使っている。説明は Documents/機能ドキュメント/計算で作る星空の背景.md
@@ -11,7 +11,8 @@ using UnityEngine.SceneManagement;
 /// **ラウンドの進行役（<see cref="SpaceJunkRound"/>）がいるシーンが表に出たら、そのシーンの空（RenderSettings.skybox）をこの素材に替える。**
 /// マップのシーンのファイルは書き換えない（13 個のマップを1つずつ直さずに済み、ほかの人のシーンの作業ともぶつからないため）。
 /// 空の差し替えは見た目だけで、ステージの明るさ（環境光）は今までどおり（作り直しをしないので変わらない）。
-/// ロビーやタイトルへ移ると、そのシーンの空に戻る（空はシーンごとの設定なので、元に戻す処理は要らない）。
+/// **ロビーのシーン（`Lobby`）も、表に出たら同じ星空にする**（2026/11/27・大槻さん。シーンのファイルは書き換えない）。
+/// タイトルへ移ると、そのシーンの空に戻る（空はシーンごとの設定なので、元に戻す処理は要らない）。
 ///
 /// シーンに置く物は無い。再生を始めたときに自分で動き出す。
 /// エディタでマップのシーンを開いただけでは星空にならない（再生中だけ）。
@@ -53,7 +54,7 @@ public static class SpaceJunkSkybox
     }
 
     /// <summary>
-    /// **表に出ているシーンに進行役がいれば、空を星空にする。**
+    /// **表に出ているシーンに進行役がいるか、ロビーのシーンなら、空を星空にする。**
     /// シーンを読み込んだときと、表のシーンが替わったときの両方で呼ぶ（どちらが先に来ても間に合うように。2回替えても困らない）。
     /// </summary>
     private static void ApplyIfGameScene()
@@ -70,7 +71,9 @@ public static class SpaceJunkSkybox
             }
         }
 
-        if (!isGameScene)
+        // ロビーのシーン（試合の係が持っている名前。係がまだいなければ、タイトルから入るときの名前）
+        string lobbyScene = SpaceJunkSession.Current != null ? SpaceJunkSession.Current.LobbySceneName : TitleScreen.LobbySceneName;
+        if (!isGameScene && active.name != lobbyScene)
         {
             return;
         }
