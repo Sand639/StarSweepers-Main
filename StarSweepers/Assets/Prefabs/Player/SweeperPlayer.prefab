@@ -65,7 +65,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d5a57f767e5e46a458fc5d3c628d0cbb, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Unity.Netcode.Runtime::Unity.Netcode.NetworkObject
-  GlobalObjectIdHash: 4185652134
+  GlobalObjectIdHash: 3160497423
   InScenePlacedSourceGlobalObjectIdHash: 0
   m_InScenePlacedDisabledByDefault: 0
   DeferredDespawnTick: 0
@@ -420,6 +420,9 @@ MonoBehaviour:
   tugStrainRecovery: 1.5
   tugMaxSeconds: 3
   tugMaxLengthScale: 1.15
+  tugLoserTeamLockout: 1
+  throwLockSeconds: 0.75
+  grabLockSeconds: 0.75
   criticalStartShare: 0.5
   criticalCannotBeStolen: 1
   criticalProtectExtra: 0.3
@@ -774,7 +777,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::SweeperRing
   shape: 0
-  size: 0.2
+  size: 0.6
   thickness: 0.15
   fillAlpha: 0.942
   starInner: 0.5
@@ -782,7 +785,7 @@ MonoBehaviour:
   rotateWithBody: 0
   color: {r: 0.3, g: 0.6, b: 0.95, a: 1}
   material: {fileID: 2100000, guid: 7a484494f321dc940b60859f5bbd7349, type: 2}
-  useShapeLooks: 1
+  useShapeLooks: 0
   shapeLooks:
   - shape: 0
     size: 1.4
