@@ -3,6 +3,7 @@ using System.IO;
 using ProjectEL4S.InputControl;
 using Unity.Netcode;
 using UnityEngine;
+using UnityEngine.InputSystem;
 using UnityEngine.SceneManagement;
 
 /// <summary>
@@ -76,6 +77,12 @@ public class SpaceJunkLobbyUI : MonoBehaviour
     /// </summary>
     private readonly DraggableGuiPanel localPlayersPanel = new DraggableGuiPanel("ロビーコンソール（ボット・挙動・このPCで遊ぶ人数）", 1f, -12f, 260f, 520f);
 
+    /// <summary>
+    /// **ロビーコンソールを 2 キーで隠しているか**（テンキーの 2 も可。押すたびに出す／隠すが切り替わる。2026/11/27・大槻さん）。
+    /// 右上の「通信の様子」の 0 キーと同じ扱い。
+    /// </summary>
+    private bool consoleHiddenByKey;
+
     /// <summary>小窓の文字の見た目。GUI.skin は OnGUI の中でしか使えないので、最初の OnGUI で作る。</summary>
     private GUIStyle labelStyle;
 
@@ -116,6 +123,14 @@ public class SpaceJunkLobbyUI : MonoBehaviour
         if (statusHud != null)
         {
             statusHud.enabled = !SpaceJunkLobbyScreen.IsSettingsOpen;
+        }
+
+        // 2 キーでロビーコンソールを出す／隠す（ゲーム設定に数字を打ち込んでいる間は読まない）
+        Keyboard keyboard = Keyboard.current;
+        if (keyboard != null && !SpaceJunkLobbyScreen.IsTyping &&
+            (keyboard.digit2Key.wasPressedThisFrame || keyboard.numpad2Key.wasPressedThisFrame))
+        {
+            consoleHiddenByKey = !consoleHiddenByKey;
         }
 
         SyncLocalPlayerCount();
@@ -159,14 +174,14 @@ public class SpaceJunkLobbyUI : MonoBehaviour
 
     /// <summary>
     /// 「このPCで遊ぶ人数」の小窓。ロビーにいる間だけ出す（ホストも参加者も、自分のPCの人数を決める）。
-    /// ゲーム設定を開いている間・タイトル画面が出ている間は隠す（重なって読めないため）。
+    /// ゲーム設定を開いている間・タイトル画面が出ている間は隠す（重なって読めないため）。2 キーで隠したときも出さない。
     /// </summary>
     private void OnGUI()
     {
         SpaceJunkSession session = SpaceJunkSession.Current;
         if (session == null || !session.IsSpawned || session.State != SpaceJunkMatchState.Lobby ||
             SpaceJunkRound.Current != null || SpaceJunkLobbyScreen.IsSettingsOpen || TitleScreen.IsVisible ||
-            LobbyTestDeparture.Current?.IsBoarding == true)
+            LobbyTestDeparture.Current?.IsBoarding == true || consoleHiddenByKey)
         {
             return;
         }
