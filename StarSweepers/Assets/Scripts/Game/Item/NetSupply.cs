@@ -142,7 +142,10 @@ public class NetSupply : NetworkBehaviour
         // ホストの記録が「その人が引っ掛け中」のまま残っていた場合に、本人までつかめなくなっていた
         bool takenByOther = IsClaimed && hookedByPlayerIndex.Value != playerIndex;
 
-        if (claimRevision != explosionRevision.Value || takenByOther || hookable.IsVanished || IsProtected)
+        // 投げた直後・クリティカルで飛んでいる間はだれもつかめない（いまつかんでいる本人の掛け直しだけは通す。2026/11/27）
+        bool protectedFromMe = IsProtected && hookedByPlayerIndex.Value != playerIndex;
+
+        if (claimRevision != explosionRevision.Value || takenByOther || hookable.IsVanished || protectedFromMe)
         {
             // すでに誰かが掛けている。記録は変えない（頼んだ人は、記録が自分でないのを見て手を離す）
             return;
@@ -157,7 +160,16 @@ public class NetSupply : NetworkBehaviour
     /// </summary>
     private void ServerGrantClaim(int playerIndex, ulong senderClientId)
     {
+        bool newHolder = hookedByPlayerIndex.Value != playerIndex;
         hookedByPlayerIndex.Value = playerIndex;
+
+        if (newHolder)
+        {
+            // 前の引っ張り合いの負けのロックは、新しくつかんだ人には関係ない
+            ServerSetTugLock(-1, -1, -1);
+            // つかんだ直後は、ほかの人が引っ張り合いを挑めない（2026/11/27）
+            ServerProtect(ReelOf(playerIndex)?.GrabLockSeconds ?? 0f);
+        }
 
         if (senderClientId != NetworkManager.ServerClientId)
         {
@@ -187,8 +199,69 @@ public class NetSupply : NetworkBehaviour
     /// </summary>
     private readonly NetworkVariable<double> protectedUntil = new NetworkVariable<double>(0d);
 
-    /// <summary>いま誰もつかめない（クリティカルで飛んでいる）間か。</summary>
+    /// <summary>いま誰もつかめない（クリティカルで飛んでいる・投げた直後・つかまれた直後）間か。</summary>
     public bool IsProtected => IsSpawned && NetworkManager != null && NetworkManager.ServerTime.Time < protectedUntil.Value;
+
+    /// <summary>**ホストだけ。** いまから <paramref name="seconds"/> 秒、誰もつかめなくする（今より短くはしない）。</summary>
+    private void ServerProtect(float seconds)
+    {
+        if (!IsServer || seconds <= 0f)
+        {
+            return;
+        }
+
+        double until = NetworkManager.ServerTime.Time + seconds;
+        if (until > protectedUntil.Value)
+        {
+            protectedUntil.Value = until;
+        }
+    }
+
+    /// <summary>その参加番号の人の巻き取り（値を読むため）。見つからなければ null。</summary>
+    private static SweeperReel ReelOf(int playerIndex)
+    {
+        SweeperNetPlayer player = playerIndex >= 0 ? FindPlayerByIndex(playerIndex) : null;
+        return player != null ? player.GetComponent<SweeperReel>() : null;
+    }
+
+    // ------------------------------------------------------------
+    // 引っ張り合いに負けた側のロック（2026/11/27）
+    // ------------------------------------------------------------
+
+    /// <summary>引っ張り合いに勝って持っている人の参加番号。この人が持っている間だけロックが効く。-1 でロックなし。</summary>
+    private readonly NetworkVariable<int> tugLockHolder = new NetworkVariable<int>(-1);
+
+    /// <summary>引っ張り合いに負けた人の参加番号。</summary>
+    private readonly NetworkVariable<int> tugLockLoser = new NetworkVariable<int>(-1);
+
+    /// <summary>引っ張り合いに負けた人のチーム（-1 でチームなし。そのときは負けた本人だけ）。</summary>
+    private readonly NetworkVariable<int> tugLockLoserTeam = new NetworkVariable<int>(-1);
+
+    /// <summary>
+    /// この人（参加番号 <paramref name="playerIndex"/>・チーム <paramref name="team"/>）が、引っ張り合いに負けたせいで、
+    /// いまこの物をつかめない（引っ張り合いも挑めない）か。勝った人が投げる・離すと解ける。
+    /// </summary>
+    public bool IsTugLockedOut(int playerIndex, int team)
+    {
+        if (!IsSpawned || tugLockHolder.Value < 0 || hookedByPlayerIndex.Value != tugLockHolder.Value)
+        {
+            return false;
+        }
+
+        return playerIndex == tugLockLoser.Value || (team >= 0 && team == tugLockLoserTeam.Value);
+    }
+
+    private void ServerSetTugLock(int holder, int loser, int loserTeam)
+    {
+        if (!IsServer)
+        {
+            return;
+        }
+
+        if (tugLockHolder.Value != holder) tugLockHolder.Value = holder;
+        if (tugLockLoser.Value != loser) tugLockLoser.Value = loser;
+        if (tugLockLoserTeam.Value != loserTeam) tugLockLoserTeam.Value = loserTeam;
+    }
 
     // ------------------------------------------------------------
     // 引っ張り合い（2026/11/24）
@@ -220,7 +293,8 @@ public class NetSupply : NetworkBehaviour
     private void RequestTugServerRpc(int playerIndex, uint claimRevision)
     {
         if (claimRevision != explosionRevision.Value || !IsClaimed || hookedByPlayerIndex.Value == playerIndex
-            || IsTugging || hookable.IsVanished || IsProtected)
+            || IsTugging || hookable.IsVanished || IsProtected
+            || IsTugLockedOut(playerIndex, SweeperNetPlayer.TeamOfPlayerIndex(playerIndex)))
         {
             return;
         }
@@ -268,6 +342,21 @@ public class NetSupply : NetworkBehaviour
         }
 
         hookedByPlayerIndex.Value = winner;
+
+        // 負けた人のチームは、勝った人が持っている間この物に手を出せない。取った直後は、ほかの人も挑めない（2026/11/27）
+        int loser = winner == holder ? challenger : holder;
+        SweeperReel winnerReel = winnerPlayer.GetComponent<SweeperReel>();
+        if (winnerReel != null && winnerReel.TugLoserTeamLockout)
+        {
+            SweeperNetPlayer loserPlayer = FindPlayerByIndex(loser);
+            ServerSetTugLock(winner, loser, loserPlayer != null ? loserPlayer.TeamIndex : -1);
+        }
+        else
+        {
+            ServerSetTugLock(-1, -1, -1);
+        }
+        ServerProtect(winnerReel != null ? winnerReel.GrabLockSeconds : 0f);
+
         if (winnerPlayer.OwnerClientId != NetworkManager.ServerClientId)
         {
             NetworkObject.ChangeOwnership(winnerPlayer.OwnerClientId);
@@ -304,11 +393,8 @@ public class NetSupply : NetworkBehaviour
             return;
         }
 
-        // クリティカルで投げた物は、飛んでいる間だれもつかめない（2026/11/24）
-        if (protectSeconds > 0f)
-        {
-            protectedUntil.Value = NetworkManager.ServerTime.Time + protectSeconds;
-        }
+        // クリティカルで投げた物は飛んでいる間、ふつうに投げた物も少しの間（Throw Lock Seconds）、だれもつかめない（2026/11/24・11/27）
+        ServerProtect(protectSeconds);
 
         TakeBackOwnership();
 

@@ -53,6 +53,25 @@ public class PlayerStun : MonoBehaviour
     [Tooltip("星に使うマテリアル（Art/Materials/SweeperRing.mat）。空なら再生したときに作るが、ビルドでは出ないことがある")]
     [SerializeField] private Material starMaterial;
 
+    [Header("スタン後の無敵（2026/11/27）")]
+    [Tooltip("スタンが解けてから、この秒数のあいだは新しくスタンしない・吹き飛ばされない（続けてスタンし続けないように）")]
+    [Min(0f)]
+    [SerializeField] private float invincibleSeconds = 2f;
+
+    [Tooltip("スタンし始めてからこの秒数の間だけは、重ねて食らったら長いほうに延ばす（引っ張った爆弾がぶつかって即爆発した、のような同じ出来事の重なり）。過ぎたらスタン中は延びない")]
+    [Min(0f)]
+    [SerializeField] private float stackWindow = 0.3f;
+
+    [Tooltip("ON：無敵の間、体を白っぽく点滅させる")]
+    [SerializeField] private bool blinkWhileInvincible = true;
+
+    [Tooltip("無敵の間に点滅する色")]
+    [SerializeField] private Color invincibleColor = new Color(1f, 1f, 1f);
+
+    [Tooltip("無敵の間、1秒に何回点滅させるか")]
+    [Min(0.1f)]
+    [SerializeField] private float invincibleBlinkPerSecond = 10f;
+
     /// <summary>
     /// スタンした瞬間に呼ばれる（渡ってくるのは秒数）。<see cref="SweeperNetSync"/> がほかの人の画面へ知らせるのに使う。
     /// ほかの人の画面で見た目だけ出すとき（<see cref="Stun(float, bool)"/> の notify が false）は呼ばれない。
@@ -68,6 +87,27 @@ public class PlayerStun : MonoBehaviour
     public float Remaining => Mathf.Max(0f, remaining);
 
     private float remaining;
+
+    // スタンし始めた時刻（重ねて食らったときに延ばしてよいかを見る）
+    private float stunStartTime = -100f;
+
+    // この時刻までは無敵（スタンが解けた瞬間から Invincible Seconds）
+    private float invincibleUntil = -100f;
+
+    // 無敵の点滅中か（終わったら色を戻すため）
+    private bool invincibleBlinking;
+
+    /// <summary>スタンが解けたあとの無敵の間か（新しくスタンしない・吹き飛ばされない）。</summary>
+    public bool IsInvincible => !IsStunned && Time.time < invincibleUntil;
+
+    /// <summary>
+    /// いま新しくスタン・吹き飛ばしを受けるか。無敵の間・スタン中（食らい始めの Stack Window を過ぎたあと）は false。
+    /// 吹き飛ばしの共通の入口（<see cref="MeteorStrikeEvent.ApplyPlayerImpact"/>）と、引っ張った物の当たり判定が見る。
+    /// </summary>
+    public bool CanTakeHit => IsStunned ? Time.time - stunStartTime <= stackWindow : !IsInvincible;
+
+    /// <summary>スタン後の無敵の秒数（インスペクターの値）。</summary>
+    public float InvincibleSeconds => invincibleSeconds;
 
     // 点滅が終わったら戻す色。
     // **スタンが始まる瞬間に、その時点の色を控える。**
@@ -242,9 +282,24 @@ public class PlayerStun : MonoBehaviour
             return;
         }
 
+        // 無敵の間・スタン中（食らい始めを過ぎたあと）は食らわない（2026/11/27）。
+        // ほかの人の画面の見た目だけのスタン（notify が false）は、本人のPCで決まったことなのでそのまま出す
+        if (notify && !CanTakeHit)
+        {
+            return;
+        }
+
         // スタン中に重ねて食らったときは控え直さない（点滅中の赤を控えてしまうため）
         if (!IsStunned)
         {
+            // 無敵の点滅の途中なら、先に元の色へ戻してから控える
+            if (invincibleBlinking)
+            {
+                RestoreColors();
+                invincibleBlinking = false;
+            }
+            invincibleUntil = -100f;
+            stunStartTime = Time.time;
             CaptureColors();
 
             // 転ぶ音は、新しくスタンしたときだけ（重ねて食らったときは鳴らさない）
@@ -293,17 +348,19 @@ public class PlayerStun : MonoBehaviour
     {
         if (remaining <= 0f)
         {
+            UpdateInvincibleBlink();
             return;
         }
 
         remaining -= Time.deltaTime;
 
-        // このフレームで解けた：色と印を元に戻して終わり
+        // このフレームで解けた：色と印を元に戻し、無敵の間に入る
         if (remaining <= 0f)
         {
             remaining = 0f;
             RestoreColors();
             ShowMarker(false);
+            invincibleUntil = Time.time + invincibleSeconds;
             return;
         }
 
@@ -313,6 +370,35 @@ public class PlayerStun : MonoBehaviour
         if (stunMarker != null && !useStars)
         {
             stunMarker.transform.Rotate(Vector3.up, markerSpinSpeed * Time.deltaTime, Space.World);
+        }
+    }
+
+    /// <summary>無敵の間は体を白っぽく点滅させ、終わったら元の色に戻す。</summary>
+    private void UpdateInvincibleBlink()
+    {
+        bool active = blinkWhileInvincible && IsInvincible;
+        if (!active)
+        {
+            if (invincibleBlinking)
+            {
+                RestoreColors();
+                invincibleBlinking = false;
+            }
+            return;
+        }
+
+        invincibleBlinking = true;
+        bool on = Mathf.Repeat(Time.time * invincibleBlinkPerSecond, 1f) < 0.5f;
+        for (int i = 0; i < originalColors.Length; i++)
+        {
+            if (on)
+            {
+                Paint(i, invincibleColor);
+            }
+            else
+            {
+                PaintOriginal(i);
+            }
         }
     }
 

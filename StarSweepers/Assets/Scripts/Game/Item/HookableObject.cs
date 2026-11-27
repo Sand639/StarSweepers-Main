@@ -166,6 +166,42 @@ public class HookableObject : MonoBehaviour
         ProtectedUntil = Mathf.Max(ProtectedUntil, Time.time + seconds);
     }
 
+    // ---- 引っ張り合いに負けた側のロック（通信なしの記録。オンラインは NetSupply が持つ。2026/11/27） ----
+
+    private object tugLockHolder;
+    private object tugLockLoser;
+    private int tugLockLoserTeam = -1;
+
+    /// <summary>
+    /// 引っ張り合いの決着を記録する（通信なし）。<paramref name="holder"/> が持っている間、負けた <paramref name="loser"/>
+    /// （チームが分かれば <paramref name="loserTeam"/> の全員）はこの物をつかめない。
+    /// </summary>
+    public void SetTugLock(object holder, object loser, int loserTeam)
+    {
+        tugLockHolder = holder;
+        tugLockLoser = loser;
+        tugLockLoserTeam = loserTeam;
+    }
+
+    /// <summary>引っ張り合いの負けのロックを外す。</summary>
+    public void ClearTugLock()
+    {
+        tugLockHolder = null;
+        tugLockLoser = null;
+        tugLockLoserTeam = -1;
+    }
+
+    /// <summary>いま <paramref name="holder"/> が持っているこの物を、<paramref name="me"/>（チーム <paramref name="myTeam"/>）がつかめないか（通信なしの記録）。</summary>
+    public bool IsTugLockedOut(object holder, object me, int myTeam)
+    {
+        if (tugLockHolder == null || holder != tugLockHolder)
+        {
+            return false;
+        }
+
+        return me == tugLockLoser || (myTeam >= 0 && myTeam == tugLockLoserTeam);
+    }
+
     /// <summary>引っ張られ始めたことを記録する（<see cref="NetSupply"/> がオンラインで誰かが引っ掛けたと知ったときにも呼ぶ）。</summary>
     public void NotePulled()
     {
@@ -192,6 +228,12 @@ public class HookableObject : MonoBehaviour
         if (hooked && !IsHooked)
         {
             NotePulled();
+        }
+
+        // だれも持たなくなったら、引っ張り合いの負けのロックも外れる
+        if (!hooked)
+        {
+            ClearTugLock();
         }
 
         IsHooked = hooked;
