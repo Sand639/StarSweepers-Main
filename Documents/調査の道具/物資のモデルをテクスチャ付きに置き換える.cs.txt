@@ -1,0 +1,243 @@
+// 物資（Item）のプレハブの見た目（子「Model」）を、Assets/Art/Models/DEBRIS_MODEL/ のテクスチャ付きモデルに置き換える一時ツール。
+// 2026/11/27・Claude Code（依頼：大槻 海斗）。
+//
+// 使い方：プロジェクトの写しの Assets/Editor などに .cs として置き、画面なしの Unity で動かす。
+//   Unity.exe -batchmode -quit -projectPath <写し> -executeMethod TempDebrisModelSwap.Run -logFile <ログ>
+// 終わったら、写しの Assets/Prefabs/Item/*.prefab を本体へ写す（GUID は同じなのでそのまま使える）。
+//
+// やること（プレハブ1つずつ）：
+//   1. 子「Model」が Assets/Art/Models/〇〇.fbx なら、同じ名前の DEBRIS_MODEL/〇〇.fbx を探す
+//   2. 新しいモデルを同じ親・同じ順番・同じ向きと大きさで置き、名前を「Model」にする。有効／無効も合わせる
+//   3. 見た目の真ん中を物資の中心（0,0,0）に合わせる（前の置き換えと同じ決まり）
+//   4. プレハブの中の部品が古いモデルの部品を指していたら（爆弾の点滅など）、新しいモデルの同じ場所の部品に付け替える
+//   5. 種類の色（SpaceJunkMaterial の Tint Renderers）は空にする（テクスチャの色をそのまま見せるため）
+//   6. 古いモデルを消す。BoxCollider の大きさは、新しい見た目の大きさと違うときだけ合わせる
+// 結果（前後の大きさ）はログに [SWAP] で出す。
+using System.Collections.Generic;
+using System.IO;
+using System.Text;
+using UnityEditor;
+using UnityEngine;
+
+public static class TempDebrisModelSwap
+{
+    private const string PrefabFolder = "Assets/Prefabs/Item";
+    private const string OldModelFolder = "Assets/Art/Models/";
+    private const string NewModelFolder = "Assets/Art/Models/DEBRIS_MODEL/";
+
+    public static void Run()
+    {
+        StringBuilder log = new StringBuilder();
+        foreach (string guid in AssetDatabase.FindAssets("t:Prefab", new[] { PrefabFolder }))
+        {
+            string path = AssetDatabase.GUIDToAssetPath(guid);
+            try
+            {
+                SwapOne(path, log);
+            }
+            catch (System.Exception e)
+            {
+                log.AppendLine($"[SWAP] ERROR {path}: {e}");
+            }
+        }
+
+        AssetDatabase.SaveAssets();
+        Debug.Log(log.ToString());
+        File.WriteAllText(Path.Combine(Directory.GetCurrentDirectory(), "swap_result.txt"), log.ToString());
+    }
+
+    private static void SwapOne(string path, StringBuilder log)
+    {
+        GameObject root = PrefabUtility.LoadPrefabContents(path);
+        try
+        {
+            Transform oldModel = root.transform.Find("Model");
+            if (oldModel == null)
+            {
+                log.AppendLine($"[SWAP] skip（Model なし） {path}");
+                return;
+            }
+
+            GameObject source = PrefabUtility.GetCorrespondingObjectFromOriginalSource(oldModel.gameObject);
+            string sourcePath = source != null ? AssetDatabase.GetAssetPath(source) : null;
+            if (string.IsNullOrEmpty(sourcePath) || !sourcePath.StartsWith(OldModelFolder) || sourcePath.StartsWith(NewModelFolder))
+            {
+                log.AppendLine($"[SWAP] skip（元が古いモデルでない：{sourcePath}） {path}");
+                return;
+            }
+
+            string newPath = NewModelFolder + Path.GetFileName(sourcePath);
+            GameObject newAsset = AssetDatabase.LoadAssetAtPath<GameObject>(newPath);
+            if (newAsset == null)
+            {
+                log.AppendLine($"[SWAP] skip（新しいモデルが無い：{newPath}） {path}");
+                return;
+            }
+
+            Bounds oldBounds = LocalBounds(root.transform, oldModel);
+            BoxCollider box = root.GetComponent<BoxCollider>();
+            Vector3 oldBoxSize = box != null ? box.size : Vector3.zero;
+            Vector3 oldBoxCenter = box != null ? box.center : Vector3.zero;
+
+            GameObject newModel = (GameObject)PrefabUtility.InstantiatePrefab(newAsset, root.transform);
+            newModel.name = "Model";
+            newModel.transform.SetSiblingIndex(oldModel.GetSiblingIndex());
+            newModel.transform.localRotation = oldModel.localRotation;
+            newModel.transform.localScale = oldModel.localScale;
+            newModel.transform.localPosition = Vector3.zero;
+            newModel.SetActive(oldModel.gameObject.activeSelf);
+
+            // 見た目の真ん中を中心に合わせる
+            Bounds raw = LocalBounds(root.transform, newModel.transform);
+            newModel.transform.localPosition = -raw.center;
+            Bounds newBounds = LocalBounds(root.transform, newModel.transform);
+
+            // 古いモデルの部品を指している参照を、新しいモデルの同じ場所の部品に付け替える
+            int remapped = RemapReferences(root, oldModel, newModel.transform, log);
+
+            // 種類の色は塗らない（テクスチャを見せる）
+            foreach (SpaceJunkMaterial material in root.GetComponentsInChildren<SpaceJunkMaterial>(true))
+            {
+                SerializedObject so = new SerializedObject(material);
+                SerializedProperty tint = so.FindProperty("tintRenderers");
+                tint.arraySize = 0;
+                so.ApplyModifiedPropertiesWithoutUndo();
+            }
+
+            Object.DestroyImmediate(oldModel.gameObject);
+
+            string boxNote = "BoxCollider なし";
+            if (box != null)
+            {
+                bool sameSize = (box.size - newBounds.size).sqrMagnitude < 0.0004f; // 2cm 以内なら同じとみなす
+                if (!sameSize)
+                {
+                    box.size = newBounds.size;
+                    box.center = Vector3.zero;
+                    boxNote = $"BoxCollider を {Fmt(oldBoxSize)}（中心 {Fmt(oldBoxCenter)}）→ {Fmt(box.size)} に合わせた";
+                }
+                else
+                {
+                    boxNote = $"BoxCollider はそのまま {Fmt(oldBoxSize)}";
+                }
+            }
+
+            PrefabUtility.SaveAsPrefabAsset(root, path);
+            log.AppendLine($"[SWAP] OK {Path.GetFileName(path)} ← {Path.GetFileName(newPath)}　見た目 {Fmt(oldBounds.size)} → {Fmt(newBounds.size)}　{boxNote}　参照の付け替え {remapped} 件");
+        }
+        finally
+        {
+            PrefabUtility.UnloadPrefabContents(root);
+        }
+    }
+
+    /// <summary>プレハブの中の部品の参照のうち、古いモデルの中を指すものを新しいモデルの同じ場所・同じ型に付け替える。</summary>
+    private static int RemapReferences(GameObject root, Transform oldModel, Transform newModel, StringBuilder log)
+    {
+        int count = 0;
+        foreach (Component component in root.GetComponentsInChildren<Component>(true))
+        {
+            if (component == null || component.transform.IsChildOf(oldModel) || component.transform.IsChildOf(newModel))
+            {
+                continue;
+            }
+
+            SerializedObject so = new SerializedObject(component);
+            SerializedProperty it = so.GetIterator();
+            bool changed = false;
+            while (it.Next(true))
+            {
+                if (it.propertyType != SerializedPropertyType.ObjectReference || it.objectReferenceValue == null)
+                {
+                    continue;
+                }
+
+                Object target = it.objectReferenceValue;
+                Transform targetTransform = target is Component c ? c.transform : target is GameObject g ? g.transform : null;
+                if (targetTransform == null || !targetTransform.IsChildOf(oldModel))
+                {
+                    continue;
+                }
+
+                string relative = RelativePath(oldModel, targetTransform);
+                Transform match = string.IsNullOrEmpty(relative) ? newModel : newModel.Find(relative);
+                Object replacement = null;
+                if (target is GameObject)
+                {
+                    replacement = match != null ? match.gameObject : newModel.gameObject;
+                }
+                else
+                {
+                    System.Type type = target.GetType();
+                    replacement = match != null ? match.GetComponent(type) : null;
+                    if (replacement == null)
+                    {
+                        // 同じ場所に無ければ、新しいモデルの中の同じ型の最初の部品
+                        replacement = newModel.GetComponentInChildren(type, true);
+                    }
+                }
+
+                log.AppendLine($"[SWAP]   参照 {component.GetType().Name}.{it.propertyPath}: {target.name}（{target.GetType().Name}）→ {(replacement != null ? replacement.name : "なし")}");
+                it.objectReferenceValue = replacement;
+                changed = true;
+                count++;
+            }
+
+            if (changed)
+            {
+                so.ApplyModifiedPropertiesWithoutUndo();
+            }
+        }
+
+        return count;
+    }
+
+    private static string RelativePath(Transform root, Transform target)
+    {
+        List<string> names = new List<string>();
+        for (Transform t = target; t != null && t != root; t = t.parent)
+        {
+            names.Insert(0, t.name);
+        }
+
+        return string.Join("/", names);
+    }
+
+    /// <summary>モデルの見た目（Renderer）を囲む箱を、プレハブの一番上から見た座標で返す。</summary>
+    private static Bounds LocalBounds(Transform root, Transform model)
+    {
+        bool has = false;
+        Bounds bounds = new Bounds();
+        foreach (MeshFilter filter in model.GetComponentsInChildren<MeshFilter>(true))
+        {
+            if (filter.sharedMesh == null)
+            {
+                continue;
+            }
+
+            Bounds mb = filter.sharedMesh.bounds;
+            Matrix4x4 m = root.worldToLocalMatrix * filter.transform.localToWorldMatrix;
+            for (int i = 0; i < 8; i++)
+            {
+                Vector3 corner = mb.center + Vector3.Scale(mb.extents, new Vector3((i & 1) == 0 ? -1 : 1, (i & 2) == 0 ? -1 : 1, (i & 4) == 0 ? -1 : 1));
+                Vector3 p = m.MultiplyPoint3x4(corner);
+                if (!has)
+                {
+                    bounds = new Bounds(p, Vector3.zero);
+                    has = true;
+                }
+                else
+                {
+                    bounds.Encapsulate(p);
+                }
+            }
+        }
+
+        return bounds;
+    }
+
+    private static string Fmt(Vector3 v)
+    {
+        return $"{v.x:0.00}×{v.y:0.00}×{v.z:0.00}";
+    }
+}
