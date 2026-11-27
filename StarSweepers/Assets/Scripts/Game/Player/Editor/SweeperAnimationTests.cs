@@ -86,6 +86,8 @@ public class SweeperAnimationTests
             anim.PlayIdle();
             anim.PlayPullRelease(0f);
             yield return WaitState(animator, "Pull", 0.5f);
+            yield return Wait(0.4f);
+            Assert.That(State(animator), Is.EqualTo("Pull"), "Pull がすぐ切れている");
             yield return WaitState(animator, "Idle", 2.5f);
         }
         finally
@@ -188,6 +190,10 @@ public class SweeperAnimationTests
             float seconds = info.normalizedTime * info.length;
             Debug.Log($"[SweeperAnimationTests] 引っ張った結果={reel.LastResult} 押した直後の Pull の位置={seconds:F2} 秒");
             Assert.That(seconds, Is.InRange(0.8f, 1.0f), "Pull が「いちばん引く所」の少し前から流れていない");
+
+            // すぐ Idle に戻されず、Pull が続いている（2026/11/27：つなぎの途中で Idle に戻されて見えなかった不具合）
+            yield return Wait(0.4f);
+            Assert.That(State(animator), Is.EqualTo("Pull"), "引っ張った直後に Pull が切れて、見えていない");
 
             // 振り切ったら Idle に戻る
             yield return WaitState(animator, "Idle", 2f);

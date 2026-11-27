@@ -418,10 +418,13 @@ public class SweeperAnimation : MonoBehaviour
         return characterController != null && !characterController.enabled ? 0f : mover.CurrentSpeed;
     }
 
-    /// <summary>その状態を流していて、まだ終わりまで来ていないか。</summary>
+    /// <summary>
+    /// その状態を流していて、まだ終わりまで来ていないか。**つなぎ（クロスフェード）の途中なら、行き先の状態で見る。**
+    /// （2026/11/27：前は今の状態だけを見ていたので、Pull へつないでいる途中は「Pull を流していない」と判定され、次のフレームで Idle に戻されて Pull が見えなかった）
+    /// </summary>
     private bool IsPlaying(int hash)
     {
-        AnimatorStateInfo state = animator.GetCurrentAnimatorStateInfo(0);
+        AnimatorStateInfo state = animator.IsInTransition(0) ? animator.GetNextAnimatorStateInfo(0) : animator.GetCurrentAnimatorStateInfo(0);
         return state.shortNameHash == hash && state.normalizedTime < 1f;
     }
 
