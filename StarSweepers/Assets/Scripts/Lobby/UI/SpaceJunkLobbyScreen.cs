@@ -82,6 +82,12 @@ public partial class SpaceJunkLobbyScreen : MonoBehaviour
     public static bool BlocksEscape => IsSettingsOpen || closedByBackFrame == Time.frameCount;
 
     /// <summary>
+    /// **左上の案内を 1 キーで隠しているか**（テンキーの 1 も可。押すたびに出す／隠すが切り替わる。2026/11/27・大槻さん）。
+    /// 右上の「通信の様子」の 0 キーと同じ扱い。ロビーに戻り直しても、隠したままにするため static にしている。
+    /// </summary>
+    private static bool hudHiddenByKey;
+
+    /// <summary>
     /// プレハブの中の部品を、役割（印 <see cref="SpaceJunkLobbyPart"/>）で引けるようにしたもの。
     /// 同じ役割が2つあれば最初に見つかったほう。行の見本の中の部品は入れない。
     /// </summary>
@@ -188,7 +194,14 @@ public partial class SpaceJunkLobbyScreen : MonoBehaviour
         bool connected = manager != null && (manager.IsServer || manager.IsConnectedClient);
         bool inLobby = connected && SpaceJunkRound.Current == null;
 
-        SetActive(SpaceJunkLobbyPartRole.Hud, inLobby && !IsSettingsOpen);
+        // 1 キーで左上の案内を出す／隠す（数字を打ち込んでいる間は読まない）
+        Keyboard keyboard = Keyboard.current;
+        if (keyboard != null && !IsTyping && (keyboard.digit1Key.wasPressedThisFrame || keyboard.numpad1Key.wasPressedThisFrame))
+        {
+            hudHiddenByKey = !hudHiddenByKey;
+        }
+
+        SetActive(SpaceJunkLobbyPartRole.Hud, inLobby && !IsSettingsOpen && !hudHiddenByKey);
 
         SpaceJunkSession session = SpaceJunkSession.Current;
         SpaceJunkLobbyTerminal terminal = SpaceJunkLobbyTerminal.Current;
