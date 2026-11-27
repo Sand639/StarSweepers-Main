@@ -83,9 +83,9 @@ public partial class SpaceJunkLobbyScreen : MonoBehaviour
 
     /// <summary>
     /// **左上の案内を 1 キーで隠しているか**（テンキーの 1 も可。押すたびに出す／隠すが切り替わる。2026/11/27・大槻さん）。
-    /// 右上の「通信の様子」の 0 キーと同じ扱い。ロビーに戻り直しても、隠したままにするため static にしている。
+    /// 右上の「通信の様子」の 0 キーと同じ扱いで、**最初は隠しておく**（2026/11/27・大槻さん）。ロビーに戻り直しても、前の状態のままにするため static にしている。
     /// </summary>
-    private static bool hudHiddenByKey;
+    private static bool hudHiddenByKey = true;
 
     /// <summary>
     /// プレハブの中の部品を、役割（印 <see cref="SpaceJunkLobbyPart"/>）で引けるようにしたもの。

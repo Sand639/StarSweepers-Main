@@ -79,9 +79,9 @@ public class SpaceJunkLobbyUI : MonoBehaviour
 
     /// <summary>
     /// **ロビーコンソールを 2 キーで隠しているか**（テンキーの 2 も可。押すたびに出す／隠すが切り替わる。2026/11/27・大槻さん）。
-    /// 右上の「通信の様子」の 0 キーと同じ扱い。
+    /// 右上の「通信の様子」の 0 キーと同じ扱いで、**最初は隠しておく**（2026/11/27・大槻さん）。
     /// </summary>
-    private bool consoleHiddenByKey;
+    private bool consoleHiddenByKey = true;
 
     /// <summary>小窓の文字の見た目。GUI.skin は OnGUI の中でしか使えないので、最初の OnGUI で作る。</summary>
     private GUIStyle labelStyle;
