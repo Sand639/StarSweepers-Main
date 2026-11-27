@@ -772,7 +772,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::SweeperRing
   shape: 0
-  size: 0.8
+  size: 0.2
   thickness: 0.15
   fillAlpha: 0.942
   starInner: 0.5
