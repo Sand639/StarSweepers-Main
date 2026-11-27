@@ -39,6 +39,26 @@ public class SweeperAnimationTests
     }
 
     [UnityTest]
+    public IEnumerator PressBack_PullPeaksAtLaunch()
+    {
+        yield return new EnterPlayMode();
+        yield return RunPullBack();
+        yield return new ExitPlayMode();
+    }
+
+    [Test]
+    public void Muzzle_IsOnLeftHandGun()
+    {
+        GameObject prefab = AssetDatabase.LoadAssetAtPath<GameObject>(PlayerPrefabPath);
+        SweeperShooter shooter = prefab.GetComponent<SweeperShooter>();
+        Transform muzzle = new SerializedObject(shooter).FindProperty("muzzle").objectReferenceValue as Transform;
+        Assert.That(muzzle, Is.Not.Null, "SweeperShooter の Muzzle が空");
+        Assert.That(muzzle.parent.name, Is.EqualTo("Gun"), "Muzzle は銃の子のはず");
+        Assert.That(muzzle.parent.parent.name, Is.EqualTo("LCT_Tool"), "銃は左手の道具の位置（LCT_Tool）に付いているはず");
+        Assert.That(muzzle.parent.parent.parent.name, Is.EqualTo("JNT_Hand_L"), "銃は左手に付いているはず");
+    }
+
+    [UnityTest]
     public IEnumerator FallingOffGround_PlaysDropThenLoop()
     {
         yield return new EnterPlayMode();
@@ -65,13 +85,18 @@ public class SweeperAnimationTests
             // Shoot（1 秒）が終わったら AimWalk に戻る
             yield return WaitState(animator, "AimWalk", 2f);
 
+            // 巻き取っている間は構えたまま（2026/11/26：前は Pull をくり返していた）
             anim.PlayPull();
-            yield return WaitState(animator, "Pull", 0.5f);
-            yield return Wait(2.5f);
-            Assert.That(State(animator), Is.EqualTo("Pull"), "Pull はくり返し続くはず");
+            yield return Wait(0.3f);
+            Assert.That(State(animator), Is.EqualTo("AimWalk"), "巻き取っている間は AimWalk のはず");
 
+            // 引っ張った：Pull を途中から1回流し、終わったら Idle に戻る
             anim.PlayIdle();
-            yield return WaitState(animator, "Idle", 0.5f);
+            anim.PlayPullRelease(0f);
+            yield return WaitState(animator, "Pull", 0.5f);
+            yield return Wait(0.4f);
+            Assert.That(State(animator), Is.EqualTo("Pull"), "Pull がすぐ切れている");
+            yield return WaitState(animator, "Idle", 2.5f);
         }
         finally
         {
@@ -184,6 +209,62 @@ public class SweeperAnimationTests
         finally
         {
             Object.Destroy(player);
+            Object.Destroy(ground);
+        }
+    }
+
+    /// <summary>離れた物資を巻き取っている途中で押す → 後ろへ飛ぶ瞬間に、Pull の「いちばん引く所」の近くまで来ているか。</summary>
+    private static IEnumerator RunPullBack()
+    {
+        PlayerBehaviorPattern[] before = PlayerBehavior.CopySaved();
+        PlayerBehaviorPattern[] normal = PlayerBehavior.CopySaved();
+        PlayerBehavior.Assign(normal, PlayerBehaviorStep.Pull, PlayerBehaviorPattern.A);
+        PlayerBehavior.Save(normal);
+
+        GameObject ground = MakeGround();
+        GameObject player = Object.Instantiate(AssetDatabase.LoadAssetAtPath<GameObject>(PlayerPrefabPath), Vector3.zero, Quaternion.identity);
+        GameObject box = GameObject.CreatePrimitive(PrimitiveType.Cube);
+        try
+        {
+            player.GetComponent<SweeperMover>().enabled = false;
+            Animator animator = player.GetComponentInChildren<Animator>();
+            animator.cullingMode = AnimatorCullingMode.AlwaysAnimate;
+            box.transform.position = new Vector3(0f, 0.5f, 6f);
+            box.transform.localScale = Vector3.one * 0.5f;
+            box.AddComponent<Rigidbody>();
+            HookableObject hookable = box.AddComponent<HookableObject>();
+            yield return Wait(0.3f);
+
+            SweeperReel reel = player.GetComponent<SweeperReel>();
+            SweeperAnimation anim = player.GetComponent<SweeperAnimation>();
+            reel.Begin(hookable);
+            anim.PlayPull();
+            yield return Wait(0.2f);
+            Assert.That(State(animator), Is.EqualTo("AimWalk"), "巻き取っている間は AimWalk のはず");
+
+            reel.Press();
+            Assert.That(reel.IsActive, Is.False, "押したのに、後ろへ飛ばしていない");
+            anim.PlayIdle();
+            yield return WaitState(animator, "Pull", 0.3f);
+
+            // 押してから 0.1 秒（Pull Lead Seconds）ほどで、いちばん引く所（0.95 秒）に来る
+            AnimatorStateInfo info = animator.IsInTransition(0) ? animator.GetNextAnimatorStateInfo(0) : animator.GetCurrentAnimatorStateInfo(0);
+            float seconds = info.normalizedTime * info.length;
+            Debug.Log($"[SweeperAnimationTests] 引っ張った結果={reel.LastResult} 押した直後の Pull の位置={seconds:F2} 秒");
+            Assert.That(seconds, Is.InRange(0.8f, 1.0f), "Pull が「いちばん引く所」の少し前から流れていない");
+
+            // すぐ Idle に戻されず、Pull が続いている（2026/11/27：つなぎの途中で Idle に戻されて見えなかった不具合）
+            yield return Wait(0.4f);
+            Assert.That(State(animator), Is.EqualTo("Pull"), "引っ張った直後に Pull が切れて、見えていない");
+
+            // 振り切ったら Idle に戻る
+            yield return WaitState(animator, "Idle", 2f);
+        }
+        finally
+        {
+            PlayerBehavior.Save(before);
+            Object.Destroy(player);
+            Object.Destroy(box);
             Object.Destroy(ground);
         }
     }

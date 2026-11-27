@@ -22,7 +22,7 @@ public static class SweeperAnimationSetup
         ("Walk", "AN_Move.fbx", true, new Vector2(300, 250)),
         ("AimWalk", "AN_AimWalk.fbx", true, new Vector2(600, 50)),
         ("Shoot", "AN_Shoot.fbx", false, new Vector2(600, 150)),
-        ("Pull", "AN_Pull.fbx", true, new Vector2(600, 250)),
+        ("Pull", "AN_Pull.fbx", false, new Vector2(600, 250)), // 2026/11/26：引っ張った瞬間に1回だけ流す形にしたので、くり返さない
         ("Throw", "AN_Throw.fbx", false, new Vector2(600, 350)),
         ("Drop", "AN_Drop.fbx", false, new Vector2(300, 450)),
         ("DropLoot", "AN_DropLoot.fbx", true, new Vector2(300, 550)),

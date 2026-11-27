@@ -578,6 +578,12 @@ public class SweeperReel : MonoBehaviour
     public event System.Action CarryThrown;
 
     /// <summary>
+    /// 物資を後ろへ引っ張った（押した・クリティカル・手前まで来て引っ張り切った）瞬間に呼ばれる（2026/11/26）。
+    /// 引数は、物資が実際に飛び出すまでの秒数（クリティカルの一瞬止まる間。ふだんは 0）。引っ張るアニメーションの「いちばん引く所」を飛び出す瞬間に合わせるのに使う。
+    /// </summary>
+    public event System.Action<float> PulledBack;
+
+    /// <summary>
     /// **当たってから、物資が「両手で持って投げる」距離（Near Throw Distance）に入るまでの秒数**（ボットが押す時刻に使う）。
     /// いつもの引き寄せは、距離が時間に比例して縮むので計算で出せる。初めからその距離にいれば 0。
     /// </summary>
@@ -1875,10 +1881,12 @@ public class SweeperReel : MonoBehaviour
         if (critical && hitStopSeconds > 0f)
         {
             StartCoroutine(LaunchAfterStop(body, supply, velocity, hitStopSeconds, protect));
+            PulledBack?.Invoke(hitStopSeconds);
         }
         else
         {
             Launch(body, supply, velocity, protect);
+            PulledBack?.Invoke(0f);
         }
     }
 

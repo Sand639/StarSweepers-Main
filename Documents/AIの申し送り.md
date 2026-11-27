@@ -210,6 +210,13 @@
 
 確かめ方：**本体を開かず、スクラッチに空の Unity プロジェクトを作って FBX を写して調べる**（`-batchmode -quit -projectPath 空のフォルダ -executeMethod`。初回でも1分くらい）。骨が当たるかは `transform.Find(binding.path)`。ポーズの画像は `clip.SampleAnimation` → `Camera.Render()` で撮れるが、**体のプレハブ（Animator 付き）で撮ると皮膚の形が更新されず全部同じポーズに写った**。`SkinnedMeshRenderer.BakeMesh` で焼いた形を別の MeshRenderer に入れて撮ると写る。
 
+
+### Animator の「流している状態か」の判定で、2回つまずいた（2026/11/27）
+
+1. **つなぎ（CrossFade）の途中は、`GetCurrentAnimatorStateInfo` が前の状態を返す。** 「流している間は続ける」判定に使うと、切り替えた次のフレームで「流していない」となって戻してしまう（Pull が見えなかった原因）。`IsInTransition` なら `GetNextAnimatorStateInfo` で見る。テストも「切り替わった」だけでなく「少し待っても続いている」まで確かめる。
+2. **このプロジェクトの「くり返し」は、FBX の Loop Time ではなく、Animator の「自分へ戻る移り変わり」で作っている**（`SweeperAnimationSetup` の `States` の loop 列）。1回だけ流したい状態を loop にしたままだと、終わりが来ずにずっと流れる。loop を変えたら、メニュー **Tools > StarSweepers > プレイヤーのアニメーションを Animator に並べる** を押し直すこと。
+- 体の左手の道具の目印 `LCT_Tool` は、新しいリグの体（`.../JNT_Shoulder_L/JNT_Arm_L/JNT_Hand_L/LCT_Tool`）にもある。**新しいリグは右手も `JNT_Hand_L` という名前**なので、名前だけで探すと右手を拾うことがある。肩（`JNT_Shoulder_L` か `_L2`）からたどること。
+- ブランチ `feature/player-action-animation`（古いリグ）と `feature/player-animation-new-rig`（新しいリグ）が並んでいた。11/27 に前者の変更を後者へ手で移した。**前者はもう使わない。**
 ### スタンは通信で配られていなかった（2026/11/24 に直した）
 
 `PlayerStun.Stun` は、ぶつかられた人のPCで呼ばれるだけで、**他の人の画面では赤い点滅も頭の印も出なかった**（吹き飛ぶ動きは位置が届くので見える）。
@@ -668,3 +675,4 @@
 | 2026/11/25 | Claude Code | 「失敗したこと」に、空の素材が古いブランチのマージで上書きされたことを書いた |
 | 2026/11/25 | Claude Code | 空の素材の申し送りに、Unity を開いたまま戻すと上書きされることを書き足した |
 | 2026/11/26 | Claude Code（依頼：小野田 喬） | 「失敗したこと」に、もらったアニメーションの骨が当たらなかった件（原因は体の FBX が古いこと）・骨の大きさで体が縮んだ件・確かめ方を足した |
+| 2026/11/27 | Claude Code（依頼：小野田 喬） | 「失敗したこと」に、Animator の流している判定で2回つまずいた件と、新しいリグの左手の LCT_Tool・2つのブランチの片付けを書いた |
