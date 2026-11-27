@@ -65,7 +65,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d5a57f767e5e46a458fc5d3c628d0cbb, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Unity.Netcode.Runtime::Unity.Netcode.NetworkObject
-  GlobalObjectIdHash: 3160497423
+  GlobalObjectIdHash: 4185652134
   InScenePlacedSourceGlobalObjectIdHash: 0
   m_InScenePlacedDisabledByDefault: 0
   DeferredDespawnTick: 0
@@ -177,6 +177,11 @@ MonoBehaviour:
   starOrbitSpeed: 320
   starColor: {r: 1, g: 0.86, b: 0.25, a: 1}
   starMaterial: {fileID: 2100000, guid: 7a484494f321dc940b60859f5bbd7349, type: 2}
+  invincibleSeconds: 2
+  stackWindow: 0.3
+  blinkWhileInvincible: 1
+  invincibleColor: {r: 1, g: 1, b: 1, a: 1}
+  invincibleBlinkPerSecond: 10
 --- !u!114 &4960064378279901257
 MonoBehaviour:
   m_ObjectHideFlags: 0
